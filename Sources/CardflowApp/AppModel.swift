@@ -34,6 +34,8 @@ final class AppModel {
     var cardEjected = false            // cartão foi ejetado automaticamente ao terminar com sucesso
     var ejectError: String?           // ejeção falhou (disco ocupado) → avisa pra ejetar à mão
     var availableUpdate: UpdateInfo?  // versão mais nova no GitHub (checagem discreta no start)
+    var offloadStartedAt: Date?       // início da transferência (cronômetro ao vivo)
+    var lastElapsed: TimeInterval?    // duração total da última transferência (mostrada no fim)
     var forcedSources: Set<String> = []        // discos que o usuário marcou como fonte (override)
     var forcedDestinations: Set<String> = []   // discos que o usuário marcou como destino (override)
     var selectedCardURL: URL?                  // qual fonte está ativa quando há várias
@@ -336,6 +338,7 @@ final class AppModel {
         var session = sessionValues
         session["camera"] = camera
         cardEjected = false; ejectError = nil
+        offloadStartedAt = Date(); lastElapsed = nil
         state = .running(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0))
 
         Task.detached { [weak self] in
@@ -354,6 +357,7 @@ final class AppModel {
                 )
                 await MainActor.run {
                     guard let self else { return }
+                    if let s = self.offloadStartedAt { self.lastElapsed = Date().timeIntervalSince(s) }
                     self.state = .finished(outcome)
                     // só ejeta quando ALGO foi de fato salvo (copiado agora ou já presente): um cartão
                     // vazio / filtro errado não pode dar luz verde + ejeção (engana o operador).
@@ -391,6 +395,7 @@ final class AppModel {
     func reset() {
         state = .idle
         cardEjected = false; ejectError = nil
+        offloadStartedAt = nil; lastElapsed = nil
         backupURL = nil; backupFreeBytes = nil; backupTotalBytes = nil
     }
 }

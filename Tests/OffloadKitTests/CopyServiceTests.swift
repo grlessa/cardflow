@@ -293,15 +293,15 @@ import Foundation
     @Test func manifestWriteFailureIsSurfacedNotSwallowed() throws {
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let fm = FileManager.default
-        // cartão SÓ com uma foto (sem sidecar — o sidecar-aside também escreveria sob _cardflow)
+        // cartão SÓ com uma foto (sem sidecar — o sidecar-aside também escreveria sob .cardflow)
         let card = work.appendingPathComponent("CARD")
         try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
         fm.createFile(atPath: card.appendingPathComponent("DCIM/100/DSC1.JPG").path, contents: Data("foto".utf8))
-        // bloqueia o manifesto: ARQUIVO onde _cardflow seria a pasta → createDirectory falha
+        // bloqueia o manifesto: ARQUIVO onde .cardflow seria a pasta → createDirectory falha
         let dest = work.appendingPathComponent("SSD")
         let offloadDir = dest.appendingPathComponent("Offload")
         try fm.createDirectory(at: offloadDir, withIntermediateDirectories: true)
-        fm.createFile(atPath: offloadDir.appendingPathComponent("_cardflow").path, contents: Data())
+        fm.createFile(atPath: offloadDir.appendingPathComponent(".cardflow").path, contents: Data())
 
         let service = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
         let outcome = try service.run(cardRoot: card, chosenMedia: .both, destinations: [dest], camera: "Cam")
@@ -393,7 +393,7 @@ import Foundation
 
         #expect(o.verifiedCount == 1)        // só o vídeo
         #expect(o.sidecarsCopied == 0)
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/_cardflow/sidecars/PRIVATE/M4ROOT/CLIP/C0001M01.XML").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/.cardflow/sidecars/PRIVATE/M4ROOT/CLIP/C0001M01.XML").path))
     }
 
     // O CAMINHO MAIS CRÍTICO: se a conferência falha (corrupção/disco ruim), a falha PRECISA ser

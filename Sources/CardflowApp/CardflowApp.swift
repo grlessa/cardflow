@@ -7,9 +7,10 @@ struct CardflowApp: App {
         WindowGroup {
             MainView()
                 .environment(model)
-                .frame(minWidth: 760, minHeight: 560)
+                .frame(minWidth: 820, minHeight: 720)   // min REAL da janela (com .contentMinSize)
                 .onAppear { model.start() }
         }
         .windowResizability(.contentMinSize)
+        .defaultSize(width: 960, height: 800)            // tamanho de abertura confortável
     }
 }

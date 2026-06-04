@@ -365,11 +365,11 @@ public struct CopyService {
             }
         }
 
-        // 3) sidecars (só se a política for .aside): vão pra _cardflow/sidecars; não contam bytes
+        // 3) sidecars (só se a política for .aside): vão pra .cardflow/sidecars; não contam bytes
         //    nem entram no verifiedCount de mídia (são contados à parte em sidecarsCopied).
         if preset.copySidecars == .aside {
             for file in sidecars {
-                try copyOne(file, "\(eventoRoot)/_cardflow/sidecars/\(file.relPath)", countsBytes: false, asSidecar: true)
+                try copyOne(file, "\(eventoRoot)/.cardflow/sidecars/\(file.relPath)", countsBytes: false, asSidecar: true)
             }
         }
 
@@ -407,7 +407,7 @@ public struct CopyService {
             do {
                 // defesa em profundidade: o manifesto é o único write fora do copyFile; garante
                 // que ele também fica dentro do destino (eventoRoot já é saneado, mas não custa).
-                try assertContained("\(eventoRoot)/_cardflow", in: [dest])
+                try assertContained("\(eventoRoot)/.cardflow", in: [dest])
                 let url = try manifestStore.write(manifest, eventRootIn: dest, eventName: eventoRoot)
                 manifestPaths.append(url.path)
             } catch {

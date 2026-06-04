@@ -12,7 +12,7 @@ public struct ManifestStore {
     }()
 
     private func cardflowDir(in destinationRoot: URL, eventName: String) -> URL {
-        destinationRoot.appendingPathComponent(eventName).appendingPathComponent("_cardflow")
+        destinationRoot.appendingPathComponent(eventName).appendingPathComponent(".cardflow")
     }
 
     @discardableResult

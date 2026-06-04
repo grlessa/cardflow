@@ -23,8 +23,8 @@ struct MainView: View {
             let s = min(max(min(size.width / 1180, size.height / 760), 1.0), 1.35)
             // largura proporcional (piso 250 / teto 540): nunca encosta na borda nem estica demais.
             cardW = min(max(size.width * 0.31, 250), 540)
-            cardH = min(max(size.height - 200, 360), 410)   // altura cresce pouco (form não estica)
-            icon = 54 * s
+            cardH = min(max(size.height - 300, 360), 390)   // altura confortável e teto fixo: a sobra
+            icon = 66 * s                                    // vira respiro (gap pro botão) em vez de esticar o card
             name = 22 * s
             gb = 25 * s
             arrow = 30 * s
@@ -78,7 +78,7 @@ struct MainView: View {
                 // MEIO — cartão → fluxo → destino (cards crescem com a janela)
                 HStack(alignment: .center, spacing: m.gap) {
                     cardPanel(model, m)
-                    TransferFlow(state: model.state, canStart: model.canStart, arrow: m.arrow)
+                    TransferFlow(state: model.state, canStart: model.canStart, arrow: m.arrow, startedAt: model.offloadStartedAt)
                     destPanel(model, m)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -86,7 +86,7 @@ struct MainView: View {
 
                 // BAIXO — ação / resultado
                 bottomBar(model)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 24)
                     .animation(.smooth(duration: 0.3), value: stateKey(model.state))
             }
             .padding(.horizontal, 28)
@@ -101,7 +101,7 @@ struct MainView: View {
                 .ignoresSafeArea()
             }
         }
-        .frame(minWidth: 760, minHeight: 560)
+        .frame(minWidth: 820, minHeight: 720)
         .onChange(of: model.selectedPresetId) { model.presetSelectionChanged() }
         .onChange(of: model.watcher.volumes) { model.reconcileVolumes() }
         .onChange(of: model.detectedCard?.id) { model.refreshCardPreview() }
@@ -143,6 +143,15 @@ struct MainView: View {
             }
             Spacer(minLength: 8)
             SDCardIcon(size: m.icon, present: card != nil)
+                .background {
+                    if card == nil {   // halo suave atrás do ícone pra a tela de espera não ficar seca
+                        Circle()
+                            .fill(RadialGradient(colors: [Color.accentColor.opacity(0.14), .clear],
+                                                 center: .center, startRadius: 0, endRadius: m.icon * 0.95))
+                            .frame(width: m.icon * 2.1, height: m.icon * 2.1)
+                            .blur(radius: 6)
+                    }
+                }
             Spacer(minLength: 18)
             VStack(spacing: 12) {
                 Text(card?.name ?? "Aguardando cartão")
@@ -307,9 +316,8 @@ struct MainView: View {
     private func diskPicker(selection: Binding<URL?>,
                             disks: [ExternalVolume], placeholder: String,
                             allowNone: Bool, disabled: Bool) -> some View {
-        // Menu como BOTÃO bordered do sistema: preenche a largura (igual aos campos) E desenha a
-        // borda nativa (sensação de clicável), com o chevron do menu à direita. O Picker nativo e o
-        // .borderlessButton centralizavam o conteúdo e deixavam o vão.
+        // Menu como BOTÃO bordered do sistema (borda nativa = sensação de clicável). Fica colado no
+        // ícone à ESQUERDA com um Spacer empurrando o resto; largura mínima pra não ficar minúsculo.
         let currentName = disks.first { $0.url == selection.wrappedValue }?.name
         return HStack(spacing: 8) {
             DriveIcon(size: 18, lit: selection.wrappedValue != nil)
@@ -320,10 +328,11 @@ struct MainView: View {
                 Text(currentName ?? placeholder)
                     .foregroundStyle(currentName == nil ? Color.secondary : Color.primary)
                     .lineLimit(1).truncationMode(.middle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minWidth: 150, alignment: .leading)
             }
             .menuStyle(.button).buttonStyle(.bordered).controlSize(.large)
-            .frame(maxWidth: .infinity).disabled(disabled)
+            .fixedSize().disabled(disabled)
+            Spacer(minLength: 0)
         }
     }
 
@@ -333,6 +342,50 @@ struct MainView: View {
 
     private func diskName(_ url: URL?, _ model: AppModel) -> String {
         model.destinations.first { $0.url == url }?.name ?? "disco"
+    }
+
+    // MARK: - Blocos do resultado (concluído)
+
+    private func statTile(_ value: String, _ label: String, color: Color = .primary) -> some View {
+        VStack(spacing: 1) {
+            Text(value).font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(color)
+                .lineLimit(1).minimumScaleFactor(0.6)   // tempos longos (2 h 15 min) encolhem sem estourar
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 7)   // largura IGUAL pros três (coerente)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func warningRow(_ icon: String, _ text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func ejectBlock(ejected: Bool) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: ejected ? "eject.fill" : "eject")
+                .font(.title3).foregroundStyle(ejected ? .green : .orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(ejected ? "Cartão ejetado" : "Ejete o cartão manualmente")
+                    .font(.callout.weight(.semibold))
+                Text(ejected ? "pode devolver e formatar" : "antes de remover do Mac")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background((ejected ? Color.green : Color.orange).opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func skippedLine(_ o: OffloadOutcome) -> String {
+        var parts: [String] = []
+        if !o.skipped.isEmpty { parts.append("\(o.skipped.count) já estava(m) no destino") }
+        if !o.unrecognized.isEmpty { parts.append("\(o.unrecognized.count) não reconhecido(s)") }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder private var updateBannerArea: some View {
@@ -403,40 +456,46 @@ struct MainView: View {
                     .font(.callout).foregroundStyle(.secondary)
             case .finished(let o):
                 let salvou = o.verifiedCount > 0 || !o.skipped.isEmpty
-                VStack(spacing: 8) {
-                    if !o.failures.isEmpty {
+                let temFalha = !o.failures.isEmpty
+                VStack(spacing: 9) {
+                    // 1) veredito (primário, grande e colorido)
+                    if temFalha {
                         Label("NÃO formate o cartão", systemImage: "exclamationmark.octagon.fill")
-                            .font(.headline).foregroundStyle(.red)
+                            .font(.title3.bold()).foregroundStyle(.red)
                     } else if salvou {
                         Label("Pode formatar o cartão com segurança", systemImage: "checkmark.seal.fill")
-                            .font(.headline).foregroundStyle(.green)
+                            .font(.title3.bold()).foregroundStyle(.green)
                     } else {
-                        Label("Nada para copiar — confira o cartão ou o filtro de mídia", systemImage: "questionmark.circle.fill")
-                            .font(.headline).foregroundStyle(.orange)
+                        Label("Nada para copiar", systemImage: "questionmark.circle.fill")
+                            .font(.title3.bold()).foregroundStyle(.orange)
                     }
-                    Text("Verificados \(o.verifiedCount) · Pulados \(o.skipped.count) · Falhas \(o.failures.count)"
-                        + (o.unrecognized.isEmpty ? "" : " · \(o.unrecognized.count) não reconhecido(s)"))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+
+                    // 2) estatísticas em blocos: tempo · verificados · falhas
+                    HStack(spacing: 10) {
+                        if let e = model.lastElapsed { statTile(formatElapsed(e), "tempo") }
+                        statTile("\(o.verifiedCount)", "verificados", color: salvou ? .green : .secondary)
+                        statTile("\(o.failures.count)", "falhas", color: temFalha ? .red : .secondary)
+                    }
+                    if !o.skipped.isEmpty || !o.unrecognized.isEmpty {
+                        Text(skippedLine(o)).font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    }
+
+                    // 3) avisos (cinema realocado / manifesto), cada um no seu bloco de atenção
                     if !o.relocatedCinema.isEmpty {
-                        Label("\(o.relocatedCinema.count) clipe(s) de cinema movido(s) pra não sobrescrever filmagem diferente — confira o relink", systemImage: "film.stack")
-                            .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
+                        warningRow("film.stack", "\(o.relocatedCinema.count) clipe(s) de cinema movido(s) pra não sobrescrever filmagem diferente — confira o relink")
                     }
                     if !o.manifestFailures.isEmpty {
-                        Label("manifesto não salvo em \(o.manifestFailures.joined(separator: ", ")) — mídia ok, mas sem o registro", systemImage: "doc.badge.ellipsis")
-                            .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
+                        warningRow("doc.badge.ellipsis", "manifesto não salvo em \(o.manifestFailures.joined(separator: ", ")) — mídia ok, mas sem o registro")
                     }
-                    if o.failures.isEmpty && salvou {
-                        if model.cardEjected {
-                            Label("Cartão ejetado — pode devolver e formatar", systemImage: "eject.fill")
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else if model.ejectError != nil {
-                            Label("Ejete o cartão manualmente antes de remover", systemImage: "eject")
-                                .font(.caption).foregroundStyle(.orange)
-                        }
+
+                    // 4) ejeção em BLOCO de destaque (só no sucesso) — pra não passar despercebida
+                    if !temFalha && salvou && (model.cardEjected || model.ejectError != nil) {
+                        ejectBlock(ejected: model.cardEjected)
                     }
-                    Button("Novo cartão") { model.reset() }.controlSize(.large)
+
+                    Button("Novo cartão") { model.reset() }.controlSize(.large).padding(.top, 2)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: 460)
             case .failed(let msg, let cardUncertain):
                 VStack(spacing: 8) {
                     if cardUncertain {
@@ -498,6 +557,7 @@ private struct TransferFlow: View {
     let state: AppModel.OffloadState
     let canStart: Bool
     var arrow: CGFloat = 32
+    var startedAt: Date? = nil   // pro cronômetro ao vivo durante a transferência
 
     var body: some View {
         VStack(spacing: 10) {
@@ -511,10 +571,20 @@ private struct TransferFlow: View {
                 MarchingChevrons()
                 ProgressView(value: Double(p.filesDone), total: Double(max(p.filesTotal, 1)))
                     .frame(width: 130).tint(.accentColor)
+                // hierarquia: contagem grande (primário) > cronômetro (destaque) > bytes (detalhe)
                 Text(p.phase == .scanning ? "Escaneando…"
                      : p.phase == .verifying ? "Conferindo…"
                      : "\(p.filesDone)/\(p.filesTotal)")
-                    .font(.caption.bold()).monospacedDigit().foregroundStyle(.primary)
+                    .font(.title3.bold()).monospacedDigit().foregroundStyle(.primary)
+                if let start = startedAt {
+                    TimelineView(.periodic(from: start, by: 1)) { ctx in
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock").foregroundStyle(.tint).font(.caption)
+                            Text(formatElapsed(ctx.date.timeIntervalSince(start)))
+                                .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+                        }
+                    }
+                }
                 Text("\(humanBytes(p.bytesDone)) / \(humanBytes(p.bytesTotal))")
                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             case .finished(let o):
@@ -582,4 +652,14 @@ func humanBytes(_ bytes: Int64) -> String {
     var v = Double(bytes); var i = 0
     while v >= 1000 && i < units.count - 1 { v /= 1000; i += 1 }
     return String(format: i == 0 ? "%.0f %@" : "%.1f %@", v, units[i])
+}
+
+/// Tempo legível em pt-BR: "45 s", "17 min 12 s", "1 h 17 min".
+func formatElapsed(_ seconds: TimeInterval) -> String {
+    let s = max(0, Int(seconds.rounded()))
+    if s < 60 { return "\(s) s" }
+    let m = s / 60, sec = s % 60
+    if m < 60 { return sec == 0 ? "\(m) min" : "\(m) min \(sec) s" }
+    let h = m / 60, mm = m % 60
+    return mm == 0 ? "\(h) h" : "\(h) h \(mm) min"
 }

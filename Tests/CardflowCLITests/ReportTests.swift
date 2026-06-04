@@ -40,7 +40,7 @@ import Foundation
     @Test func outcomeMentionsSidecarsAndManifest() {
         let o = OffloadOutcome(verifiedCount: 4, failures: [], unrecognized: [], skipped: [],
                                sidecarsCopied: 2, cardAlreadyCopied: false,
-                               manifestPaths: ["/Volumes/SSD/Conf/_cardflow/manifest-x.json"])
+                               manifestPaths: ["/Volumes/SSD/Conf/.cardflow/manifest-x.json"])
         let s = Report.outcome(o)
         #expect(s.contains("Sidecars: 2"))
         #expect(s.contains("manifest-x.json"))
