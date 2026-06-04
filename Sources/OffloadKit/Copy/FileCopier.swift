@@ -6,8 +6,10 @@ public struct FileCopier {
 
     /// Lê a origem UMA vez: grava em todos os destinos e calcula o xxHash64 da origem no caminho.
     /// Cria os diretórios intermediários. Retorna o hash da origem.
+    /// `onChunk` recebe o nº de bytes de cada bloco gravado — pra mostrar progresso DENTRO de um
+    /// arquivo grande (senão a barra fica parada até o arquivo inteiro terminar).
     @discardableResult
-    public func copy(source: URL, to destinations: [URL]) throws -> UInt64 {
+    public func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void = { _ in }) throws -> UInt64 {
         let fm = FileManager.default
         let reader = try FileHandle(forReadingFrom: source)
         defer { try? reader.close() }
@@ -29,6 +31,7 @@ public struct FileCopier {
                 guard let data = try reader.read(upToCount: chunkSize), !data.isEmpty else { done = true; return }
                 data.withUnsafeBytes { hasher.update($0) }
                 for w in writers { try w.write(contentsOf: data) }
+                onChunk(data.count)
             }
         }
         // fsync: força os bytes do buffer do SO para o disco FÍSICO antes do verify. Sem isso, o verify

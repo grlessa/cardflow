@@ -41,4 +41,20 @@ import Foundation
 
         #expect(try FileCopier().verify(expectedHash: goodHash, fileAt: file) == false)
     }
+
+    @Test func reportsChunkProgressSummingToFileSize() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let src = work.appendingPathComponent("big.bin")
+        let payload = Data((0..<10_000).map { UInt8($0 & 0xFF) })   // 10 KB
+        try payload.write(to: src)
+        let dest = work.appendingPathComponent("out/big.bin")
+
+        var reported = 0
+        var calls = 0
+        let copier = FileCopier(chunkSize: 1024)   // força vários blocos (10 KB / 1 KB ≈ 10)
+        _ = try copier.copy(source: src, to: [dest], onChunk: { reported += $0; calls += 1 })
+
+        #expect(reported == payload.count)   // a soma dos blocos = tamanho do arquivo
+        #expect(calls > 1)                    // reportou DURANTE o arquivo, não só no fim
+    }
 }

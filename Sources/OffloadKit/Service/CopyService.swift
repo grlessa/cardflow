@@ -116,7 +116,8 @@ public struct CopyService {
     }
 
     private func copyFile(_ file: MediaFile, desiredRel: String, destinations: [URL],
-                          claimed: inout [URL: [String: UInt64]]) throws -> CopyFileResult {
+                          claimed: inout [URL: [String: UInt64]],
+                          onCopiedBytes: (Int) -> Void = { _ in }) throws -> CopyFileResult {
         try assertContained(desiredRel, in: destinations)   // nada escreve fora do destino
         var result = CopyFileResult()
         let fm = FileManager.default
@@ -130,7 +131,7 @@ public struct CopyService {
         }
         if !anyExisting {
             let targets = destinations.map { $0.appendingPathComponent(desiredRel) }
-            let sourceHash = try copier.copy(source: file.sourceURL, to: targets)
+            let sourceHash = try copier.copy(source: file.sourceURL, to: targets, onChunk: onCopiedBytes)
             let hashHex = String(format: "%016llx", sourceHash)
             for dest in destinations {
                 let url = dest.appendingPathComponent(desiredRel)
@@ -170,7 +171,7 @@ public struct CopyService {
             presentByDest[dest] == true ? nil : dest.appendingPathComponent(finalRelByDest[dest]!)
         }
         result.fullyPresent = writeTargets.isEmpty
-        if !writeTargets.isEmpty { _ = try copier.copy(source: file.sourceURL, to: writeTargets) }
+        if !writeTargets.isEmpty { _ = try copier.copy(source: file.sourceURL, to: writeTargets, onChunk: onCopiedBytes) }
 
         for dest in destinations {
             let rel = finalRelByDest[dest]!
@@ -273,14 +274,31 @@ public struct CopyService {
         var relocatedCinema: [String] = []
 
         func copyOne(_ file: MediaFile, _ desiredRel: String) throws {
-            let r = try copyFile(file, desiredRel: desiredRel, destinations: destinations, claimed: &claimed)
+            let base = bytesDone
+            var sinceReport: Int64 = 0
+            // progresso DENTRO do arquivo: a barra anda enquanto um vídeo grande copia (limita a
+            // emissão a cada ~32 MB pra não disparar milhares de updates de UI num arquivo de 18 GB).
+            let r = try copyFile(file, desiredRel: desiredRel, destinations: destinations, claimed: &claimed,
+                                 onCopiedBytes: { chunk in
+                bytesDone += Int64(chunk)
+                sinceReport += Int64(chunk)
+                if sinceReport >= 32 * 1024 * 1024 {
+                    sinceReport = 0
+                    onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
+                }
+            })
             verifiedCount += r.verified
             failures.append(contentsOf: r.failures)
             records.append(contentsOf: r.records)
             if r.fullyPresent { skipped.append(file.relPath) }
-            bytesDone += file.size
+            bytesDone = base + file.size   // normaliza (verify não conta; arquivo pulado avança pelo tamanho)
             processed += 1
             onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
+        }
+
+        // fase vira "Copiando" já no começo (mesmo antes do 1º bloco), pra sumir o "Escaneando".
+        if !selected.isEmpty {
+            onProgress(OffloadProgress(phase: .copying, filesDone: 0, filesTotal: totalFiles, bytesDone: 0, bytesTotal: required))
         }
 
         // 1) arquivos planos: achata + renomeia (contador estável por arquivo)
