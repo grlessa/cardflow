@@ -396,8 +396,10 @@ struct MainView: View {
                         Text("Escolha um disco de destino").font(.caption).foregroundStyle(.orange)
                     }
                 }
-            case .running:
-                Label("Copiando… não desconecte o cartão nem o disco", systemImage: "lock.fill")
+            case .running(let p):
+                Label(p.phase == .verifying ? "Conferindo… não desconecte o cartão nem o disco"
+                                            : "Copiando… não desconecte o cartão nem o disco",
+                      systemImage: "lock.fill")
                     .font(.callout).foregroundStyle(.secondary)
             case .finished(let o):
                 let salvou = o.verifiedCount > 0 || !o.skipped.isEmpty
@@ -509,7 +511,9 @@ private struct TransferFlow: View {
                 MarchingChevrons()
                 ProgressView(value: Double(p.filesDone), total: Double(max(p.filesTotal, 1)))
                     .frame(width: 130).tint(.accentColor)
-                Text(p.phase == .scanning ? "Escaneando…" : "\(p.filesDone)/\(p.filesTotal)")
+                Text(p.phase == .scanning ? "Escaneando…"
+                     : p.phase == .verifying ? "Conferindo…"
+                     : "\(p.filesDone)/\(p.filesTotal)")
                     .font(.caption.bold()).monospacedDigit().foregroundStyle(.primary)
                 Text("\(humanBytes(p.bytesDone)) / \(humanBytes(p.bytesTotal))")
                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
@@ -572,8 +576,10 @@ private extension View {
 }
 
 func humanBytes(_ bytes: Int64) -> String {
+    // decimal (1000), igual ao Finder e ao Ajustes do macOS — pra o número bater com o que o
+    // usuário vê no disco. O binário (1024) mostrava 70.8 onde o Finder mostra 76.0 (mesma mídia).
     let units = ["B", "KB", "MB", "GB", "TB"]
     var v = Double(bytes); var i = 0
-    while v >= 1024 && i < units.count - 1 { v /= 1024; i += 1 }
+    while v >= 1000 && i < units.count - 1 { v /= 1000; i += 1 }
     return String(format: i == 0 ? "%.0f %@" : "%.1f %@", v, units[i])
 }

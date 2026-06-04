@@ -14,7 +14,9 @@ extension Preset {
                               "rw2", "rwl", "dng", "nef", "nrw", "orf", "gpr", "tif", "tiff", "insp"],
             videoExtensions: ["mp4", "mov", "mts", "m2ts", "avi", "insv", "360", "3gp"],
             audioExtensions: ["wav", "mp3", "m4a", "aac", "flac", "aiff", "aif"],
-            sidecarExtensions: ["xml", "thm", "xmp", "bim", "cube"], copySidecars: .aside,
+            // sidecars desligados por padrão: a maioria não usa os XMLs de metadados e eles
+            // inflavam a contagem (106 vídeos viravam 211 arquivos). Dá pra religar no editor.
+            sidecarExtensions: ["xml", "thm", "xmp", "bim", "cube"], copySidecars: .skip,
             dateFormat: "yyyy-MM-dd", locale: "pt_BR", sessionFields: []
         )
     }

@@ -1,6 +1,14 @@
 import Foundation
 
-public struct FileCopier {
+/// Cópia + verificação de um arquivo. Protocolo pra permitir injetar um copiador de teste
+/// (ex.: que força o verify a falhar) e cobrir o caminho crítico de detecção de corrupção.
+public protocol FileCopying {
+    @discardableResult
+    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void) throws -> UInt64
+    func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool
+}
+
+public struct FileCopier: FileCopying {
     private let chunkSize: Int
     public init(chunkSize: Int = 1 << 22) { self.chunkSize = chunkSize }   // 4 MB
 
@@ -34,8 +42,9 @@ public struct FileCopier {
                 onChunk(data.count)
             }
         }
-        // fsync: força os bytes do buffer do SO para o disco FÍSICO antes do verify. Sem isso, o verify
-        // leria de volta da page cache e passaria mesmo se a mídia ainda não tivesse chegado no SSD/cartão.
+        // fsync: empurra os bytes pra fora do cache de página antes da conferência, pra a releitura
+        // valer (a conferência relê e o hash não bate se a gravação saiu errada). Nota: fsync não força
+        // o cache interno do drive (isso seria F_FULLFSYNC, bem mais lento) — suficiente pro nosso verify.
         for w in writers { try w.synchronize() }
         return hasher.finalize()
     }

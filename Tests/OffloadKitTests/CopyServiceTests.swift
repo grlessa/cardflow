@@ -352,6 +352,70 @@ import Foundation
         // e NADA foi gravado fora do destino
         #expect(!fm.fileExists(atPath: work.appendingPathComponent("ESCAPED").path))
     }
+
+    // Pipeline de verificação paralela sob carga: 12 arquivos × 2 destinos = 24 conferências
+    // rodando concorrentes com as cópias. Tudo precisa ser conferido, presente e correto.
+    @Test func pipelineVerifiesManyFilesToTwoDestinations() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        for i in 0..<12 {
+            let data = Data("clip-\(i)".utf8) + Data((0..<5000).map { UInt8(($0 + i) & 0xFF) })
+            fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C\(String(format: "%04d", i)).MP4").path, contents: data)
+        }
+        let d1 = work.appendingPathComponent("SSD"); let d2 = work.appendingPathComponent("HD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        let o = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [d1, d2], camera: "Cam")
+
+        #expect(o.verifiedCount == 24)   // 12 vídeos × 2 destinos, todos conferidos byte a byte
+        #expect(o.failures.isEmpty)
+        for i in 0..<12 {
+            let rel = "Offload/VIDEO/C\(String(format: "%04d", i)).MP4"
+            #expect(fm.fileExists(atPath: d1.appendingPathComponent(rel).path))
+            #expect(fm.fileExists(atPath: d2.appendingPathComponent(rel).path))
+        }
+    }
+
+    @Test func skipSidecarsByDefaultDoesNotCopyXml() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("PRIVATE/M4ROOT/CLIP"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("PRIVATE/M4ROOT/CLIP/C0001.MP4").path, contents: Data("video".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("PRIVATE/M4ROOT/CLIP/C0001M01.XML").path, contents: Data("<meta/>".utf8))
+        let dest = work.appendingPathComponent("SSD")
+
+        var p = Preset.flatDefault
+        p.copySidecars = .skip
+        let o = try CopyService(preset: p, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+            .run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        #expect(o.verifiedCount == 1)        // só o vídeo
+        #expect(o.sidecarsCopied == 0)
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/_cardflow/sidecars/PRIVATE/M4ROOT/CLIP/C0001M01.XML").path))
+    }
+
+    // O CAMINHO MAIS CRÍTICO: se a conferência falha (corrupção/disco ruim), a falha PRECISA ser
+    // reportada (pra UI dizer "não formate") e o arquivo corrompido removido. Nunca luz verde com dado ruim.
+    @Test func verifyFailureIsReportedAndCorruptRemoved() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("video".utf8))
+        let dest = work.appendingPathComponent("SSD")
+
+        // copiador que GRAVA normal mas a conferência SEMPRE reprova (simula corrupção na gravação)
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: .current, copier: FailingVerifyCopier())
+        let o = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        #expect(o.verifiedCount == 0)                                   // nada conferido
+        #expect(!o.failures.isEmpty)                                    // a falha É reportada → "não formate"
+        #expect(o.failures.contains { $0.hasSuffix("C0001.MP4") })
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/VIDEO/C0001.MP4").path))  // corrompido removido
+    }
 }
 
 private struct AlwaysEnoughSpace: FreeSpaceProviding {
@@ -360,4 +424,14 @@ private struct AlwaysEnoughSpace: FreeSpaceProviding {
 private struct FixedSpace: FreeSpaceProviding {
     let bytes: Int64
     func availableBytes(at url: URL) throws -> Int64 { bytes }
+}
+
+/// Grava de verdade (delega ao FileCopier real) mas a conferência SEMPRE reprova — pra testar
+/// que uma corrupção de gravação vira falha reportada, não luz verde.
+private struct FailingVerifyCopier: FileCopying {
+    private let real = FileCopier()
+    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void) throws -> UInt64 {
+        try real.copy(source: source, to: destinations, onChunk: onChunk)
+    }
+    func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool { false }
 }

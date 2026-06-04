@@ -1,7 +1,7 @@
 import Foundation
 
 public struct OffloadProgress: Equatable, Sendable {
-    public enum Phase: String, Sendable { case scanning, copying, done }
+    public enum Phase: String, Sendable { case scanning, copying, verifying, done }
     public var phase: Phase
     public var filesDone: Int
     public var filesTotal: Int

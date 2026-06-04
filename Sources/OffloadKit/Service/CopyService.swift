@@ -45,7 +45,7 @@ public struct CopyService {
     let nameBuilder: NameBuilder
     private let resolver = CollisionResolver()
     let spaceChecker: SpaceChecker
-    private let copier = FileCopier()
+    private let copier: FileCopying
     let marginBytes: Int64
     private let clock: () -> Date
     private let activityKeeper: ActivityKeeping
@@ -57,11 +57,13 @@ public struct CopyService {
                 clock: @escaping () -> Date = { Date() },
                 activityKeeper: ActivityKeeping = SystemActivityKeeper(),
                 manifestStore: ManifestStore = ManifestStore(),
+                copier: FileCopying = FileCopier(),
                 appVersion: String = "0.1.0") {
         self.preset = preset
         self.scanner = CardScanner(classifier: FileClassifier(preset: preset))
         self.nameBuilder = NameBuilder(preset: preset, timeZone: timeZone)
         self.spaceChecker = SpaceChecker(provider: spaceProvider)
+        self.copier = copier
         self.marginBytes = marginBytes
         self.clock = clock
         self.activityKeeper = activityKeeper
@@ -93,11 +95,39 @@ public struct CopyService {
         return ["_" + f.string(from: file.captureDate)]
     }
 
+    /// Um arquivo já gravado, a ser conferido (ler de volta + hash) em paralelo com as cópias seguintes.
+    private struct PendingVerify {
+        let url: URL
+        let expectedHash: UInt64
+        let rel: String
+        let sourceRel: String
+        let type: FileType
+        let bytes: Int64
+        let hashHex: String
+    }
+
     private struct CopyFileResult {
-        var verified = 0
-        var failures: [String] = []
+        var pending: [PendingVerify] = []                // gravados, a conferir
+        var presentRecords: [Manifest.FileRecord] = []   // já presentes (não grava nem confere de novo)
         var fullyPresent = false
-        var records: [Manifest.FileRecord] = []
+    }
+
+    /// Acumulador da verificação paralela. Tudo sob lock: a fila de fundo escreve aqui enquanto
+    /// o laço de cópia segue. Reference type de propósito (evita acesso exclusivo a `var` capturado).
+    private final class VerifyAccumulator {
+        private let lock = NSLock()
+        private var verified = 0          // mídia (foto/vídeo/áudio/cinema)
+        private var sidecarVerified = 0   // sidecars-aside (contados à parte, como no fluxo antigo)
+        private var failures: [String] = []
+        private var records: [Manifest.FileRecord] = []
+        func addVerified(_ r: Manifest.FileRecord, sidecar: Bool) {
+            lock.lock(); if sidecar { sidecarVerified += 1 } else { verified += 1 }; records.append(r); lock.unlock()
+        }
+        func addFailure(_ rel: String) { lock.lock(); failures.append(rel); lock.unlock() }
+        func addPresent(_ rs: [Manifest.FileRecord]) { guard !rs.isEmpty else { return }; lock.lock(); records.append(contentsOf: rs); lock.unlock() }
+        func snapshot() -> (verified: Int, sidecarVerified: Int, failures: [String], records: [Manifest.FileRecord]) {
+            lock.lock(); defer { lock.unlock() }; return (verified, sidecarVerified, failures, records)
+        }
     }
 
     /// Defesa final contra path traversal: garante que `rel` não escapa de NENHUM destino.
@@ -135,14 +165,10 @@ public struct CopyService {
             let hashHex = String(format: "%016llx", sourceHash)
             for dest in destinations {
                 let url = dest.appendingPathComponent(desiredRel)
-                if try copier.verify(expectedHash: sourceHash, fileAt: url) {
-                    result.verified += 1
-                    claimed[dest]?[desiredRel] = sourceHash
-                    result.records.append(.init(sourceRelPath: file.relPath, destRelPath: desiredRel, type: file.type, bytes: file.size, xxhash64: hashHex, status: "verified"))
-                } else {
-                    try? fm.removeItem(at: url)   // verify falhou → remove o arquivo corrompido (não deixa lixo)
-                    result.failures.append(desiredRel)
-                }
+                // otimista: o arquivo foi escrito (fsync já feito); a conferência confirma em paralelo.
+                claimed[dest]?[desiredRel] = sourceHash
+                result.pending.append(PendingVerify(url: url, expectedHash: sourceHash, rel: desiredRel,
+                                                    sourceRel: file.relPath, type: file.type, bytes: file.size, hashHex: hashHex))
             }
             return result
         }
@@ -177,16 +203,11 @@ public struct CopyService {
             let rel = finalRelByDest[dest]!
             let url = dest.appendingPathComponent(rel)
             if presentByDest[dest] == false {
-                if try copier.verify(expectedHash: sourceHash, fileAt: url) {
-                    result.verified += 1
-                    claimed[dest]?[rel] = sourceHash
-                    result.records.append(.init(sourceRelPath: file.relPath, destRelPath: rel, type: file.type, bytes: file.size, xxhash64: hashHex, status: "verified"))
-                } else {
-                    try? FileManager.default.removeItem(at: url)   // verify falhou → remove o corrompido
-                    result.failures.append(rel)
-                }
+                claimed[dest]?[rel] = sourceHash
+                result.pending.append(PendingVerify(url: url, expectedHash: sourceHash, rel: rel,
+                                                    sourceRel: file.relPath, type: file.type, bytes: file.size, hashHex: hashHex))
             } else {
-                result.records.append(.init(sourceRelPath: file.relPath, destRelPath: rel, type: file.type, bytes: file.size, xxhash64: hashHex, status: "present"))
+                result.presentRecords.append(.init(sourceRelPath: file.relPath, destRelPath: rel, type: file.type, bytes: file.size, xxhash64: hashHex, status: "present"))
             }
         }
         return result
@@ -260,20 +281,38 @@ public struct CopyService {
         var bytesDone: Int64 = 0
 
         var claimed: [URL: [String: UInt64]] = Dictionary(uniqueKeysWithValues: destinations.map { ($0, [:]) })
-        var verifiedCount = 0
-        var failures: [String] = []
         var skipped: [String] = []
-        var records: [Manifest.FileRecord] = []
         // contador ESTÁVEL: posição do arquivo entre TODA a mídia plana (foto/vídeo/áudio) do cartão,
         // ordenada — independe da seleção de mídia, então re-rodar com outra mídia não renumera (idempotência).
         let countable = all.filter { !$0.preserve && ($0.type == .photo || $0.type == .video || $0.type == .audio) }
         var counterIndex: [String: Int] = [:]
         for (i, f) in countable.enumerated() { counterIndex[f.relPath] = i + 1 }
 
+        // VERIFICAÇÃO EM PARALELO: a cópia escreve (com fsync) e segue; a conferência (ler de volta +
+        // hash) roda numa fila serial, sobrepondo a leitura de um arquivo com a cópia do próximo.
+        // Recupera quase todo o tempo do "ler de volta" SEM abrir mão da verificação byte a byte.
+        let acc = VerifyAccumulator()
+        let verifyQueue = DispatchQueue(label: "br.com.cardflow.verify")   // serial: confere 1 por vez
+        let verifyGroup = DispatchGroup()
+        let copier = self.copier   // captura imutável (não captura self na fila de fundo)
+        func enqueueVerify(_ pv: PendingVerify, sidecar: Bool) {
+            verifyGroup.enter()
+            verifyQueue.async {
+                let ok = (try? copier.verify(expectedHash: pv.expectedHash, fileAt: pv.url)) ?? false
+                if ok {
+                    acc.addVerified(.init(sourceRelPath: pv.sourceRel, destRelPath: pv.rel, type: pv.type, bytes: pv.bytes, xxhash64: pv.hashHex, status: "verified"), sidecar: sidecar)
+                } else {
+                    acc.addFailure(pv.rel)
+                    try? FileManager.default.removeItem(at: pv.url)   // verify falhou → remove o corrompido
+                }
+                verifyGroup.leave()
+            }
+        }
+
         var processed = 0
         var relocatedCinema: [String] = []
 
-        func copyOne(_ file: MediaFile, _ desiredRel: String) throws {
+        func copyOne(_ file: MediaFile, _ desiredRel: String, countsBytes: Bool = true, asSidecar: Bool = false) throws {
             let base = bytesDone
             var sinceReport: Int64 = 0
             // progresso DENTRO do arquivo: a barra anda enquanto um vídeo grande copia (limita a
@@ -287,11 +326,10 @@ public struct CopyService {
                     onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
                 }
             })
-            verifiedCount += r.verified
-            failures.append(contentsOf: r.failures)
-            records.append(contentsOf: r.records)
+            acc.addPresent(r.presentRecords)
             if r.fullyPresent { skipped.append(file.relPath) }
-            bytesDone = base + file.size   // normaliza (verify não conta; arquivo pulado avança pelo tamanho)
+            for pv in r.pending { enqueueVerify(pv, sidecar: asSidecar) }   // confere em paralelo enquanto o próximo já copia
+            bytesDone = countsBytes ? base + file.size : base   // sidecar não conta no total de bytes
             processed += 1
             onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
         }
@@ -327,19 +365,22 @@ public struct CopyService {
             }
         }
 
-        var sidecarsCopied = 0
+        // 3) sidecars (só se a política for .aside): vão pra _cardflow/sidecars; não contam bytes
+        //    nem entram no verifiedCount de mídia (são contados à parte em sidecarsCopied).
         if preset.copySidecars == .aside {
             for file in sidecars {
-                let desiredRel = "\(eventoRoot)/_cardflow/sidecars/\(file.relPath)"
-                let r = try copyFile(file, desiredRel: desiredRel, destinations: destinations, claimed: &claimed)
-                sidecarsCopied += r.verified
-                failures.append(contentsOf: r.failures)
-                records.append(contentsOf: r.records)   // sidecars também são listados no manifesto
-                if r.fullyPresent { skipped.append(file.relPath) }   // sidecar já presente conta como pulado (re-run)
-                processed += 1
-                onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
+                try copyOne(file, "\(eventoRoot)/_cardflow/sidecars/\(file.relPath)", countsBytes: false, asSidecar: true)
             }
         }
+
+        // espera a verificação terminar (a maior parte já rodou em paralelo com as cópias acima).
+        onProgress(OffloadProgress(phase: .verifying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
+        verifyGroup.wait()
+        let snap = acc.snapshot()
+        let verifiedCount = snap.verified
+        let sidecarsCopied = snap.sidecarVerified
+        let failures = snap.failures
+        let records = snap.records.sorted { $0.destRelPath < $1.destRelPath }   // ordem determinística
 
         let finished = clock()
         let fingerprint = CardFingerprint.compute(files: selected)
