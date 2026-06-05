@@ -8,6 +8,8 @@ struct MainView: View {
     @State private var editor: PresetEditorModel?
     @State private var confirmDelete = false
     @State private var importError = false
+    @State private var showingHistory = false
+    @State private var showingOnboarding = false
 
     /// Tamanhos derivados da janela: cards crescem na largura e ícone/números/seta escalam.
     private struct Metrics {
@@ -32,48 +34,58 @@ struct MainView: View {
         }
     }
 
+    // TOPO — seletor de preset, gerenciamento, histórico e ajuda. Extraído do body pra o
+    // type-checker não engasgar com a expressão gigante da tela inteira.
+    @ViewBuilder private var presetBar: some View {
+        @Bindable var model = model
+        HStack(spacing: 8) {
+            Text("Preset").font(.callout).foregroundStyle(.secondary)
+            Picker("", selection: $model.selectedPresetId) {
+                ForEach(model.presets, id: \.id) { p in Text(p.name).tag(p.id) }
+            }
+            .labelsHidden().fixedSize().disabled(model.isBusy)
+            Button { openEditor(.editing(model.activePreset)) } label: { Image(systemName: "pencil") }
+                .help("Editar este preset").disabled(model.isBusy)
+            Button { openEditor(.creating()) } label: { Image(systemName: "plus") }
+                .help("Novo preset").disabled(model.isBusy)
+            Menu {
+                Button("Importar preset…") { importPresetPanel() }
+                Button("Exportar este preset…") { exportPresetPanel() }
+                Button("Duplicar") { model.duplicateActivePreset() }
+                Divider()
+                Button("Excluir", role: .destructive) { confirmDelete = true }
+                    .disabled(model.selectedPresetId == "factory-default")
+            } label: { Image(systemName: "ellipsis.circle") }
+            .menuIndicator(.hidden).help("Gerenciar presets").disabled(model.isBusy)
+            .confirmationDialog("Excluir o preset “\(model.activePreset.name)”?",
+                                isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Excluir", role: .destructive) { model.deleteActivePreset() }
+                Button("Cancelar", role: .cancel) {}
+            }
+            .alert("Não consegui importar esse preset.", isPresented: $importError) {
+                Button("OK", role: .cancel) {}
+            }
+            Spacer()
+            Button { showingHistory = true } label: { Label("Histórico", systemImage: "clock.arrow.circlepath") }
+                .help("Cópias já feitas neste disco").disabled(model.destinationURL == nil)
+            Button { showingOnboarding = true } label: { Image(systemName: "questionmark.circle") }
+                .help("Como usar o Cardflow")
+        }
+    }
+
+    // abre o editor já sabendo os nomes dos OUTROS presets (pra avisar nome duplicado, #23).
+    private func openEditor(_ ed: PresetEditorModel) {
+        ed.otherNames = Set(model.presets.filter { $0.id != ed.draft.id }.map(\.name))
+        editor = ed
+    }
+
     var body: some View {
         @Bindable var model = model
         GeometryReader { geo in
             let m = Metrics(geo.size)
             VStack(spacing: 14) {
                 updateBannerArea
-                // TOPO — preset
-                HStack(spacing: 8) {
-                    Text("Preset").font(.callout).foregroundStyle(.secondary)
-                    Picker("", selection: $model.selectedPresetId) {
-                        ForEach(model.presets, id: \.id) { p in Text(p.name).tag(p.id) }
-                    }
-                    .labelsHidden().fixedSize().disabled(model.isBusy)
-                    Button { editor = .editing(model.activePreset) } label: {
-                        Image(systemName: "pencil")
-                    }
-                    .help("Editar este preset").disabled(model.isBusy)
-                    Button { editor = .creating() } label: {
-                        Image(systemName: "plus")
-                    }
-                    .help("Novo preset").disabled(model.isBusy)
-                    Menu {
-                        Button("Importar preset…") { importPresetPanel() }
-                        Button("Exportar este preset…") { exportPresetPanel() }
-                        Button("Duplicar") { model.duplicateActivePreset() }
-                        Divider()
-                        Button("Excluir", role: .destructive) { confirmDelete = true }
-                            .disabled(model.selectedPresetId == "factory-default")
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .menuIndicator(.hidden).help("Gerenciar presets").disabled(model.isBusy)
-                    .confirmationDialog("Excluir o preset “\(model.activePreset.name)”?",
-                                        isPresented: $confirmDelete, titleVisibility: .visible) {
-                        Button("Excluir", role: .destructive) { model.deleteActivePreset() }
-                        Button("Cancelar", role: .cancel) {}
-                    }
-                    .alert("Não consegui importar esse preset.", isPresented: $importError) {
-                        Button("OK", role: .cancel) {}
-                    }
-                }
-                .padding(.top, 16)
+                presetBar.padding(.top, 16)   // TOPO — preset + histórico + ajuda
 
                 // MEIO — cartão → fluxo → destino (cards crescem com a janela)
                 HStack(alignment: .center, spacing: m.gap) {
@@ -108,6 +120,18 @@ struct MainView: View {
         .onChange(of: model.mediaChoice) { model.refreshCardPreview() }
         .onChange(of: model.destinationURL) { model.refreshCardPreview() }
         .onChange(of: model.backupURL) { model.refreshCardPreview() }
+        .sheet(isPresented: $showingHistory) {
+            HistoryView(manifests: model.loadHistory(), onClose: { showingHistory = false })
+        }
+        .sheet(isPresented: $showingOnboarding) {
+            OnboardingView(onClose: { showingOnboarding = false })
+        }
+        .onAppear {
+            if !UserDefaults.standard.bool(forKey: "cardflow.didOnboard") {
+                UserDefaults.standard.set(true, forKey: "cardflow.didOnboard")
+                showingOnboarding = true
+            }
+        }
         .sheet(item: $editor) { ed in
             PresetEditorView(
                 model: ed,
@@ -115,8 +139,11 @@ struct MainView: View {
                     if ed.save(into: model.presetStore) {
                         model.reloadPresets(selecting: ed.draft.id, preserveContext: true)
                         model.savePresetSelection()   // lembra o preset salvo/criado na sessão
+                        editor = nil                  // só fecha quando REALMENTE salvou
+                    } else {
+                        // #9: não fecha a sheet — senão a configuração inteira do voluntário sumiria sem aviso.
+                        ed.saveError = "Não foi possível salvar o preset. Revise a estrutura de pastas e o nome e tente de novo."
                     }
-                    editor = nil
                 },
                 onCancel: { editor = nil },
                 onDelete: {
@@ -168,6 +195,11 @@ struct MainView: View {
                     Text("Tudo").tag(Preset.Media.Kind.both)
                 }.pickerStyle(.segmented).labelsHidden().disabled(model.isBusy)
             }
+            Toggle("Só os de hoje", isOn: Binding(get: { model.filterTodayOnly },
+                                                  set: { model.filterTodayOnly = $0; model.refreshCardPreview() }))
+                .toggleStyle(.checkbox).font(.caption).foregroundStyle(.secondary)
+                .padding(.top, 6).disabled(model.isBusy)
+                .help("Copia só os arquivos capturados hoje — útil quando o cartão acumula vários dias")
             if let card {   // correção: se foi detectado errado, mover pra destino
                 Button { model.useAsDestination(card) } label: {
                     Label("Não é a fonte? Mover pra destino", systemImage: "arrow.right.circle")
@@ -203,6 +235,14 @@ struct MainView: View {
                 Text(humanBytes(pv.totalBytes))
                     .font(.system(size: gb, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(Color.accentColor)
+                // numa retomada, deixa claro: o número grande é o TOTAL do cartão; aqui o que falta copiar.
+                if model.isResume {
+                    let novos = pv.selectedCount - pv.alreadyPresent
+                    Label("\(pv.alreadyPresent) já no destino · vai copiar \(novos) novo(s) · \(humanBytes(pv.remainingBytes))",
+                          systemImage: "arrow.clockwise")
+                        .font(.caption).foregroundStyle(Color.accentColor)
+                        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                }
                 if pv.junk > 0 {
                     Text("\(pv.junk) ignorado(s) · thumbnail/lixo")
                         .font(.caption2).foregroundStyle(.tertiary)
@@ -371,10 +411,15 @@ struct MainView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(ejected ? "Cartão ejetado" : "Ejete o cartão manualmente")
                     .font(.callout.weight(.semibold))
-                Text(ejected ? "pode devolver e formatar" : "antes de remover do Mac")
+                Text(ejected ? "pode devolver e formatar"
+                     : (model.ejectError != nil ? "o disco está em uso — feche janelas do Finder que mostrem o cartão"
+                                                : "antes de remover do Mac"))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            if !ejected {
+                Button("Tentar de novo") { model.retryEject() }.controlSize(.small)
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity)
@@ -384,7 +429,7 @@ struct MainView: View {
     private func skippedLine(_ o: OffloadOutcome) -> String {
         var parts: [String] = []
         if !o.skipped.isEmpty { parts.append("\(o.skipped.count) já estava(m) no destino") }
-        if !o.unrecognized.isEmpty { parts.append("\(o.unrecognized.count) não reconhecido(s)") }
+        if !o.unrecognized.isEmpty { parts.append("\(o.unrecognized.count) não reconhecido(s), copiado(s) pra Desconhecidos") }
         return parts.joined(separator: " · ")
     }
 
@@ -439,30 +484,53 @@ struct MainView: View {
             case .idle:
                 VStack(spacing: 6) {
                     Button(action: { model.startOffload() }) {
-                        Label("INICIAR", systemImage: "play.fill")
+                        Label(model.isResume ? "RETOMAR" : "INICIAR",
+                              systemImage: model.isResume ? "arrow.clockwise" : "play.fill")
                             .font(.title3.bold()).frame(maxWidth: 320).padding(.vertical, 9)
                     }
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .shadow(color: .accentColor.opacity(model.canStart ? 0.55 : 0), radius: 14, y: 0)
                     .disabled(!model.canStart)
+                    if model.isResume {
+                        Text("backup parcial detectado — continua de onde parou, copiando só o que falta")
+                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 320)
+                    }
                     if model.detectedCard != nil && model.destinationURL == nil {
-                        Text("Escolha um disco de destino").font(.caption).foregroundStyle(.orange)
+                        // sem NENHUM destino conectado → mandar "escolher" um disco que não existe confunde.
+                        Text(model.destinations.isEmpty
+                             ? "Conecte um SSD ou HD para receber a cópia"
+                             : "Escolha um disco de destino")
+                            .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
                     }
                 }
             case .running(let p):
-                Label(p.phase == .verifying ? "Conferindo… não desconecte o cartão nem o disco"
-                                            : "Copiando… não desconecte o cartão nem o disco",
-                      systemImage: "lock.fill")
-                    .font(.callout).foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Label(model.isCancelling ? "Parando com segurança… terminando o bloco atual"
+                          : (p.phase == .verifying ? "Conferindo… não desconecte o cartão nem o disco"
+                                                   : "Copiando… não desconecte o cartão nem o disco"),
+                          systemImage: model.isCancelling ? "stop.circle" : "lock.fill")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if model.isCancelling {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Parando…").font(.callout).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Button(role: .destructive) { model.cancelOffload() } label: {
+                            Label("Parar", systemImage: "stop.fill")
+                        }.controlSize(.regular)
+                    }
+                }
             case .finished(let o):
-                let salvou = o.verifiedCount > 0 || !o.skipped.isEmpty
+                let salvou = o.verifiedCount > 0 || !o.skipped.isEmpty   // p/ cor dos tiles (pode ser true mesmo com falha)
                 let temFalha = !o.failures.isEmpty
+                let podeFormatar = o.canSafelyFormatCard                  // decisão ÚNICA (igual à ejeção e ao badge)
                 VStack(spacing: 9) {
                     // 1) veredito (primário, grande e colorido)
                     if temFalha {
                         Label("NÃO formate o cartão", systemImage: "exclamationmark.octagon.fill")
                             .font(.title3.bold()).foregroundStyle(.red)
-                    } else if salvou {
+                    } else if podeFormatar {
                         Label("Pode formatar o cartão com segurança", systemImage: "checkmark.seal.fill")
                             .font(.title3.bold()).foregroundStyle(.green)
                     } else {
@@ -489,11 +557,23 @@ struct MainView: View {
                     }
 
                     // 4) ejeção em BLOCO de destaque (só no sucesso) — pra não passar despercebida
-                    if !temFalha && salvou && (model.cardEjected || model.ejectError != nil) {
+                    if podeFormatar && (model.cardEjected || model.ejectError != nil) {
                         ejectBlock(ejected: model.cardEjected)
                     }
 
-                    Button("Novo cartão") { model.reset() }.controlSize(.large).padding(.top, 2)
+                    HStack(spacing: 10) {
+                        if podeFormatar {
+                            Button { model.revealOffloadInFinder(o) } label: {
+                                Label("Abrir no Finder", systemImage: "folder")
+                            }.controlSize(.large)
+                        }
+                        Button("Novo cartão") { model.reset() }.controlSize(.large)
+                    }.padding(.top, 2)
+                    if podeFormatar && !o.manifestPaths.isEmpty {
+                        Button { model.openReport(o) } label: {
+                            Label("Ver relatório da cópia", systemImage: "doc.text")
+                        }.buttonStyle(.link).controlSize(.small)
+                    }
                 }
                 .frame(maxWidth: 460)
             case .failed(let msg, let cardUncertain):
@@ -561,10 +641,14 @@ private struct CapacityBar: View {
                 }
             }
             .frame(height: 6)
+            .accessibilityElement()
+            .accessibilityLabel("Espaço no disco")
+            .accessibilityValue("\(humanBytes(free)) livres de \(humanBytes(total)), \(Int((usedFrac * 100).rounded())) por cento usado")
             (Text("livre: ").foregroundStyle(.secondary)
                 + Text(humanBytes(free)).fontWeight(.bold)
                 + Text("  de \(humanBytes(total))").foregroundStyle(.secondary))
                 .font(.subheadline).monospacedDigit()
+                .accessibilityHidden(true)   // a barra acima já anuncia o mesmo valor pro VoiceOver
         }
     }
 }
@@ -587,26 +671,36 @@ private struct TransferFlow: View {
                     .shadow(color: .accentColor.opacity(canStart ? 0.6 : 0), radius: 8)
             case .running(let p):
                 MarchingChevrons()
-                ProgressView(value: Double(p.filesDone), total: Double(max(p.filesTotal, 1)))
+                // barra por BYTES (não por arquivos): num clipe único de 18 GB a barra de arquivos
+                // ficaria em 0/1 por minutos e pareceria travada — o que faz o leigo arrancar o cartão.
+                ProgressView(value: Double(p.bytesDone), total: Double(max(p.bytesTotal, 1)))
                     .frame(width: 130).tint(.accentColor)
-                // hierarquia: contagem grande (primário) > cronômetro (destaque) > bytes (detalhe)
+                // hierarquia: contagem grande (primário) > cronômetro + ETA (destaque) > bytes (detalhe)
                 Text(p.phase == .scanning ? "Escaneando…"
                      : p.phase == .verifying ? "Conferindo…"
                      : "\(p.filesDone)/\(p.filesTotal)")
                     .font(.title3.bold()).monospacedDigit().foregroundStyle(.primary)
                 if let start = startedAt {
                     TimelineView(.periodic(from: start, by: 1)) { ctx in
-                        HStack(spacing: 5) {
-                            Image(systemName: "clock").foregroundStyle(.tint).font(.caption)
-                            Text(formatElapsed(ctx.date.timeIntervalSince(start)))
-                                .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+                        let elapsed = ctx.date.timeIntervalSince(start)
+                        VStack(spacing: 2) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock").foregroundStyle(.tint).font(.caption)
+                                Text(formatElapsed(elapsed))
+                                    .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+                            }
+                            if p.phase == .copying, p.bytesDone > 0, p.bytesTotal > p.bytesDone, elapsed > 1 {
+                                let restante = Double(p.bytesTotal - p.bytesDone) / (Double(p.bytesDone) / elapsed)
+                                Text("~\(formatElapsed(restante)) restante")
+                                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                            }
                         }
                     }
                 }
                 Text("\(humanBytes(p.bytesDone)) / \(humanBytes(p.bytesTotal))")
                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             case .finished(let o):
-                ResultBadge(ok: o.failures.isEmpty && (o.verifiedCount > 0 || !o.skipped.isEmpty))
+                ResultBadge(ok: o.canSafelyFormatCard)
             case .failed:
                 Image(systemName: "exclamationmark.octagon.fill")
                     .font(.system(size: 42)).foregroundStyle(.red)
@@ -663,21 +757,6 @@ private extension View {
     func cardSurface() -> some View { modifier(CardSurface()) }
 }
 
-func humanBytes(_ bytes: Int64) -> String {
-    // decimal (1000), igual ao Finder e ao Ajustes do macOS — pra o número bater com o que o
-    // usuário vê no disco. O binário (1024) mostrava 70.8 onde o Finder mostra 76.0 (mesma mídia).
-    let units = ["B", "KB", "MB", "GB", "TB"]
-    var v = Double(bytes); var i = 0
-    while v >= 1000 && i < units.count - 1 { v /= 1000; i += 1 }
-    return String(format: i == 0 ? "%.0f %@" : "%.1f %@", v, units[i])
-}
-
-/// Tempo legível em pt-BR: "45 s", "17 min 12 s", "1 h 17 min".
-func formatElapsed(_ seconds: TimeInterval) -> String {
-    let s = max(0, Int(seconds.rounded()))
-    if s < 60 { return "\(s) s" }
-    let m = s / 60, sec = s % 60
-    if m < 60 { return sec == 0 ? "\(m) min" : "\(m) min \(sec) s" }
-    let h = m / 60, mm = m % 60
-    return mm == 0 ? "\(h) h" : "\(h) h \(mm) min"
-}
+// finos invólucros pra OffloadKit.Format (fonte única, testada) — mantêm os call sites curtos.
+func humanBytes(_ bytes: Int64) -> String { Format.humanBytes(bytes) }
+func formatElapsed(_ seconds: TimeInterval) -> String { Format.elapsed(seconds) }

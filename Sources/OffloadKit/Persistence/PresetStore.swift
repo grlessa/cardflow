@@ -45,7 +45,12 @@ public struct PresetStore {
     public enum PresetError: Error, Equatable {
         case unsupportedSchema(Int)
         case invalidTemplate(String)
+        case fileTooLarge
     }
+
+    /// Teto do arquivo .cfp importado: um preset legítimo tem alguns KB. Acima disto é entrada
+    /// suspeita (DoS de decode) e é rejeitada antes de decodificar.
+    public static let maxImportBytes = 1 * 1024 * 1024   // 1 MB
 
     public static let maxSchemaVersion = 2
 
@@ -102,7 +107,9 @@ public struct PresetStore {
     }
 
     public func load(from url: URL) throws -> Preset {
-        let preset = try JSONDecoder().decode(Preset.self, from: Data(contentsOf: url))
+        let data = try Data(contentsOf: url)
+        guard data.count <= Self.maxImportBytes else { throw PresetError.fileTooLarge }
+        let preset = try JSONDecoder().decode(Preset.self, from: data)
         try Self.validate(preset)
         return preset
     }
@@ -129,6 +136,8 @@ extension PresetStore.PresetError: LocalizedError {
             return "Este preset foi feito numa versão incompatível do app (schema \(v))."
         case .invalidTemplate(let reason):
             return "Preset inválido: \(reason)"
+        case .fileTooLarge:
+            return "Este arquivo de preset é grande demais para ser válido e não foi importado."
         }
     }
 }

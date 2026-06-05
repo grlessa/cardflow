@@ -32,6 +32,14 @@ public enum UpdateChecker {
 
     private struct Release: Decodable { let tag_name: String; let html_url: String }
 
+    /// Só aceita uma URL de download https em github.com — um JSON adulterado não pode fazer o
+    /// botão "Baixar" abrir um file:// ou um custom scheme no lugar da página de releases.
+    static func validDownloadURL(_ s: String) -> URL? {
+        guard let u = URL(string: s), u.scheme == "https",
+              let host = u.host, host == "github.com" || host.hasSuffix(".github.com") else { return nil }
+        return u
+    }
+
     /// Consulta a última release. Devolve `UpdateInfo` só quando há versão MAIS NOVA que `current`.
     public static func checkForUpdate(current: String,
                                       session: URLSession = .shared) async -> UpdateInfo? {
@@ -42,7 +50,7 @@ public enum UpdateChecker {
         guard let (data, resp) = try? await session.data(for: req),
               let http = resp as? HTTPURLResponse, http.statusCode == 200,
               let release = try? JSONDecoder().decode(Release.self, from: data),
-              let page = URL(string: release.html_url),
+              let page = validDownloadURL(release.html_url),
               isNewer(release.tag_name, than: current)
         else { return nil }
         return UpdateInfo(version: String(release.tag_name.drop(while: { !$0.isNumber })), pageURL: page)

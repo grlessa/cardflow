@@ -106,6 +106,7 @@ import Foundation
             "DCIM/100MSDCF/DSC00002.JPG",
             "PRIVATE/M4ROOT/CLIP/C0001.MP4",
             "PRIVATE/M4ROOT/CLIP/C0001M01.XML",   // sidecar-aside já presente agora também conta como pulado
+            "MISC/notas.txt",                     // não-reconhecido (rede de segurança #3) já presente → pulado
         ]))
     }
 
@@ -416,6 +417,370 @@ import Foundation
         #expect(o.failures.contains { $0.hasSuffix("C0001.MP4") })
         #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0001.MP4").path))  // corrompido removido
     }
+
+    /// Lista os NOMES de todos os arquivos (não-pastas) sob um diretório, recursivamente.
+    private func filesRecursively(under dir: URL) -> [String] {
+        guard let en = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        var out: [String] = []
+        for case let u as URL in en {
+            let isDir = (try? u.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            if !isDir { out.append(u.lastPathComponent) }
+        }
+        return out
+    }
+
+    // #1: depois de um run que deu certo, NENHUM `.cardflow-partial` sobra — tudo que foi conferido
+    // virou nome final via rename atômico. Logo, todo arquivo de nome final no destino está íntegro.
+    @Test func successfulRunLeavesNoPartialFiles() throws {
+        let card = try FakeCard(); defer { card.cleanup() }
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .sampleConferencia, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
+        let o = try svc.run(cardRoot: card.root, chosenMedia: .both, destinations: [dest], camera: "Cam01")
+        #expect(o.failures.isEmpty)
+        let partials = filesRecursively(under: dest).filter { $0.hasSuffix(CopyService.partialSuffix) }
+        #expect(partials.isEmpty)
+        // e o arquivo final existe (foi promovido a partir do parcial)
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Conferencia-Junho-2026/Foto/DSC00001.JPG").path))
+    }
+
+    // #2: corte no meio (disco enche). O run lança, mas ANTES de sair: drena a verificação (nada de
+    // closure async mexendo no disco depois), limpa o parcial que estourou, mantém os arquivos já
+    // conferidos com nome final, e grava um manifesto PARCIAL marcado como interrompido.
+    @Test func interruptedRunDrainsVerifyCleansPartialsAndWritesPartialManifest() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        for i in 0..<3 {
+            let data = Data("clip-\(i)".utf8) + Data((0..<3000).map { UInt8(($0 + i) & 0xFF) })
+            fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C\(String(format: "%04d", i)).MP4").path, contents: data)
+        }
+        let dest = work.appendingPathComponent("SSD")
+
+        // copiador que grava 1 arquivo OK e estoura no 2º (cria o parcial com bytes incompletos e falha)
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: .current, copier: FailAfterNCopier(succeed: 1))
+        #expect(throws: (any Error).self) {
+            _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        }
+
+        // nenhum parcial sobra
+        let partials = filesRecursively(under: dest).filter { $0.hasSuffix(CopyService.partialSuffix) }
+        #expect(partials.isEmpty)
+        // o arquivo que copiou+conferiu ANTES da falha ficou com nome final
+        let finais = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
+        #expect(finais.count == 1)
+        // manifesto PARCIAL gravado e marcado como interrompido
+        let manifests = try ManifestStore().loadAll(eventRootIn: dest, eventName: "Offload")
+        #expect(manifests.count == 1)
+        #expect(manifests.first?.interrupted == true)
+        #expect(manifests.first?.totals.verified == 1)
+    }
+
+    // #5: cancelamento entre arquivos para limpo (nada de parcial), preserva os já copiados e
+    // registra manifesto parcial. Mesma maquinaria da interrupção, disparada pelo botão Parar.
+    @Test func cancellationBetweenFilesStopsCleanly() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        for i in 0..<4 {
+            let data = Data("clip-\(i)".utf8) + Data((0..<2000).map { UInt8(($0 + i) & 0xFF) })
+            fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C\(String(format: "%04d", i)).MP4").path, contents: data)
+        }
+        let dest = work.appendingPathComponent("SSD")
+        var calls = 0
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        #expect(throws: OffloadError.cancelled) {
+            _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam",
+                            isCancelled: { calls += 1; return calls > 1 })   // cancela cedo (entre/dentro de arquivo)
+        }
+        // invariantes (independem de quantos blocos/arquivos passaram antes do cancelamento):
+        // nenhum parcial sobra e o que sobrou foi registrado num manifesto marcado como interrompido.
+        let partials = filesRecursively(under: dest).filter { $0.hasSuffix(CopyService.partialSuffix) }
+        #expect(partials.isEmpty)
+        let manifests = try ManifestStore().loadAll(eventRootIn: dest, eventName: "Offload")
+        #expect(manifests.first?.interrupted == true)
+    }
+
+    // #28: filtro "só hoje" (capturedSince) copia só os arquivos planos a partir da data; antigos ficam.
+    @Test func capturedSinceFiltersOlderFlatFiles() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        let oldFile = card.appendingPathComponent("DCIM/100/OLD.MP4")
+        let newFile = card.appendingPathComponent("DCIM/100/NEW.MP4")
+        fm.createFile(atPath: oldFile.path, contents: Data("antigo".utf8))
+        fm.createFile(atPath: newFile.path, contents: Data("recente".utf8))
+        let oldDate = Date(timeIntervalSince1970: 1_000_000)
+        let newDate = Date(timeIntervalSince1970: 1_780_000_000)
+        try fm.setAttributes([.creationDate: oldDate, .modificationDate: oldDate], ofItemAtPath: oldFile.path)
+        try fm.setAttributes([.creationDate: newDate, .modificationDate: newDate], ofItemAtPath: newFile.path)
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        let o = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam",
+                            capturedSince: Date(timeIntervalSince1970: 1_500_000_000))
+        #expect(o.verifiedCount == 1)   // só o recente
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/NEW.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/OLD.MP4").path))
+    }
+
+    // Retomada RÁPIDA: a 2ª rodada pula os arquivos que o manifesto anterior já conferiu, sem reler —
+    // confiando na verificação anterior (escolha do usuário). Provado: adultera o destino (mesmo
+    // tamanho, sem mexer no manifesto) e a retomada rápida NÃO relê, então não recopia.
+    @Test func fastResumeTrustsManifestAndSkipsWithoutRehashing() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("conteudo-original".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        let o1 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o1.verifiedCount == 1)
+
+        // adultera o destino com OUTRO conteúdo do MESMO tamanho, sem tocar no manifesto
+        let destFile = dest.appendingPathComponent("Offload/Video/C0001.MP4")
+        try Data("conteudo-trocado!".utf8).write(to: destFile)   // mesmo nº de bytes
+
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam", fastResume: true)
+        #expect(o2.verifiedCount == 0)                       // pulou sem reconferir
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))
+        #expect(try Data(contentsOf: destFile) == Data("conteudo-trocado!".utf8))   // não recopiou (trade-off)
+    }
+
+    // Cenário real: backup completo, esqueceu de formatar, continuou gravando. Re-rodar deve copiar
+    // SÓ os arquivos novos e PULAR os já copiados (não recopiar tudo).
+    @Test func incrementalRunCopiesOnlyNewFilesNotEverything() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0000.MP4").path, contents: Data("video-0".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("video-1".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        let o1 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o1.verifiedCount == 2)
+
+        // esqueceu de formatar e gravou mais 2 vídeos no mesmo cartão
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("video-2-novo".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0003.MP4").path, contents: Data("video-3-novo".utf8))
+
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o2.verifiedCount == 2)   // SÓ os 2 novos foram copiados+conferidos
+        #expect(Set(o2.skipped) == Set(["DCIM/100/C0000.MP4", "DCIM/100/C0001.MP4"]))   // os 2 antigos, pulados
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0002.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0003.MP4").path))
+        // nenhuma duplicata: exatamente 4 vídeos no destino
+        let videos = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
+        #expect(videos.count == 4)
+    }
+
+    // Renomear NÃO atrapalha o pulo: o app compara o nome de destino que o PRESET GERA (não o nome da
+    // câmera). Como a regra é determinística, o mesmo arquivo gera o mesmo nome de destino → é pulado.
+    @Test func incrementalSkipWorksEvenWhenPresetRenamesToDifferentName() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("filmagem".utf8))
+        var p = Preset.flatDefault
+        p.evento = "Culto"
+        // renomeia pra um nome TOTALMENTE diferente do da câmera
+        p.rename = .init(enabled: true, template: "{evento}_{ano}-{mes}-{dia}_{nome_original}", counterPadding: 4)
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: p, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        let o1 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o1.verifiedCount == 1)
+        // o arquivo no destino tem nome renomeado (começa com "Culto_"), diferente de "C0001.MP4"
+        let copiados = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
+        #expect(copiados.count == 1)
+        #expect(copiados.first?.hasPrefix("Culto_") == true)
+        #expect(copiados.first != "C0001.MP4")
+
+        // re-rodar: reconhece e PULA, mesmo o nome no destino sendo diferente do da câmera
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o2.verifiedCount == 0)
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))
+        #expect(filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }.count == 1)   // sem duplicata
+    }
+
+    // Mesmo cenário com preset de CONTADOR: enquanto os arquivos novos vêm DEPOIS (números maiores,
+    // o caso normal de câmera), os antigos mantêm o número e são pulados; só os novos são copiados.
+    @Test func incrementalRunWithCounterSkipsOldWhenNewFilesSortAfter() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0000.MP4").path, contents: Data("a".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("b".utf8))
+        var p = Preset.flatDefault
+        p.rename = .init(enabled: true, template: "{contador}_{nome_original}", counterPadding: 4)
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: p, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("c-novo".utf8))
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o2.verifiedCount == 1)                              // só o novo
+        #expect(o2.skipped.contains("DCIM/100/C0000.MP4"))         // antigos mantêm o número → pulados
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))
+        let videos = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
+        #expect(videos.count == 3)                                 // sem duplicata
+    }
+
+    // A prévia conta quantas mídias já estão no destino → a UI decide entre "Iniciar" e "Retomar".
+    @Test func previewCountsAlreadyPresentForResumeDetection() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0000.MP4").path, contents: Data("v0".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("v1".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        // prévia agora: tudo já presente (não é retomada — está completo)
+        let p1 = try svc.preview(cardRoot: card, chosenMedia: .video, destinations: [dest])
+        #expect(p1.alreadyPresent == 2)
+        #expect(p1.selectedCount == 2)
+
+        // chega um 3º vídeo no cartão → prévia mostra 2 de 3: É uma retomada
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("v2".utf8))
+        let p2 = try svc.preview(cardRoot: card, chosenMedia: .video, destinations: [dest])
+        #expect(p2.alreadyPresent == 2)
+        #expect(p2.selectedCount == 3)
+    }
+
+    // A checagem de espaço desconta o que já está no disco: uma retomada não é barrada por "sem espaço"
+    // contando arquivos que já estão lá (e não serão reescritos).
+    @Test func resumeNotBlockedBySpaceForAlreadyPresentFiles() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("um video qualquer".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        // 1ª rodada: espaço sobrando, copia e escreve o manifesto
+        _ = try CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+            .run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        // 2ª rodada: disco "sem espaço" (0 bytes, margem 0). Sem o desconto isto BLOQUEARIA; com o
+        // desconto, o arquivo já verificado precisa de 0 bytes → retoma sem erro.
+        let o2 = try CopyService(preset: .flatDefault, spaceProvider: FixedSpace(bytes: 0),
+                                 timeZone: .current, marginBytes: 0)
+            .run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o2.failures.isEmpty)
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))
+    }
+
+    // Sem retomada rápida (reconferência completa) a adulteração É detectada e o arquivo é recopiado.
+    @Test func fullVerifyResumeDetectsTamperedDest() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("conteudo-original".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        try Data("conteudo-trocado!".utf8).write(to: dest.appendingPathComponent("Offload/Video/C0001.MP4"))
+
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam", fastResume: false)
+        #expect(o2.verifiedCount == 1)   // reconferiu, viu diferente, gravou cópia (não confiou)
+    }
+
+    // #3: arquivo não reconhecido (formato desconhecido) NÃO é deixado pra trás — é copiado verbatim
+    // e conferido pra .cardflow/desconhecidos, como rede de segurança contra perder footage de um formato novo.
+    @Test func unknownFilesAreCopiedToSafetyNetNotLeftBehind() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("video".utf8))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/MISTERIO.xyz").path, contents: Data("formato-novo".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let o = try CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+            .run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        #expect(o.failures.isEmpty)
+        #expect(o.unrecognized == ["DCIM/100/MISTERIO.xyz"])   // ainda listado como não-reconhecido
+        // mas agora ele EXISTE no destino (copiado verbatim na rede de segurança), não foi perdido
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/.cardflow/desconhecidos/DCIM/100/MISTERIO.xyz").path))
+        #expect(try Data(contentsOf: dest.appendingPathComponent("Offload/.cardflow/desconhecidos/DCIM/100/MISTERIO.xyz")) == Data("formato-novo".utf8))
+        #expect(o.canSafelyFormatCard)   // mídia + desconhecido salvos e conferidos → pode formatar
+    }
+
+    // #21: 2 SSDs, um arquivo verifica num e falha no outro → cada manifesto é FIEL ao seu disco
+    // (o disco que falhou não afirma ter o arquivo), e o cartão NÃO pode ser formatado.
+    @Test func twoDisksOneCorruptManifestIsHonestPerDisk() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("video".utf8))
+        let ssd = work.appendingPathComponent("SSD")
+        let hd = work.appendingPathComponent("HD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: .current, copier: FailVerifyOnDest(marker: "/HD/"))
+        let o = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [ssd, hd], camera: "Cam")
+
+        #expect(o.failures.count == 1)            // a falha do HD é reportada
+        #expect(!o.canSafelyFormatCard)           // uma cópia falhou → não pode formatar
+        // SSD: tem o arquivo; manifesto lista 1 verificado
+        let ssdM = try ManifestStore().loadAll(eventRootIn: ssd, eventName: "Offload")
+        #expect(ssdM.first?.files.count == 1)
+        #expect(ssdM.first?.totals.verified == 1)
+        // HD: NÃO tem o arquivo; manifesto não mente sobre ele
+        let hdM = try ManifestStore().loadAll(eventRootIn: hd, eventName: "Offload")
+        #expect(hdM.first?.files.isEmpty == true)
+        #expect(hdM.first?.totals.verified == 0)
+    }
+
+    // Parar responsivo: cancelamento no MEIO de um arquivo grande (não só entre arquivos). O copiador
+    // checa o sinal por bloco e lança; o run trata como .cancelled, limpa parcial e não deixa nada meia-boca.
+    @Test func cancellationMidFileStopsWithinAFile() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        // um vídeo grande o bastante pra ter vários blocos de cópia
+        let big = Data((0..<2_000_000).map { UInt8($0 & 0xFF) })   // 2 MB
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: big)
+        let dest = work.appendingPathComponent("SSD")
+        var chunks = 0
+        // copiador com blocos pequenos pra cancelar no meio do arquivo
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: .current, copier: FileCopier(chunkSize: 64 * 1024))
+        #expect(throws: OffloadError.cancelled) {
+            _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam",
+                            isCancelled: { chunks += 1; return chunks > 2 })   // cancela já no 3º bloco
+        }
+        // nada de parcial nem de arquivo final meia-boca
+        let leftovers = filesRecursively(under: dest).filter { $0.hasSuffix(CopyService.partialSuffix) || $0.uppercased().hasSuffix(".MP4") }
+        #expect(leftovers.isEmpty)
+    }
+
+    // #15: disco cheio (ENOSPC) no meio vira erro CLARO (diskFullDuringCopy), não I/O genérico em inglês.
+    @Test func diskFullDuringCopyGivesClearError() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("video".utf8))
+        let dest = work.appendingPathComponent("SSD")
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
+                              timeZone: .current, copier: FailAfterNCopier(succeed: 0))   // estoura ENOSPC no 1º
+        #expect(throws: OffloadError.diskFullDuringCopy) {
+            _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        }
+    }
 }
 
 private struct AlwaysEnoughSpace: FreeSpaceProviding {
@@ -430,8 +795,46 @@ private struct FixedSpace: FreeSpaceProviding {
 /// que uma corrupção de gravação vira falha reportada, não luz verde.
 private struct FailingVerifyCopier: FileCopying {
     private let real = FileCopier()
-    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void) throws -> UInt64 {
-        try real.copy(source: source, to: destinations, onChunk: onChunk)
+    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void, isCancelled: () -> Bool) throws -> UInt64 {
+        try real.copy(source: source, to: destinations, onChunk: onChunk, isCancelled: isCancelled)
     }
     func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool { false }
+}
+
+/// Copia `succeed` arquivos normalmente e, no seguinte, simula disco enchendo no meio: cria o(s)
+/// parcial(is) com bytes incompletos e lança ENOSPC. Pra exercer o caminho de interrupção.
+private final class FailAfterNCopier: FileCopying {
+    private let real = FileCopier()
+    private let succeed: Int
+    private var count = 0
+    init(succeed: Int) { self.succeed = succeed }
+    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void, isCancelled: () -> Bool) throws -> UInt64 {
+        defer { count += 1 }
+        if count >= succeed {
+            let fm = FileManager.default
+            for d in destinations {
+                try? fm.createDirectory(at: d.deletingLastPathComponent(), withIntermediateDirectories: true)
+                fm.createFile(atPath: d.path, contents: Data("incompleto".utf8))
+            }
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+        }
+        return try real.copy(source: source, to: destinations, onChunk: onChunk)
+    }
+    func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool {
+        try real.verify(expectedHash: expectedHash, fileAt: url)
+    }
+}
+
+/// Grava normal nos dois destinos, mas a conferência SEMPRE reprova no destino cujo caminho contém
+/// `marker` (simula um SSD que corrompe). Pra testar manifesto fiel por disco (#21).
+private struct FailVerifyOnDest: FileCopying {
+    private let real = FileCopier()
+    let marker: String
+    func copy(source: URL, to destinations: [URL], onChunk: (Int) -> Void, isCancelled: () -> Bool) throws -> UInt64 {
+        try real.copy(source: source, to: destinations, onChunk: onChunk, isCancelled: isCancelled)
+    }
+    func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool {
+        if url.path.contains(marker) { return false }   // este disco "corrompe"
+        return try real.verify(expectedHash: expectedHash, fileAt: url)
+    }
 }

@@ -52,13 +52,34 @@ public struct Manifest: Codable, Equatable, Sendable {
     public var files: [FileRecord]
     public var unrecognized: [String]
     public var totals: Totals
+    /// true quando o offload foi cortado no meio (crash/quit/cabo): o manifesto é um registro
+    /// PARCIAL do que já tinha sido salvo e conferido até a interrupção, não de um backup completo.
+    public var interrupted: Bool
 
     public init(schemaVersion: Int, offloadId: String, appVersion: String, presetName: String, camera: String,
                 startedAt: Date, finishedAt: Date, source: SourceInfo, destinations: [String],
-                files: [FileRecord], unrecognized: [String], totals: Totals) {
+                files: [FileRecord], unrecognized: [String], totals: Totals, interrupted: Bool = false) {
         self.schemaVersion = schemaVersion; self.offloadId = offloadId; self.appVersion = appVersion
         self.presetName = presetName; self.camera = camera; self.startedAt = startedAt; self.finishedAt = finishedAt
         self.source = source; self.destinations = destinations; self.files = files
-        self.unrecognized = unrecognized; self.totals = totals
+        self.unrecognized = unrecognized; self.totals = totals; self.interrupted = interrupted
+    }
+
+    // decode tolerante: manifestos gravados antes deste campo (sem `interrupted`) ainda carregam.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        offloadId = try c.decode(String.self, forKey: .offloadId)
+        appVersion = try c.decode(String.self, forKey: .appVersion)
+        presetName = try c.decode(String.self, forKey: .presetName)
+        camera = try c.decode(String.self, forKey: .camera)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        finishedAt = try c.decode(Date.self, forKey: .finishedAt)
+        source = try c.decode(SourceInfo.self, forKey: .source)
+        destinations = try c.decode([String].self, forKey: .destinations)
+        files = try c.decode([FileRecord].self, forKey: .files)
+        unrecognized = try c.decode([String].self, forKey: .unrecognized)
+        totals = try c.decode(Totals.self, forKey: .totals)
+        interrupted = try c.decodeIfPresent(Bool.self, forKey: .interrupted) ?? false
     }
 }

@@ -14,7 +14,8 @@ import Foundation
         #expect(p.photos == 2)
         #expect(p.videos == 1)
         #expect(p.selectedCount == 3)
-        #expect(p.totalBytes == 2048 + 1024 + 4096)
+        // 3 mídias + o não-reconhecido (64 B), que agora é copiado como rede de segurança (#3)
+        #expect(p.totalBytes == 2048 + 1024 + 4096 + 64)
         #expect(p.unrecognized == ["MISC/notas.txt"])
         #expect(p.shortfalls.isEmpty)
     }

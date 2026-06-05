@@ -14,6 +14,15 @@ import Foundation
         #expect(Preset.factoryDefault.id == "factory-default")
     }
 
+    // #32: import de .cfp acima do teto é rejeitado antes de decodificar (defesa contra DoS de decode).
+    @Test func importRejectsOversizedFile() throws {
+        let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PresetStore(directory: dir)
+        let huge = dir.appendingPathComponent("gigante.cfp")
+        try Data(count: PresetStore.maxImportBytes + 1).write(to: huge)
+        #expect(throws: PresetStore.PresetError.fileTooLarge) { _ = try store.load(from: huge) }
+    }
+
     @Test func factoryDefaultIsPtBrByDate() throws {
         let p = Preset.factoryDefault
         #expect(p.evento == "Sessão")

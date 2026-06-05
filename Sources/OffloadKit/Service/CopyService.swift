@@ -3,6 +3,8 @@ import Foundation
 public enum OffloadError: Error, Equatable {
     case notEnoughSpace([SpaceChecker.Shortfall])
     case unsafeDestination(String)   // o caminho do preset tentou gravar FORA da pasta de destino
+    case cancelled                   // o usuário parou o backup no meio
+    case diskFullDuringCopy          // um disco de destino encheu DURANTE a cópia (ENOSPC)
 }
 
 extension OffloadError: LocalizedError {
@@ -13,7 +15,20 @@ extension OffloadError: LocalizedError {
             return "Não há espaço suficiente em: \(names). Libere espaço no destino e tente de novo."
         case .unsafeDestination:
             return "Este preset tem uma estrutura de pastas inválida (tentou gravar fora da pasta de destino). Edite o preset e tente de novo."
+        case .cancelled:
+            return "Backup cancelado. Os arquivos já copiados estão no destino, mas o backup está incompleto — mantenha o cartão como está."
+        case .diskFullDuringCopy:
+            return "Um disco de destino encheu durante a cópia. Libere espaço e tente de novo. O cartão está intocado — mantenha-o como está."
         }
+    }
+
+    /// O erro (ou algum erro aninhado) é "disco cheio" (ENOSPC)? Modo de falha comum em campo.
+    static func isDiskFull(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain && ns.code == CocoaError.fileWriteOutOfSpace.rawValue { return true }
+        if ns.domain == NSPOSIXErrorDomain && ns.code == Int(ENOSPC) { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError { return isDiskFull(underlying) }
+        return false
     }
 }
 
@@ -58,7 +73,7 @@ public struct CopyService {
                 activityKeeper: ActivityKeeping = SystemActivityKeeper(),
                 manifestStore: ManifestStore = ManifestStore(),
                 copier: FileCopying = FileCopier(),
-                appVersion: String = "0.1.0") {
+                appVersion: String = OffloadKit.version) {
         self.preset = preset
         self.scanner = CardScanner(classifier: FileClassifier(preset: preset))
         self.nameBuilder = NameBuilder(preset: preset, timeZone: timeZone)
@@ -69,6 +84,13 @@ public struct CopyService {
         self.activityKeeper = activityKeeper
         self.manifestStore = manifestStore
         self.appVersion = appVersion
+    }
+
+    /// Filtro de data do "só hoje": passa arquivos PLANOS capturados a partir de `since`. Bundles de
+    /// cinema (preserve) passam sempre — filtrar por arquivo quebraria um clipe pela metade.
+    static func dateFilter(_ since: Date?) -> (MediaFile) -> Bool {
+        guard let since else { return { _ in true } }
+        return { $0.preserve || $0.captureDate >= since }
     }
 
     func wants(_ type: FileType, _ chosen: Preset.Media.Kind) -> Bool {
@@ -87,17 +109,60 @@ public struct CopyService {
         f.preserve ? (chosen == .video || chosen == .both) : wants(f.type, chosen)
     }
 
-    func disambiguationSuffixes(for file: MediaFile, sourceHash: UInt64) -> [String] {
+    /// Registros já verificados/presentes em cada destino, lendo os manifestos anteriores deste evento.
+    /// Base da retomada rápida (pular sem reler) e da checagem de espaço justa (descontar o que já lá está).
+    func priorVerifiedRecords(_ destinations: [URL], eventoRoot: String) -> [URL: [Manifest.FileRecord]] {
+        var out: [URL: [Manifest.FileRecord]] = [:]
+        for dest in destinations {
+            var recs: [Manifest.FileRecord] = []
+            for m in ((try? manifestStore.loadAll(eventRootIn: dest, eventName: eventoRoot)) ?? []) {
+                recs += m.files.filter { $0.status == "verified" || $0.status == "present" }
+            }
+            out[dest] = recs
+        }
+        return out
+    }
+
+    /// Bytes que cada destino ainda PRECISA receber: total do payload menos o que já está verificado lá
+    /// (mesmo arquivo de origem, mesmo tamanho). Sem isto, retomar num disco apertado seria barrado por
+    /// "sem espaço" contando o que já está no disco.
+    func requiredPerDestination(payload: [MediaFile], priorByDest: [URL: [Manifest.FileRecord]],
+                                destinations: [URL]) -> [URL: Int64] {
+        var out: [URL: Int64] = [:]
+        for dest in destinations {
+            var alreadyBytes: [String: Int64] = [:]
+            for f in (priorByDest[dest] ?? []) { alreadyBytes[f.sourceRelPath] = f.bytes }
+            out[dest] = payload.reduce(Int64(0)) { acc, f in (alreadyBytes[f.relPath] == f.size) ? acc : acc + f.size }
+        }
+        return out
+    }
+
+    func disambiguationSuffixes(for file: MediaFile) -> [String] {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = nameBuilder.timeZone
         f.dateFormat = "yyyy-MM-dd_HHmmss"
-        return ["_" + f.string(from: file.captureDate)]
+        let base = "_" + f.string(from: file.captureDate)
+        // variantes LEGÍVEIS pra rajada de fotos no mesmo segundo (base, base-2…base-9) antes de
+        // cair no sufixo de hash hex (que é único mas feio). Cobre a maioria das rajadas reais.
+        return [base] + (2...9).map { "\(base)-\($0)" }
     }
 
-    /// Um arquivo já gravado, a ser conferido (ler de volta + hash) em paralelo com as cópias seguintes.
+    /// Sufixo dos arquivos em escrita. A cópia grava em `<final>.cardflow-partial` e só renomeia
+    /// pro nome FINAL (rename atômico, mesmo volume) DEPOIS de conferir byte a byte. Consequência:
+    /// todo arquivo com nome final no destino está garantidamente íntegro — um crash/quit no meio
+    /// deixa só um `.cardflow-partial`, nunca um arquivo de nome final pela metade.
+    static let partialSuffix = ".cardflow-partial"
+    private func partialURL(for finalURL: URL) -> URL {
+        URL(fileURLWithPath: finalURL.path + Self.partialSuffix)
+    }
+
+    /// Um arquivo já gravado (no caminho parcial), a ser conferido e então renomeado pro nome final,
+    /// em paralelo com as cópias seguintes.
     private struct PendingVerify {
-        let url: URL
+        let url: URL          // nome FINAL (só passa a existir após a conferência)
+        let tempURL: URL      // arquivo `.cardflow-partial` em que os bytes foram gravados
+        let sourceURL: URL    // origem (pra recopiar numa falha transitória de verify)
         let expectedHash: UInt64
         let rel: String
         let sourceRel: String
@@ -112,21 +177,31 @@ public struct CopyService {
         var fullyPresent = false
     }
 
+    /// Categoria de um arquivo conferido — pra contar mídia, sidecar e não-reconhecido à parte.
+    private enum VerifyCategory { case media, sidecar, unrecognized }
+
     /// Acumulador da verificação paralela. Tudo sob lock: a fila de fundo escreve aqui enquanto
     /// o laço de cópia segue. Reference type de propósito (evita acesso exclusivo a `var` capturado).
     private final class VerifyAccumulator {
         private let lock = NSLock()
-        private var verified = 0          // mídia (foto/vídeo/áudio/cinema)
-        private var sidecarVerified = 0   // sidecars-aside (contados à parte, como no fluxo antigo)
+        private var verified = 0             // mídia (foto/vídeo/áudio/cinema)
+        private var sidecarVerified = 0      // sidecars-aside (contados à parte, como no fluxo antigo)
+        private var unrecognizedVerified = 0 // não-reconhecidos copiados pra .cardflow/desconhecidos (rede de segurança)
         private var failures: [String] = []
         private var records: [Manifest.FileRecord] = []
-        func addVerified(_ r: Manifest.FileRecord, sidecar: Bool) {
-            lock.lock(); if sidecar { sidecarVerified += 1 } else { verified += 1 }; records.append(r); lock.unlock()
+        func addVerified(_ r: Manifest.FileRecord, category: VerifyCategory) {
+            lock.lock()
+            switch category {
+            case .media: verified += 1
+            case .sidecar: sidecarVerified += 1
+            case .unrecognized: unrecognizedVerified += 1
+            }
+            records.append(r); lock.unlock()
         }
         func addFailure(_ rel: String) { lock.lock(); failures.append(rel); lock.unlock() }
         func addPresent(_ rs: [Manifest.FileRecord]) { guard !rs.isEmpty else { return }; lock.lock(); records.append(contentsOf: rs); lock.unlock() }
-        func snapshot() -> (verified: Int, sidecarVerified: Int, failures: [String], records: [Manifest.FileRecord]) {
-            lock.lock(); defer { lock.unlock() }; return (verified, sidecarVerified, failures, records)
+        func snapshot() -> (verified: Int, sidecarVerified: Int, unrecognizedVerified: Int, failures: [String], records: [Manifest.FileRecord]) {
+            lock.lock(); defer { lock.unlock() }; return (verified, sidecarVerified, unrecognizedVerified, failures, records)
         }
     }
 
@@ -145,12 +220,49 @@ public struct CopyService {
         }
     }
 
+    /// Remove `*.cardflow-partial` órfãos de um run interrompido (crash/quit/cabo). Escopo: a árvore
+    /// do evento em cada destino — onde os parciais ficam — pra não varrer o disco inteiro a cada cópia.
+    private func sweepOrphanPartials(eventoRoot: String, in destinations: [URL]) {
+        let fm = FileManager.default
+        for dest in destinations {
+            let root = dest.appendingPathComponent(eventoRoot)
+            guard let en = fm.enumerator(at: root, includingPropertiesForKeys: nil,
+                                         options: [], errorHandler: { _, _ in true }) else { continue }
+            for case let u as URL in en where u.lastPathComponent.hasSuffix(Self.partialSuffix) {
+                try? fm.removeItem(at: u)
+            }
+        }
+    }
+
     private func copyFile(_ file: MediaFile, desiredRel: String, destinations: [URL],
                           claimed: inout [URL: [String: UInt64]],
-                          onCopiedBytes: (Int) -> Void = { _ in }) throws -> CopyFileResult {
+                          verifiedByDest: [URL: [String: (bytes: Int64, hash: UInt64)]] = [:],
+                          onCopiedBytes: (Int) -> Void = { _ in },
+                          isCancelled: () -> Bool = { false }) throws -> CopyFileResult {
         try assertContained(desiredRel, in: destinations)   // nada escreve fora do destino
         var result = CopyFileResult()
         let fm = FileManager.default
+
+        // RETOMADA RÁPIDA: se o manifesto anterior já conferiu este arquivo em TODOS os destinos
+        // (mesmo caminho e tamanho) e ele ainda está lá com esse tamanho, pula sem reler — confiando
+        // na verificação anterior. Evita reler dezenas de GB do cartão e do SSD na retomada.
+        if !verifiedByDest.isEmpty {
+            let vouchedEverywhere = destinations.allSatisfy { dest in
+                guard let rec = verifiedByDest[dest]?[desiredRel], rec.bytes == file.size else { return false }
+                let sz = (try? dest.appendingPathComponent(desiredRel).resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+                return sz == Int(file.size)
+            }
+            if vouchedEverywhere {
+                result.fullyPresent = true
+                for dest in destinations {
+                    let rec = verifiedByDest[dest]![desiredRel]!
+                    claimed[dest]?[desiredRel] = rec.hash
+                    result.presentRecords.append(.init(sourceRelPath: file.relPath, destRelPath: desiredRel,
+                        type: file.type, bytes: file.size, xxhash64: String(format: "%016llx", rec.hash), status: "present"))
+                }
+                return result
+            }
+        }
 
         // Caminho rápido: se NADA existe no caminho desejado (no disco ou já reivindicado
         // nesta sessão) em nenhum destino, não há colisão possível — grava direto e o hash
@@ -160,14 +272,15 @@ public struct CopyService {
                 || fm.fileExists(atPath: dest.appendingPathComponent(desiredRel).path)
         }
         if !anyExisting {
-            let targets = destinations.map { $0.appendingPathComponent(desiredRel) }
-            let sourceHash = try copier.copy(source: file.sourceURL, to: targets, onChunk: onCopiedBytes)
+            let finals = destinations.map { $0.appendingPathComponent(desiredRel) }
+            // grava nos PARCIAIS; a conferência renomeia pro final só depois de bater o hash.
+            let sourceHash = try copier.copy(source: file.sourceURL, to: finals.map(partialURL(for:)), onChunk: onCopiedBytes, isCancelled: isCancelled)
             let hashHex = String(format: "%016llx", sourceHash)
-            for dest in destinations {
-                let url = dest.appendingPathComponent(desiredRel)
-                // otimista: o arquivo foi escrito (fsync já feito); a conferência confirma em paralelo.
+            for (i, dest) in destinations.enumerated() {
+                // otimista: o parcial foi escrito (fsync já feito); a conferência confirma e promove em paralelo.
                 claimed[dest]?[desiredRel] = sourceHash
-                result.pending.append(PendingVerify(url: url, expectedHash: sourceHash, rel: desiredRel,
+                result.pending.append(PendingVerify(url: finals[i], tempURL: partialURL(for: finals[i]),
+                                                    sourceURL: file.sourceURL, expectedHash: sourceHash, rel: desiredRel,
                                                     sourceRel: file.relPath, type: file.type, bytes: file.size, hashHex: hashHex))
             }
             return result
@@ -175,7 +288,7 @@ public struct CopyService {
 
         // Caminho com colisão possível: pré-hash + resolução determinística (não-sobrescrita).
         let sourceHash = try XXHash64.hash(fileAt: file.sourceURL)
-        let suffixes = disambiguationSuffixes(for: file, sourceHash: sourceHash)
+        let suffixes = disambiguationSuffixes(for: file)
         let hashHex = String(format: "%016llx", sourceHash)
 
         var finalRelByDest: [URL: String] = [:]
@@ -197,14 +310,16 @@ public struct CopyService {
             presentByDest[dest] == true ? nil : dest.appendingPathComponent(finalRelByDest[dest]!)
         }
         result.fullyPresent = writeTargets.isEmpty
-        if !writeTargets.isEmpty { _ = try copier.copy(source: file.sourceURL, to: writeTargets, onChunk: onCopiedBytes) }
+        // grava nos PARCIAIS; a conferência renomeia pro final só depois de bater o hash.
+        if !writeTargets.isEmpty { _ = try copier.copy(source: file.sourceURL, to: writeTargets.map(partialURL(for:)), onChunk: onCopiedBytes, isCancelled: isCancelled) }
 
         for dest in destinations {
             let rel = finalRelByDest[dest]!
             let url = dest.appendingPathComponent(rel)
             if presentByDest[dest] == false {
                 claimed[dest]?[rel] = sourceHash
-                result.pending.append(PendingVerify(url: url, expectedHash: sourceHash, rel: rel,
+                result.pending.append(PendingVerify(url: url, tempURL: partialURL(for: url),
+                                                    sourceURL: file.sourceURL, expectedHash: sourceHash, rel: rel,
                                                     sourceRel: file.relPath, type: file.type, bytes: file.size, hashHex: hashHex))
             } else {
                 result.presentRecords.append(.init(sourceRelPath: file.relPath, destRelPath: rel, type: file.type, bytes: file.size, xxhash64: hashHex, status: "present"))
@@ -255,6 +370,9 @@ public struct CopyService {
     public func run(cardRoot: URL, chosenMedia: Preset.Media.Kind,
                     destinations: [URL], camera: String,
                     sessionValues: [String: String] = [:],
+                    capturedSince: Date? = nil,
+                    fastResume: Bool = true,
+                    isCancelled: () -> Bool = { false },
                     onProgress: (OffloadProgress) -> Void = { _ in }) throws -> OffloadOutcome {
         let token = activityKeeper.begin(reason: "Cardflow offload")
         defer { activityKeeper.end(token) }
@@ -268,15 +386,37 @@ public struct CopyService {
         let eventoRoot = NameBuilder.sanitizePathComponent(preset.evento)
         let cardName = NameBuilder.sanitizePathComponent(cardRoot.lastPathComponent)
         let all = try scanner.scan(cardRoot: cardRoot)
-        let selected = all.filter { isSelected($0, chosenMedia) }
-        let sidecars = all.filter { $0.type == .sidecar && !$0.preserve }
-        let unrecognized = all.filter { $0.type == .unknown && !$0.preserve }.map(\.relPath).sorted()
+        let dateOK = Self.dateFilter(capturedSince)   // filtro "só hoje" (planos); cinema passa sempre
+        let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
+        let sidecars = all.filter { $0.type == .sidecar && !$0.preserve && dateOK($0) }
+        // não-reconhecidos: copiados verbatim como REDE DE SEGURANÇA (#3) — podem ser footage de um
+        // formato que ainda não conhecemos, então nunca são deixados pra trás em silêncio.
+        let unrecognizedFiles = all.filter { $0.type == .unknown && !$0.preserve && dateOK($0) }
+        let unrecognized = unrecognizedFiles.map(\.relPath).sorted()
 
-        let required = selected.reduce(Int64(0)) { $0 + $1.size }
-        let shortfalls = try spaceChecker.check(requiredBytesPerDestination: required, destinations: destinations, marginBytes: marginBytes)
+        // lê os manifestos anteriores deste evento UMA vez: base da retomada rápida + checagem de espaço.
+        let priorByDest = fastResume ? priorVerifiedRecords(destinations, eventoRoot: eventoRoot) : [:]
+        // índice da retomada rápida (destRelPath → tamanho+hash): pula sem reler na cópia.
+        var verifiedByDest: [URL: [String: (bytes: Int64, hash: UInt64)]] = [:]
+        for (dest, recs) in priorByDest {
+            var byDestRel: [String: (bytes: Int64, hash: UInt64)] = [:]
+            for f in recs where !f.xxhash64.isEmpty {
+                if let h = UInt64(f.xxhash64, radix: 16) { byDestRel[f.destRelPath] = (f.bytes, h) }
+            }
+            verifiedByDest[dest] = byDestRel
+        }
+
+        let payload = selected + unrecognizedFiles
+        let required = payload.reduce(Int64(0)) { $0 + $1.size }   // total que PODE ser escrito (barra de progresso)
+        // checagem POR DESTINO, descontando o que aquele disco já tem verificado (não será reescrito).
+        let needByDest = requiredPerDestination(payload: payload, priorByDest: priorByDest, destinations: destinations)
+        let shortfalls: [SpaceChecker.Shortfall] = try destinations.compactMap { dest in
+            try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? required,
+                                   destinations: [dest], marginBytes: marginBytes).first
+        }
         if !shortfalls.isEmpty { throw OffloadError.notEnoughSpace(shortfalls) }
 
-        let totalFiles = selected.count + (preset.copySidecars == .aside ? sidecars.count : 0)
+        let totalFiles = selected.count + unrecognizedFiles.count + (preset.copySidecars == .aside ? sidecars.count : 0)
         onProgress(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: totalFiles, bytesDone: 0, bytesTotal: required))
         var bytesDone: Int64 = 0
 
@@ -295,15 +435,34 @@ public struct CopyService {
         let verifyQueue = DispatchQueue(label: "br.com.cardflow.verify")   // serial: confere 1 por vez
         let verifyGroup = DispatchGroup()
         let copier = self.copier   // captura imutável (não captura self na fila de fundo)
-        func enqueueVerify(_ pv: PendingVerify, sidecar: Bool) {
+        func enqueueVerify(_ pv: PendingVerify, category: VerifyCategory) {
             verifyGroup.enter()
             verifyQueue.async {
-                let ok = (try? copier.verify(expectedHash: pv.expectedHash, fileAt: pv.url)) ?? false
+                let fm = FileManager.default
+                var ok = (try? copier.verify(expectedHash: pv.expectedHash, fileAt: pv.tempURL)) ?? false
+                // retry de falha TRANSITÓRIA (glitch de cabo USB / hiccup de controlador): recopia da
+                // origem e reconfere até 2 vezes antes de desistir. Não é perda (a falha real ainda é
+                // gritada na Uia); é resiliência pros casos que somem na 2ª tentativa.
+                var extraAttempts = 0
+                while !ok && extraAttempts < 2 {
+                    extraAttempts += 1
+                    _ = try? copier.copy(source: pv.sourceURL, to: [pv.tempURL], onChunk: { _ in }, isCancelled: { false })
+                    ok = (try? copier.verify(expectedHash: pv.expectedHash, fileAt: pv.tempURL)) ?? false
+                }
                 if ok {
-                    acc.addVerified(.init(sourceRelPath: pv.sourceRel, destRelPath: pv.rel, type: pv.type, bytes: pv.bytes, xxhash64: pv.hashHex, status: "verified"), sidecar: sidecar)
+                    do {
+                        // promove o parcial pro nome final (rename atômico). NUNCA sobrescreve: se o
+                        // final já existir (não deveria, colisão já foi resolvida), trata como falha
+                        // em vez de apagar um arquivo bom.
+                        try fm.moveItem(at: pv.tempURL, to: pv.url)
+                        acc.addVerified(.init(sourceRelPath: pv.sourceRel, destRelPath: pv.rel, type: pv.type, bytes: pv.bytes, xxhash64: pv.hashHex, status: "verified"), category: category)
+                    } catch {
+                        acc.addFailure(pv.rel)
+                        try? fm.removeItem(at: pv.tempURL)
+                    }
                 } else {
                     acc.addFailure(pv.rel)
-                    try? FileManager.default.removeItem(at: pv.url)   // verify falhou → remove o corrompido
+                    try? fm.removeItem(at: pv.tempURL)   // verify falhou → remove o parcial corrompido
                 }
                 verifyGroup.leave()
             }
@@ -312,12 +471,16 @@ public struct CopyService {
         var processed = 0
         var relocatedCinema: [String] = []
 
-        func copyOne(_ file: MediaFile, _ desiredRel: String, countsBytes: Bool = true, asSidecar: Bool = false) throws {
+        func copyOne(_ file: MediaFile, _ desiredRel: String, countsBytes: Bool = true, category: VerifyCategory = .media) throws {
+            // cancelamento COOPERATIVO: checa entre arquivos, nunca no meio de um (não deixa arquivo
+            // pela metade). Lança .cancelled → o mesmo catch que trata interrupção drena/limpa/registra.
+            if isCancelled() { throw OffloadError.cancelled }
             let base = bytesDone
             var sinceReport: Int64 = 0
             // progresso DENTRO do arquivo: a barra anda enquanto um vídeo grande copia (limita a
             // emissão a cada ~32 MB pra não disparar milhares de updates de UI num arquivo de 18 GB).
             let r = try copyFile(file, desiredRel: desiredRel, destinations: destinations, claimed: &claimed,
+                                 verifiedByDest: verifiedByDest,
                                  onCopiedBytes: { chunk in
                 bytesDone += Int64(chunk)
                 sinceReport += Int64(chunk)
@@ -325,52 +488,100 @@ public struct CopyService {
                     sinceReport = 0
                     onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
                 }
-            })
+            }, isCancelled: isCancelled)
             acc.addPresent(r.presentRecords)
             if r.fullyPresent { skipped.append(file.relPath) }
-            for pv in r.pending { enqueueVerify(pv, sidecar: asSidecar) }   // confere em paralelo enquanto o próximo já copia
+            for pv in r.pending { enqueueVerify(pv, category: category) }   // confere em paralelo enquanto o próximo já copia
             bytesDone = countsBytes ? base + file.size : base   // sidecar não conta no total de bytes
             processed += 1
             onProgress(OffloadProgress(phase: .copying, filesDone: processed, filesTotal: totalFiles, bytesDone: bytesDone, bytesTotal: required))
         }
+
+        // limpa parciais de um run anterior interrompido antes de começar (hygiene; o nome final
+        // já é seguro por si só, mas isso evita acúmulo de `.cardflow-partial`).
+        sweepOrphanPartials(eventoRoot: eventoRoot, in: destinations)
 
         // fase vira "Copiando" já no começo (mesmo antes do 1º bloco), pra sumir o "Escaneando".
         if !selected.isEmpty {
             onProgress(OffloadProgress(phase: .copying, filesDone: 0, filesTotal: totalFiles, bytesDone: 0, bytesTotal: required))
         }
 
-        // 1) arquivos planos: achata + renomeia (contador estável por arquivo)
-        for file in selected where !file.preserve {
-            let context = NamingContext(camera: camera, counter: counterIndex[file.relPath] ?? 1,
-                                        cardName: cardRoot.lastPathComponent, sessionValues: sessionValues)
-            try copyOne(file, try nameBuilder.relativeDestination(for: file, context: context))
-        }
-
-        // 2) preservados: por BUNDLE, verbatim, desambiguando no nível da pasta do cartão
-        var bundleOrder: [String] = []
-        var bundles: [String: [MediaFile]] = [:]
-        for file in selected where file.preserve {
-            let key = PreservePlanner.bundleKey(file.relPath)
-            if bundles[key] == nil { bundleOrder.append(key) }
-            bundles[key, default: []].append(file)
-        }
-        for key in bundleOrder {
-            let bundle = bundles[key]!
-            let (parent, relocated) = try resolveBundleParent(
-                eventoRoot: eventoRoot, cardName: cardName, bundle: bundle,
-                destinations: destinations, claimed: claimed)
-            if relocated { relocatedCinema.append(key) }
-            for file in bundle {
-                try copyOne(file, "\(eventoRoot)/\(parent)/\(file.relPath)")
+        do {
+            // 1) arquivos planos: achata + renomeia (contador estável por arquivo)
+            for file in selected where !file.preserve {
+                let context = NamingContext(camera: camera, counter: counterIndex[file.relPath] ?? 1,
+                                            cardName: cardRoot.lastPathComponent, sessionValues: sessionValues)
+                try copyOne(file, try nameBuilder.relativeDestination(for: file, context: context))
             }
-        }
 
-        // 3) sidecars (só se a política for .aside): vão pra .cardflow/sidecars; não contam bytes
-        //    nem entram no verifiedCount de mídia (são contados à parte em sidecarsCopied).
-        if preset.copySidecars == .aside {
-            for file in sidecars {
-                try copyOne(file, "\(eventoRoot)/.cardflow/sidecars/\(file.relPath)", countsBytes: false, asSidecar: true)
+            // 2) preservados: por BUNDLE, verbatim, desambiguando no nível da pasta do cartão
+            var bundleOrder: [String] = []
+            var bundles: [String: [MediaFile]] = [:]
+            for file in selected where file.preserve {
+                let key = PreservePlanner.bundleKey(file.relPath)
+                if bundles[key] == nil { bundleOrder.append(key) }
+                bundles[key, default: []].append(file)
             }
+            for key in bundleOrder {
+                let bundle = bundles[key]!
+                let (parent, relocated) = try resolveBundleParent(
+                    eventoRoot: eventoRoot, cardName: cardName, bundle: bundle,
+                    destinations: destinations, claimed: claimed)
+                if relocated { relocatedCinema.append(key) }
+                for file in bundle {
+                    try copyOne(file, "\(eventoRoot)/\(parent)/\(file.relPath)")
+                }
+            }
+
+            // 3) sidecars (só se a política for .aside): vão pra .cardflow/sidecars; não contam bytes
+            //    nem entram no verifiedCount de mídia (são contados à parte em sidecarsCopied).
+            if preset.copySidecars == .aside {
+                for file in sidecars {
+                    try copyOne(file, "\(eventoRoot)/.cardflow/sidecars/\(file.relPath)", countsBytes: false, category: .sidecar)
+                }
+            }
+
+            // 4) não-reconhecidos: rede de segurança (#3). Copia verbatim+conferido pra
+            //    .cardflow/desconhecidos, pra um formato novo nunca sumir sem aviso. Conta no verde
+            //    como "desconhecido" (à parte da mídia), e uma falha aqui também impede formatar.
+            for file in unrecognizedFiles {
+                try copyOne(file, "\(eventoRoot)/.cardflow/desconhecidos/\(file.relPath)", countsBytes: true, category: .unrecognized)
+            }
+        } catch {
+            // Corte no meio (disco cheio, cartão arrancado, espaço acabou). SEMPRE drena a verificação
+            // antes de sair: senão closures async continuariam renomeando/removendo arquivos no disco
+            // DEPOIS de run() retornar (corrida perigosa num app cujo trabalho é não mexer errado em footage).
+            verifyGroup.wait()
+            // limpa o parcial que estourou no meio da escrita (os conferidos já viraram nome final;
+            // os reprovados já foram removidos pela própria verificação).
+            sweepOrphanPartials(eventoRoot: eventoRoot, in: destinations)
+            // manifesto PARCIAL marcado como interrompido: trilha do que foi salvo+conferido até aqui.
+            let snap = acc.snapshot()
+            let records = snap.records.sorted { $0.destRelPath < $1.destRelPath }
+            let fp = CardFingerprint.compute(files: selected)
+            let totals = Manifest.Totals(
+                photos: selected.filter { $0.type == .photo }.count,
+                videos: selected.filter { $0.type == .video }.count,
+                audio: selected.filter { $0.type == .audio }.count,
+                cinema: PreservePlanner.bundleCount(selected),
+                sidecars: records.filter { $0.type == .sidecar }.count,
+                verified: snap.verified, failed: snap.failures.count, skipped: skipped.count)
+            let partialManifest = Manifest(
+                schemaVersion: 2, offloadId: fp, appVersion: appVersion,
+                presetName: preset.name, camera: camera, startedAt: started, finishedAt: clock(),
+                source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fp, fileCount: selected.count, bytes: required),
+                destinations: destinations.map(\.path), files: records, unrecognized: unrecognized,
+                totals: totals, interrupted: true)
+            for dest in destinations {
+                guard (try? assertContained("\(eventoRoot)/.cardflow", in: [dest])) != nil else { continue }
+                _ = try? manifestStore.write(partialManifest, eventRootIn: dest, eventName: eventoRoot)
+            }
+            // cancelamento no meio de um arquivo (botão Parar) chega como CancellationError → normaliza.
+            if error is CancellationError { throw OffloadError.cancelled }
+            // disco cheio é um modo de falha comum em campo: troca o erro de I/O genérico (em inglês,
+            // incompreensível pro leigo) por uma mensagem clara apontando o que fazer.
+            if OffloadError.isDiskFull(error) { throw OffloadError.diskFullDuringCopy }
+            throw error
         }
 
         // espera a verificação terminar (a maior parte já rodou em paralelo com as cópias acima).
@@ -393,22 +604,29 @@ public struct CopyService {
             cinema: PreservePlanner.bundleCount(selected),
             sidecars: records.filter { $0.type == .sidecar }.count,
             verified: verifiedCount, failed: failures.count, skipped: skipped.count)
-        let manifest = Manifest(
-            schemaVersion: 2, offloadId: fingerprint, appVersion: appVersion,
-            presetName: preset.name, camera: camera, startedAt: started, finishedAt: finished,
-            source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fingerprint, fileCount: selected.count, bytes: required),
-            destinations: destinations.map(\.path),
-            files: records, unrecognized: unrecognized,
-            totals: totals
-        )
         var manifestPaths: [String] = []
         var manifestFailures: [String] = []
+        let fm = FileManager.default
         for dest in destinations {
             do {
                 // defesa em profundidade: o manifesto é o único write fora do copyFile; garante
                 // que ele também fica dentro do destino (eventoRoot já é saneado, mas não custa).
                 try assertContained("\(eventoRoot)/.cardflow", in: [dest])
-                let url = try manifestStore.write(manifest, eventRootIn: dest, eventName: eventoRoot)
+                // #21: manifesto FIEL por disco — só lista os arquivos que REALMENTE estão neste destino.
+                // No modo 2 SSDs, se um arquivo verificou num disco e falhou no outro, cada manifesto
+                // reflete o seu próprio disco, em vez de os dois afirmarem ter o arquivo.
+                let destFiles = records.filter { fm.fileExists(atPath: dest.appendingPathComponent($0.destRelPath).path) }
+                var destTotals = totals
+                // verified conta só MÍDIA: sidecars e não-reconhecidos vivem sob .cardflow/ e têm contagem
+                // própria; cinema (fora de .cardflow) conta. (type sozinho não basta: .RMD de cinema é .unknown.)
+                destTotals.verified = destFiles.filter { $0.status == "verified" && !$0.destRelPath.contains("/.cardflow/") }.count
+                let destManifest = Manifest(
+                    schemaVersion: 2, offloadId: fingerprint, appVersion: appVersion,
+                    presetName: preset.name, camera: camera, startedAt: started, finishedAt: finished,
+                    source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fingerprint, fileCount: selected.count, bytes: required),
+                    destinations: destinations.map(\.path),
+                    files: destFiles, unrecognized: unrecognized, totals: destTotals)
+                let url = try manifestStore.write(destManifest, eventRootIn: dest, eventName: eventoRoot)
                 manifestPaths.append(url.path)
             } catch {
                 manifestFailures.append(dest.lastPathComponent)   // mídia já verificada; só o registro falhou

@@ -130,12 +130,44 @@ public struct NameBuilder {
     /// Também neutraliza um valor que seja exatamente "." ou ".." — senão um {evento}="…"
     /// viraria um componente de path de travessia (subir de pasta).
     public static func sanitizePathComponent(_ s: String) -> String {
-        let cleaned = s.replacingOccurrences(of: "/", with: "-")
+        var cleaned = s.replacingOccurrences(of: "/", with: "-")
                        .replacingOccurrences(of: ":", with: "-")
-                       .replacingOccurrences(of: "\0", with: "")
+        // remove caracteres de controle (TAB, newline, \r, NUL e cia.): criam arquivos que parecem
+        // corrompidos, difíceis de selecionar no Finder, e quebram scripts. NUL é categoria de controle.
+        cleaned.unicodeScalars.removeAll { $0.properties.generalCategory == .control }
+        // normaliza pra NFC (forma canônica): cartões diferentes gravam acentos em NFC ou NFD;
+        // sem isto o mesmo "Café" sairia inconsistente entre fontes.
+        cleaned = cleaned.precomposedStringWithCanonicalMapping
         if cleaned == "." { return "_" }
         if cleaned == ".." { return "__" }
         return cleaned
+    }
+
+    /// Trunca um componente de path pra caber no limite de bytes do filesystem (APFS ≈ 255 bytes/componente).
+    /// Acentos pt-BR custam 2-3 bytes cada em UTF-8, então um nome de evento entusiasmado estoura fácil.
+    /// Corta em fronteira de caractere (nunca no meio de um grapheme) e preserva a extensão do arquivo.
+    static func truncateComponent(_ s: String, maxBytes: Int, keepingExtension: Bool) -> String {
+        guard s.utf8.count > maxBytes else { return s }
+        if keepingExtension {
+            let ns = s as NSString
+            let ext = ns.pathExtension
+            let stem = ns.deletingPathExtension
+            let extBudget = ext.isEmpty ? 0 : ext.utf8.count + 1   // ".ext"
+            let cut = truncateToBytes(stem, maxBytes: max(1, maxBytes - extBudget))
+            return ext.isEmpty ? cut : "\(cut).\(ext)"
+        }
+        return truncateToBytes(s, maxBytes: maxBytes)
+    }
+
+    private static func truncateToBytes(_ s: String, maxBytes: Int) -> String {
+        var out = ""
+        var bytes = 0
+        for ch in s {
+            let c = String(ch).utf8.count
+            if bytes + c > maxBytes { break }
+            out.append(ch); bytes += c
+        }
+        return out
     }
 
     /// Rejeita um template cuja PARTE LITERAL permitiria escapar da pasta de destino
@@ -181,15 +213,36 @@ public struct NameBuilder {
 
     public func relativeDestination(for file: MediaFile, context ctx: NamingContext) throws -> String {
         let folder = try render(preset.folderStructure, file: file, ctx: ctx)
-        let fileName: String
+        let originalName = (file.relPath as NSString).lastPathComponent
+        var fileName: String
         if preset.rename.enabled {
-            let stem = try render(preset.rename.template, file: file, ctx: ctx)
+            let rendered = try render(preset.rename.template, file: file, ctx: ctx)
             let ext = (file.relPath as NSString).pathExtension
-            fileName = ext.isEmpty ? stem : "\(stem).\(ext)"
+            // #7: se o template renderiza vazio (evento vazio, campo de sessão em branco, só
+            // separadores), cai pro nome ORIGINAL — senão viraria ".JPG" (oculto no Finder) ou
+            // ".JPG_<hash>" (oculto E sem extensão válida). Footage oculto, pro leigo, é footage perdido.
+            let originalStem = (originalName as NSString).deletingPathExtension
+            let stem = Self.isEffectivelyEmpty(rendered) ? originalStem : rendered
+            if stem.isEmpty {
+                fileName = originalName
+            } else {
+                fileName = ext.isEmpty ? stem : "\(stem).\(ext)"
+            }
         } else {
-            fileName = (file.relPath as NSString).lastPathComponent
+            fileName = originalName
         }
-        return folder + "/" + fileName
+        // #8: nenhum componente pode passar do limite do filesystem, senão o FileManager lança
+        // ENAMETOOLONG e derruba o offload INTEIRO. Trunca cada segmento de pasta e o nome do arquivo.
+        let safeFolder = folder.split(separator: "/", omittingEmptySubsequences: false)
+            .map { Self.truncateComponent(String($0), maxBytes: 200, keepingExtension: false) }
+            .joined(separator: "/")
+        let safeFile = Self.truncateComponent(fileName, maxBytes: 200, keepingExtension: true)
+        return safeFolder + "/" + safeFile
+    }
+
+    /// "Vazio na prática": só separadores/espaços (ou nada). Um stem assim viraria arquivo oculto.
+    private static func isEffectivelyEmpty(_ s: String) -> Bool {
+        s.trimmingCharacters(in: CharacterSet(charactersIn: " -_.").union(.whitespacesAndNewlines)).isEmpty
     }
 
     /// Compat com o Plano 1 (testes/serviço que passam camera+counter direto).

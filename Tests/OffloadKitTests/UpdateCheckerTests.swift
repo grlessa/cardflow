@@ -17,4 +17,14 @@ import Testing
         #expect(!UpdateChecker.isNewer("0.0.9", than: "0.1.0"))
         #expect(!UpdateChecker.isNewer("0.9.0", than: "0.10.0"))
     }
+
+    // #32: a URL de download só vale se for https em github.com — um JSON adulterado não abre
+    // file:// nem outro host pelo botão "Baixar".
+    @Test func onlyAcceptsHttpsGithubDownloadURL() {
+        #expect(UpdateChecker.validDownloadURL("https://github.com/grlessa/cardflow/releases/tag/v0.2.0") != nil)
+        #expect(UpdateChecker.validDownloadURL("https://api.github.com/x") != nil)   // subdomínio github.com
+        #expect(UpdateChecker.validDownloadURL("file:///etc/passwd") == nil)
+        #expect(UpdateChecker.validDownloadURL("http://github.com/x") == nil)        // não-https
+        #expect(UpdateChecker.validDownloadURL("https://evil.com/x") == nil)         // outro host
+    }
 }

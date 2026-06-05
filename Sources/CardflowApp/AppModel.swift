@@ -23,6 +23,9 @@ final class AppModel {
     private var destWasAutoSelected = false   // destino atual veio de auto-seleção, não da escolha do usuário
     var camera: String = "Cam01"
     var mediaChoice: Preset.Media.Kind = .both
+    var filterTodayOnly = false        // "só hoje": copia só o que foi capturado hoje (vários domingos no mesmo disco)
+    /// Início de hoje (fuso local) quando o filtro está ligado; senão sem filtro.
+    var capturedSince: Date? { filterTodayOnly ? Calendar.current.startOfDay(for: Date()) : nil }
     var state: OffloadState = .idle
     var cardPreview: OffloadPreview?   // prévia do cartão detectado (contagem/tamanho)
     var eventName: String = ""                   // pasta-mãe (sobrescreve o evento do preset nesta sessão)
@@ -43,6 +46,8 @@ final class AppModel {
     private var previewedCardURL: URL?  // a fonte que a prévia atual representa (pra limpar ao trocar)
     private var previewedDestinations: [URL] = []   // destinos da prévia atual (pra recalcular espaço ao trocar)
     private var suppressPresetResetOnce = false     // o editor mudou a seleção → não reseta a Pasta dessa vez
+    private var offloadTask: Task<Void, Never>?     // a transferência em andamento (pra poder cancelar)
+    var isCancelling = false                        // o usuário clicou Parar e estamos encerrando (feedback)
 
     var activePreset: Preset {
         presets.first { $0.id == selectedPresetId } ?? .factoryDefault
@@ -92,6 +97,12 @@ final class AppModel {
         return sf.contains { $0.destination == url }
     }
     var principalTooSmall: Bool { hasShortfall(destinationURL) }
+    /// É uma RETOMADA? Parte deste evento já está gravada+conferida no destino, e ainda falta copiar.
+    /// O botão vira "Retomar" pra o usuário confiar que o sistema entendeu que era pra continuar.
+    var isResume: Bool {
+        guard let pv = cardPreview else { return false }
+        return pv.alreadyPresent > 0 && pv.alreadyPresent < pv.selectedCount
+    }
     /// Está copiando? (pra travar os controles durante o processo)
     var isBusy: Bool { if case .running = state { return true }; return false }
     /// Pasta-mãe efetiva (o que o usuário digitou, ou o evento do preset), saneada:
@@ -146,6 +157,7 @@ final class AppModel {
         restoreSession()    // restaura o que foi lembrado (destino só se o disco estiver plugado)
         reconcileVolumes()  // valida + auto-maior só se a restauração não setou destino
         checkForUpdates()   // discreto: pergunta ao GitHub se há versão nova (falha silenciosa)
+        Notifier.requestAuthorizationIfNeeded()   // pra avisar quando o offload terminar (a pessoa sai de perto)
     }
 
     /// Checagem de atualização: a única chamada de rede do app. Não envia nada; só lê a versão
@@ -318,9 +330,10 @@ final class AppModel {
         guard let card = cardURL, !dests.isEmpty else { cardPreview = nil; return }
         let preset = activePreset
         let media = preset.media.mode == .locked ? preset.media.lockedTo : mediaChoice
+        let since = capturedSince
         Task.detached { [weak self] in
             let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
-            let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests)
+            let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests, capturedSince: since)
             await MainActor.run {
                 guard let self, self.previewGeneration == gen else { return }   // ignora resultado obsoleto
                 self.cardPreview = pv
@@ -339,19 +352,28 @@ final class AppModel {
         session["camera"] = camera
         cardEjected = false; ejectError = nil
         offloadStartedAt = Date(); lastElapsed = nil
+        let cardName = detectedCard?.name ?? card.lastPathComponent   // capturado agora (some ao ejetar)
+        let since = capturedSince                                     // filtro "só hoje", se ligado
+        isCancelling = false                                         // run novo: limpa feedback de Parar anterior
         state = .running(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0))
 
-        Task.detached { [weak self] in
+        offloadTask = Task.detached { [weak self] in
             let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
             do {
                 let outcome = try service.run(
                     cardRoot: card, chosenMedia: media, destinations: destinations, camera: camera,
                     sessionValues: session,
+                    capturedSince: since,
+                    isCancelled: { Task.isCancelled },   // botão Parar cancela este Task → checado entre arquivos
                     onProgress: { p in
                         Task { @MainActor in
-                            guard let self else { return }
-                            // nunca deixa um progresso atrasado sobrescrever o estado terminal
-                            if case .running = self.state { self.state = .running(p) }
+                            guard let self, case .running(let cur) = self.state else { return }
+                            // ignora progresso fora de ordem (Tasks não-estruturadas não preservam
+                            // ordem de entrega) — senão a barra por bytes recuaria/piscaria e passaria
+                            // sensação de travamento, levando o leigo a abortar um offload saudável.
+                            if p.phase.order > cur.phase.order || (p.phase == cur.phase && p.bytesDone >= cur.bytesDone) {
+                                self.state = .running(p)
+                            }
                         }
                     }
                 )
@@ -359,27 +381,76 @@ final class AppModel {
                     guard let self else { return }
                     if let s = self.offloadStartedAt { self.lastElapsed = Date().timeIntervalSince(s) }
                     self.state = .finished(outcome)
-                    // só ejeta quando ALGO foi de fato salvo (copiado agora ou já presente): um cartão
-                    // vazio / filtro errado não pode dar luz verde + ejeção (engana o operador).
-                    let salvou = outcome.verifiedCount > 0 || !outcome.skipped.isEmpty
-                    if outcome.failures.isEmpty && salvou { self.ejectCard(at: card) }
+                    // decisão ÚNICA (mesma da UI): só ejeta quando é seguro formatar. Cartão vazio /
+                    // filtro errado não pode dar luz verde + ejeção (enganaria o operador).
+                    if outcome.canSafelyFormatCard { self.ejectCard(at: card) }
+                    self.notifyFinished(outcome, cardName: cardName)
                 }
             } catch let error as OffloadError {
                 // pré-voo (espaço) acontece ANTES de copiar → cartão intocado. Os demais (ex.: caminho
                 // inválido) também lançam antes de escrever, mas avisamos por garantia (lado seguro).
                 let uncertain: Bool = { if case .notEnoughSpace = error { return false } else { return true } }()
                 let msg = error.errorDescription ?? "\(error)"
-                await MainActor.run { self?.state = .failed(msg, cardUncertain: uncertain) }
+                let isCancel: Bool = { if case .cancelled = error { return true } else { return false } }()
+                await MainActor.run {
+                    self?.state = .failed(msg, cardUncertain: uncertain)
+                    // cancelamento é do próprio usuário (ele está ali) → não dispara notificação de "falha".
+                    if !isCancel { self?.notifyFailed(uncertain: uncertain, cardName: cardName) }
+                }
             } catch let error as NamingError {
                 // erro de template (mesmo p/ todo arquivo) lança ANTES de copiar → cartão intocado.
                 let msg = error.errorDescription ?? "\(error)"
-                await MainActor.run { self?.state = .failed(msg, cardUncertain: false) }
+                await MainActor.run { self?.state = .failed(msg, cardUncertain: false); self?.notifyFailed(uncertain: false, cardName: cardName) }
             } catch {
                 // falha durante a cópia (disco removido, I/O, etc.) → estado do destino incerto.
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                await MainActor.run { self?.state = .failed(msg, cardUncertain: true) }
+                await MainActor.run { self?.state = .failed(msg, cardUncertain: true); self?.notifyFailed(uncertain: true, cardName: cardName) }
             }
         }
+    }
+
+    /// Aviso do sistema ao terminar — pra quem saiu de perto durante a cópia (vários minutos).
+    func notifyFinished(_ outcome: OffloadOutcome, cardName: String) {
+        if !outcome.failures.isEmpty {
+            Notifier.notify(title: "Atenção: falha no backup",
+                            body: "NÃO formate o cartão \(cardName). \(outcome.failures.count) arquivo(s) não passaram na conferência.")
+        } else if outcome.canSafelyFormatCard {
+            Notifier.notify(title: "Backup concluído",
+                            body: "Cartão \(cardName) verificado. Pode formatar com segurança.")
+        }
+        // nada salvo (cartão vazio / filtro errado) → sem notificação
+    }
+
+    func notifyFailed(uncertain: Bool, cardName: String) {
+        if uncertain {
+            Notifier.notify(title: "Backup interrompido",
+                            body: "NÃO formate o cartão \(cardName). A mídia não foi totalmente verificada — tente de novo.")
+        } else {
+            Notifier.notify(title: "Backup não realizado",
+                            body: "O cartão \(cardName) está intacto. Veja o aviso no Cardflow.")
+        }
+    }
+
+    /// Abre o relatório legível (manifesto .txt) da cópia — lista o que foi salvo e conferido,
+    /// pra dar confiança e servir de prova pra um responsável. Reusa o que o motor já gravou.
+    func openReport(_ outcome: OffloadOutcome) {
+        guard let jsonPath = outcome.manifestPaths.first else { return }
+        let txt = URL(fileURLWithPath: jsonPath).deletingPathExtension().appendingPathExtension("txt")
+        let target = FileManager.default.fileExists(atPath: txt.path) ? txt : URL(fileURLWithPath: jsonPath)
+        NSWorkspace.shared.open(target)
+    }
+
+    /// Abre a pasta do evento no destino — de onde a confiança do leigo vem: ver os arquivos com os
+    /// próprios olhos antes de formatar. Usa o manifesto (já tem o caminho) ou o destino principal.
+    func revealOffloadInFinder(_ outcome: OffloadOutcome) {
+        let target: URL
+        if let first = outcome.manifestPaths.first {
+            // .../<dest>/<evento>/.cardflow/manifest-x.json → sobe 2 níveis = pasta do evento
+            target = URL(fileURLWithPath: first).deletingLastPathComponent().deletingLastPathComponent()
+        } else if let d = destinationURL {
+            target = d
+        } else { return }
+        NSWorkspace.shared.open(target)
     }
 
     /// Ejeta o cartão (volume) ao terminar com sucesso. Se o disco estiver ocupado, não trava: avisa.
@@ -392,7 +463,28 @@ final class AppModel {
         }
     }
 
+    /// Re-tenta ejetar o cartão (depois de o usuário fechar a janela do Finder que o segurava).
+    func retryEject() {
+        if let u = detectedCard?.url { ejectCard(at: u) }
+    }
+
+    /// Histórico de cópias do destino atual (lê os manifestos já gravados). Vazio se não há destino.
+    func loadHistory() -> [Manifest] {
+        guard let dest = destinationURL else { return [] }
+        return ManifestStore().loadAllInDestination(dest)
+    }
+
+    /// Para a transferência em andamento. O cancelamento checa entre blocos (interrompe no meio de
+    /// um arquivo grande): o motor drena a verificação, limpa o parcial e registra um manifesto parcial.
+    func cancelOffload() {
+        guard isBusy else { return }
+        isCancelling = true   // feedback imediato (o encerramento pode levar até o fim do bloco atual)
+        offloadTask?.cancel()
+    }
+
     func reset() {
+        offloadTask?.cancel(); offloadTask = nil   // não deixa um offload órfão rodando após reset
+        isCancelling = false
         state = .idle
         cardEjected = false; ejectError = nil
         offloadStartedAt = nil; lastElapsed = nil

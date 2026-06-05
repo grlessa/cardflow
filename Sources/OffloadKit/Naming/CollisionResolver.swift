@@ -26,8 +26,12 @@ public struct CollisionResolver {
                 return .use(candidate)
             }
         }
+        // último recurso: sufixo de HASH do conteúdo (único por bytes). Checa também aqui pra ser
+        // idempotente — numa re-rodada, o arquivo já gravado sob este sufixo é pulado, não recopiado.
         let hashSuffix = "_" + String(sourceHash, radix: 16)
-        return .use(Self.insert(suffix: hashSuffix, into: desired))
+        let hashCandidate = Self.insert(suffix: hashSuffix, into: desired)
+        if let h = existingHash(hashCandidate), h == sourceHash { return .alreadyPresent(hashCandidate) }
+        return .use(hashCandidate)
     }
 
     /// Insere o sufixo antes da extensão: "a/b/DSC1.jpg" + "_x" → "a/b/DSC1_x.jpg".

@@ -6,12 +6,12 @@ let raw = Array(CommandLine.arguments.dropFirst())
 
 if raw.contains("--help") || raw.contains("-h") || raw.isEmpty {
     print("""
-    cardflow — offload verificado de cartão (teste do motor OffloadKit)
+    cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)
 
     uso:
       cardflow --card <caminho> --to <destino> [--to <destino2>] \\
-               [--media both|foto|video] [--camera <nome>] [--evento <nome>] \\
-               [--rename] [--dry-run] [--yes] [--preset <arquivo.json>]
+               [--media tudo|foto|video|audio] [--camera <nome>] [--evento <nome>] \\
+               [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <arquivo.cfp>]
     """)
     exit(raw.isEmpty ? 1 : 0)
 }

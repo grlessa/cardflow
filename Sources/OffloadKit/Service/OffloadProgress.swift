@@ -1,7 +1,13 @@
 import Foundation
 
 public struct OffloadProgress: Equatable, Sendable {
-    public enum Phase: String, Sendable { case scanning, copying, verifying, done }
+    public enum Phase: String, Sendable {
+        case scanning, copying, verifying, done
+        /// Ordem das fases — pra a UI ignorar progresso fora de ordem (não deixar a barra recuar).
+        public var order: Int {
+            switch self { case .scanning: 0; case .copying: 1; case .verifying: 2; case .done: 3 }
+        }
+    }
     public var phase: Phase
     public var filesDone: Int
     public var filesTotal: Int

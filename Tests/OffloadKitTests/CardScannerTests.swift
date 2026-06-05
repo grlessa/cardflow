@@ -45,4 +45,16 @@ import Foundation
         #expect(preserve("clip.braw") && preserve("clip.sidecar"))
         #expect(!preserve("DCIM/100MSDCF/DSC0001.JPG"))             // plano
     }
+
+    // #13: data de captura usa criação > modificação > fallback estável (NÃO 1970).
+    @Test func resolveCaptureFallsBackStablyNotEpoch() {
+        let creation = Date(timeIntervalSince1970: 2000)
+        let modification = Date(timeIntervalSince1970: 1000)
+        let fallback = Date(timeIntervalSince1970: 5000)
+        #expect(CardScanner.resolveCapture(creation: creation, modification: modification, fallback: fallback) == creation)
+        #expect(CardScanner.resolveCapture(creation: nil, modification: modification, fallback: fallback) == modification)
+        #expect(CardScanner.resolveCapture(creation: nil, modification: nil, fallback: fallback) == fallback)
+        // a regressão de #13: sem data do arquivo, NÃO cai em 1970 (footage de hoje em pasta "jan 1970")
+        #expect(CardScanner.resolveCapture(creation: nil, modification: nil, fallback: fallback) != Date(timeIntervalSince1970: 0))
+    }
 }

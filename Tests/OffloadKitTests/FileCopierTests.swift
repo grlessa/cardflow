@@ -42,6 +42,23 @@ import Foundation
         #expect(try FileCopier().verify(expectedHash: goodHash, fileAt: file) == false)
     }
 
+    // #14: o arquivo copiado preserva a data de modificação da origem (uma cópia do Finder faz isso;
+    // sem isto tudo ficaria datado do momento do offload, quebrando ordenar-por-data e ficando PIOR que o Finder).
+    @Test func preservesSourceModificationDate() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let src = work.appendingPathComponent("clip.mov")
+        try Data("conteudo-do-clipe".utf8).write(to: src)
+        let past = Date(timeIntervalSince1970: 1_700_000_000)   // data antiga determinística
+        try FileManager.default.setAttributes([.modificationDate: past], ofItemAtPath: src.path)
+
+        let dest = work.appendingPathComponent("out/clip.mov")
+        _ = try FileCopier().copy(source: src, to: [dest])
+
+        let destMod = try FileManager.default.attributesOfItem(atPath: dest.path)[.modificationDate] as? Date
+        #expect(destMod != nil)
+        #expect(abs((destMod ?? .distantPast).timeIntervalSince(past)) < 1)
+    }
+
     @Test func reportsChunkProgressSummingToFileSize() throws {
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let src = work.appendingPathComponent("big.bin")

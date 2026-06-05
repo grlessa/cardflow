@@ -19,11 +19,12 @@ import Foundation
         var updates: [OffloadProgress] = []
         _ = try service.run(cardRoot: card.root, chosenMedia: .both, destinations: [dest], camera: "Cam",
                             onProgress: { updates.append($0) })
-        // termina em done com filesDone == filesTotal (3 mídias + 1 sidecar-aside agora contam no progresso)
+        // termina em done com filesDone == filesTotal (3 mídias + 1 sidecar-aside + 1 não-reconhecido
+        // copiado como rede de segurança, todos contam no progresso)
         let last = try #require(updates.last)
         #expect(last.phase == .done)
-        #expect(last.filesDone == 4)
-        #expect(last.filesTotal == 4)
+        #expect(last.filesDone == 5)
+        #expect(last.filesTotal == 5)
         // progresso é monotônico não-decrescente em filesDone
         #expect(updates.map(\.filesDone) == updates.map(\.filesDone).sorted())
     }

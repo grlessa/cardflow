@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 
 APP="$(pwd)/Cardflow.app"
 PROFILE="${NOTARY_PROFILE:-cardflow-notary}"   # perfil de credencial guardado no Keychain
+source scripts/_notarize.sh                    # notarize_with_log (busca o log da Apple na recusa)
 
 echo "==> 1/5  Empacotando o app (release)…"
 bash scripts/make-app.sh
@@ -27,9 +28,8 @@ codesign --verify --strict --verbose=2 "$APP"
 echo "==> 4/5  Notarizando (Apple verifica; leva alguns minutos)…"
 ZIP="$(pwd)/Cardflow.zip"; rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
-if ! xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait; then
-  echo ""
-  echo "❌ Notarização falhou. Você já guardou as credenciais? Rode UMA vez:"
+if ! notarize_with_log "$ZIP" "$PROFILE"; then
+  echo "   Se ainda não guardou as credenciais, rode UMA vez:"
   echo "   xcrun notarytool store-credentials \"$PROFILE\" \\"
   echo "       --apple-id SEU_EMAIL_APPLE --team-id SEU_TEAM_ID --password SENHA_DE_APP"
   echo "   (Como pegar cada coisa: docs/notarizacao.md)"

@@ -14,6 +14,7 @@ APP="$(pwd)/Cardflow.app"
 DMG="$(pwd)/Cardflow.dmg"
 VOLNAME="Cardflow"
 PROFILE="${NOTARY_PROFILE:-cardflow-notary}"
+source scripts/_notarize.sh   # notarize_with_log (busca o log da Apple na recusa)
 
 [ -d "$APP" ] || { echo "❌ Cardflow.app não existe. Rode scripts/sign-and-notarize.sh primeiro."; exit 1; }
 
@@ -41,7 +42,7 @@ fi
 echo "==> Assinando o DMG…"
 codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 echo "==> Notarizando o DMG (a Apple verifica; leva alguns minutos)…"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+notarize_with_log "$DMG" "$PROFILE" || exit 1
 echo "==> Grampeando o ticket no DMG…"
 xcrun stapler staple "$DMG"
 echo ""

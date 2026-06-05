@@ -33,6 +33,37 @@ import Foundation
         #expect(loaded.first == m)
     }
 
+    // #29: um manifesto inválido (JSON truncado por um crash antigo) é ignorado, mas os válidos carregam.
+    @Test func loadAllSkipsCorruptManifestButLoadsValidOnes() throws {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let store = ManifestStore()
+        _ = try store.write(sampleManifest(), eventRootIn: dest, eventName: "Conf")
+        // injeta um manifesto corrompido na mesma pasta
+        let dir = dest.appendingPathComponent("Conf").appendingPathComponent(".cardflow")
+        try Data("{ truncado".utf8).write(to: dir.appendingPathComponent("manifest-quebrado.json"))
+        let loaded = try store.loadAll(eventRootIn: dest, eventName: "Conf")
+        #expect(loaded.count == 1)   // só o válido
+    }
+
+    // #19: o histórico varre TODAS as pastas de evento do destino, mais recente primeiro.
+    @Test func loadAllInDestinationGathersEveryEventNewestFirst() throws {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let store = ManifestStore()
+        var antigo = sampleManifest(); antigo.presetName = "Antigo"
+        antigo.finishedAt = Date(timeIntervalSince1970: 1_000_000)
+        var novo = sampleManifest(); novo.presetName = "Novo"
+        novo.finishedAt = Date(timeIntervalSince1970: 2_000_000)
+        _ = try store.write(antigo, eventRootIn: dest, eventName: "Culto A")
+        _ = try store.write(novo, eventRootIn: dest, eventName: "Culto B")
+        let all = store.loadAllInDestination(dest)
+        #expect(all.count == 2)
+        #expect(all.first?.presetName == "Novo")   // mais recente primeiro
+    }
+
     @Test func humanSummaryMentionsTotals() {
         let s = ManifestStore().humanSummary(sampleManifest())
         #expect(s.contains("1 foto"))

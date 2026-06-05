@@ -26,13 +26,22 @@ final class PresetEditorModel: Identifiable {
 
     nonisolated let id = UUID()   // identidade da apresentação (.sheet(item:))
     var draft: Preset
+    let original: Preset   // snapshot pra detectar edição não salva (#23)
     let isNew: Bool        // ainda não tem .cfp salvo
     let canDelete: Bool    // editando um preset salvo (≠ fábrica)
+    var otherNames: Set<String> = []   // nomes dos OUTROS presets (pra avisar nome duplicado, #23)
 
     private init(draft: Preset, isNew: Bool, canDelete: Bool) {
-        self.draft = draft; self.isNew = isNew; self.canDelete = canDelete
+        self.draft = draft; self.original = draft; self.isNew = isNew; self.canDelete = canDelete
         self.folderLevels = TemplateTokenizer.levels(from: draft.folderStructure)
         self.nameSegments = TemplateTokenizer.parse(draft.rename.template)
+    }
+
+    /// Tem edição ainda não salva? (pra confirmar antes de descartar)
+    var hasUnsavedChanges: Bool { draft != original }
+    /// Nome igual ao de outro preset → aviso não-bloqueante (dois indistinguíveis no Picker).
+    var duplicateNameWarning: String? {
+        otherNames.contains(trimmedName) ? "Já existe um preset com esse nome." : nil
     }
 
     /// "Novo": começa do preset de fábrica com id fresco e nome em branco.
@@ -249,10 +258,18 @@ final class PresetEditorModel: Identifiable {
     // MARK: - Salvar
 
     var trimmedName: String { draft.name.trimmingCharacters(in: .whitespaces) }
+    /// Mensagem de erro quando o salvamento em disco falha — pra a sheet NÃO fechar engolindo a edição.
+    var saveError: String?
 
     /// Por que o botão Salvar está desabilitado (nil = pode salvar). Mostrado na UI.
     var saveDisabledReason: String? {
         if trimmedName.isEmpty { return "Dê um nome ao preset." }
+        // #9: estrutura de pastas vazia passa em validateTokensExist (nada pra validar) mas o
+        // PresetStore.validate rejeita ao salvar — então a sheet fecharia descartando tudo em silêncio.
+        // Pega aqui pra o botão já avisar antes.
+        if draft.folderStructure.split(separator: "/", omittingEmptySubsequences: true).isEmpty {
+            return "Defina ao menos uma pasta de destino."
+        }
         if let e = sessionFieldsError { return e }
         if let e = templateError { return e }
         return nil

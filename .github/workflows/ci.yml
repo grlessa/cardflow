@@ -1,0 +1,21 @@
+name: CI
+
+# Roda build + os testes do motor em todo push e PR. É a rede de segurança do app:
+# sem CI, uma regressão só apareceria quando um voluntário perdesse footage em campo.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versão do Swift
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Testes
+        run: swift test

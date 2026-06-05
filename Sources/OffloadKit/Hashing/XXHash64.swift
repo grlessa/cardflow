@@ -55,21 +55,28 @@ public struct XXHash64 {
         return v
     }
 
+    /// Lê 8 bytes little-endian DIRETO do buffer cru, sem cópia. `loadUnaligned` lê em ordem nativa
+    /// e `.littleEndian` garante o resultado LE (no-op em arm64/x86, que já são LE). Bit-idêntico ao
+    /// read64 byte a byte, mas sem o loop de shift — coberto pelo vetor canônico e pelos testes incrementais.
+    @inline(__always) private static func load64(_ b: UnsafeRawBufferPointer, _ i: Int) -> UInt64 {
+        b.loadUnaligned(fromByteOffset: i, as: UInt64.self).littleEndian
+    }
+
     public mutating func update(_ bytes: UnsafeRawBufferPointer) {
-        guard bytes.count > 0 else { return }
-        totalLen &+= UInt64(bytes.count)
-        var input = Array(bytes)
+        let count = bytes.count
+        guard count > 0 else { return }
+        totalLen &+= UInt64(count)
         var index = 0
 
-        // Completa o buffer pendente até 32 e processa.
+        // Completa o buffer pendente até 32 e processa (caminho raro de blocos straddling).
         if bufferLen > 0 {
             let need = 32 - bufferLen
-            if input.count < need {
-                for k in 0..<input.count { buffer[bufferLen + k] = input[k] }
-                bufferLen += input.count
+            if count < need {
+                for k in 0..<count { buffer[bufferLen + k] = bytes[k] }
+                bufferLen += count
                 return
             }
-            for k in 0..<need { buffer[bufferLen + k] = input[k] }
+            for k in 0..<need { buffer[bufferLen + k] = bytes[k] }
             v1 = Self.round(v1, Self.read64(buffer, 0))
             v2 = Self.round(v2, Self.read64(buffer, 8))
             v3 = Self.round(v3, Self.read64(buffer, 16))
@@ -78,22 +85,22 @@ public struct XXHash64 {
             bufferLen = 0
         }
 
-        // Processa blocos completos de 32 bytes direto do input.
-        while index + 32 <= input.count {
-            v1 = Self.round(v1, Self.read64(input, index))
-            v2 = Self.round(v2, Self.read64(input, index + 8))
-            v3 = Self.round(v3, Self.read64(input, index + 16))
-            v4 = Self.round(v4, Self.read64(input, index + 24))
+        // Caminho QUENTE: blocos de 32 bytes lidos direto do buffer cru (sem Array(bytes) — eram
+        // dezenas de GB de cópia heap copiando dezenas de GB de footage; e sem o shift byte a byte).
+        while index + 32 <= count {
+            v1 = Self.round(v1, Self.load64(bytes, index))
+            v2 = Self.round(v2, Self.load64(bytes, index + 8))
+            v3 = Self.round(v3, Self.load64(bytes, index + 16))
+            v4 = Self.round(v4, Self.load64(bytes, index + 24))
             index += 32
         }
 
-        // Guarda o resto.
-        let remaining = input.count - index
+        // Guarda o resto (< 32 bytes) no buffer pra próxima chamada / finalize.
+        let remaining = count - index
         if remaining > 0 {
-            for k in 0..<remaining { buffer[k] = input[index + k] }
+            for k in 0..<remaining { buffer[k] = bytes[index + k] }
             bufferLen = remaining
         }
-        input.removeAll(keepingCapacity: false)
     }
 
     public func finalize() -> UInt64 {

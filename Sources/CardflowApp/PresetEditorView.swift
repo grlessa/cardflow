@@ -8,6 +8,7 @@ struct PresetEditorView: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
     @State private var confirmingDelete = false
+    @State private var confirmingDiscard = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +22,14 @@ struct PresetEditorView: View {
             footer
         }
         .frame(width: 600, height: 620)
+        .alert("Não foi possível salvar", isPresented: Binding(
+            get: { model.saveError != nil },
+            set: { if !$0 { model.saveError = nil } }
+        )) {
+            Button("OK", role: .cancel) { model.saveError = nil }
+        } message: {
+            Text(model.saveError ?? "")
+        }
     }
 
     private var header: some View {
@@ -205,9 +214,19 @@ struct PresetEditorView: View {
             }
             if let reason = model.saveDisabledReason {
                 Label(reason, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            } else if let aviso = model.duplicateNameWarning {
+                Label(aviso, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).lineLimit(1)
             }
             Spacer()
-            Button("Cancelar", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+            Button("Cancelar", role: .cancel) {
+                // #23: não descarta uma edição trabalhosa sem confirmar (igual à exclusão).
+                if model.hasUnsavedChanges { confirmingDiscard = true } else { onCancel() }
+            }
+            .keyboardShortcut(.cancelAction)
+            .confirmationDialog("Descartar as alterações deste preset?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                Button("Descartar", role: .destructive, action: onCancel)
+                Button("Continuar editando", role: .cancel) {}
+            }
             if model.step != .basico {
                 Button("Voltar") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue - 1)! }
             }

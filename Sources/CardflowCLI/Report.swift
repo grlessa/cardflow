@@ -2,13 +2,8 @@ import Foundation
 import OffloadKit
 
 public enum Report {
-    public static func humanBytes(_ bytes: Int64) -> String {
-        let units = ["B", "KB", "MB", "GB", "TB"]
-        var value = Double(bytes)
-        var idx = 0
-        while value >= 1024 && idx < units.count - 1 { value /= 1024; idx += 1 }
-        return String(format: "%.1f %@", value, units[idx])
-    }
+    // fonte única (decimal, igual ao app e ao Finder) — era base 1024 aqui, divergindo do app.
+    public static func humanBytes(_ bytes: Int64) -> String { Format.humanBytes(bytes) }
 
     public static func summary(preview p: OffloadPreview, destinations: [URL]) -> String {
         var lines: [String] = []

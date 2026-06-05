@@ -200,4 +200,52 @@ import Foundation
         #expect(!rel.hasPrefix("../"))
         #expect(rel.hasPrefix("__/"))   // ".." virou "__"
     }
+
+    // #7: template que renderiza VAZIO não pode gerar ".JPG" (oculto). Cai pro nome original.
+    @Test func emptyRenderedStemFallsBackToOriginalName() throws {
+        var p = Preset.flatDefault
+        p.evento = ""
+        p.folderStructure = "fixo"
+        p.rename = .init(enabled: true, template: "{evento}", counterPadding: 4)   // renderiza vazio
+        let nb = NameBuilder(preset: p, timeZone: tz)
+        let rel = try nb.relativeDestination(for: file(type: .photo, rel: "DCIM/100/DSC00001.JPG"), context: ctx())
+        let fileName = (rel as NSString).lastPathComponent
+        #expect(!fileName.hasPrefix("."))          // NÃO é oculto
+        #expect(fileName == "DSC00001.JPG")        // caiu pro nome original
+    }
+
+    // #7b: template só com separadores também é "vazio na prática" → cai pro original.
+    @Test func separatorsOnlyStemFallsBackToOriginalName() throws {
+        var p = Preset.flatDefault
+        p.evento = ""
+        p.folderStructure = "fixo"
+        p.rename = .init(enabled: true, template: "{evento}_-_{evento}", counterPadding: 4)
+        let nb = NameBuilder(preset: p, timeZone: tz)
+        let rel = try nb.relativeDestination(for: file(type: .photo, rel: "DCIM/100/IMG_9.JPG"), context: ctx())
+        #expect((rel as NSString).lastPathComponent == "IMG_9.JPG")
+    }
+
+    // #8: nome de evento gigante (acentos pt-BR custam 2-3 bytes) não pode estourar o limite do FS.
+    @Test func overlongComponentIsTruncatedKeepingExtension() throws {
+        var p = Preset.flatDefault
+        p.evento = String(repeating: "é", count: 300)   // ~600 bytes UTF-8
+        p.folderStructure = "{evento}"
+        p.rename = .init(enabled: true, template: "{evento}", counterPadding: 4)
+        let nb = NameBuilder(preset: p, timeZone: tz)
+        let rel = try nb.relativeDestination(for: file(type: .photo, rel: "DCIM/100/DSC1.JPG"), context: ctx())
+        for comp in rel.split(separator: "/") {
+            #expect(String(comp).utf8.count <= 255)   // cabe no limite do APFS
+        }
+        #expect((rel as NSString).pathExtension == "JPG")   // extensão preservada
+    }
+
+    // #26: caracteres de controle são removidos e o valor é normalizado pra NFC.
+    @Test func sanitizeStripsControlCharsAndNormalizesNFC() {
+        let cleaned = NameBuilder.sanitizePathComponent("Cul\tto\n09\r")
+        #expect(cleaned == "Culto09")
+        let nfd = "Cafe\u{301}"   // "Café" decomposto (NFD)
+        let nfc = NameBuilder.sanitizePathComponent(nfd)
+        #expect(nfc == "Café")
+        #expect(nfc.unicodeScalars.count == 4)   // C a f é(precomposto)
+    }
 }

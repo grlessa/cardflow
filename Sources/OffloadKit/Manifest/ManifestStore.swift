@@ -26,9 +26,10 @@ public struct ManifestStore {
         // DIFERENTES no mesmo segundo não sobrescrevem um ao outro (mesmo cartão = mesmo id = idempotente).
         let stamp = Self.stamp.string(from: manifest.finishedAt) + "-" + String(manifest.offloadId.prefix(8))
         let jsonURL = dir.appendingPathComponent("manifest-\(stamp).json")
-        try enc.encode(manifest).write(to: jsonURL)
+        // escrita atômica: um crash no meio nunca deixa um manifesto JSON truncado/inválido no disco.
+        try enc.encode(manifest).write(to: jsonURL, options: .atomic)
         let txtURL = dir.appendingPathComponent("manifest-\(stamp).txt")
-        try Data(humanSummary(manifest).utf8).write(to: txtURL)
+        try Data(humanSummary(manifest).utf8).write(to: txtURL, options: .atomic)
         return jsonURL
     }
 
@@ -41,9 +42,24 @@ public struct ManifestStore {
             .compactMap { try? dec.decode(Manifest.self, from: Data(contentsOf: $0)) }
     }
 
+    /// Todos os manifestos de um destino, varrendo as pastas de evento (`<dest>/<evento>/.cardflow`).
+    /// Mais recente primeiro. Pro histórico de cópias na UI — rastreabilidade sobre infra já gravada.
+    public func loadAllInDestination(_ destinationRoot: URL) -> [Manifest] {
+        let fm = FileManager.default
+        guard let events = try? fm.contentsOfDirectory(at: destinationRoot, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        var out: [Manifest] = []
+        for event in events where (try? event.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+            out += (try? loadAll(eventRootIn: destinationRoot, eventName: event.lastPathComponent)) ?? []
+        }
+        return out.sorted { $0.finishedAt > $1.finishedAt }
+    }
+
     public func humanSummary(_ m: Manifest) -> String {
-        """
-        Offload: \(m.presetName) · câmera \(m.camera)
+        let cabecalho = m.interrupted
+            ? "Offload INTERROMPIDO: \(m.presetName) · câmera \(m.camera)\n(registro parcial — o backup não terminou; mantenha o cartão como está)"
+            : "Offload: \(m.presetName) · câmera \(m.camera)"
+        return """
+        \(cabecalho)
         Início: \(m.startedAt)  Fim: \(m.finishedAt)
         Cartão: \(m.source.volumeName) (\(m.source.fileCount) arquivos)
         \(m.totals.photos) foto(s) + \(m.totals.videos) vídeo(s) + \(m.totals.audio) áudio(s) + \(m.totals.cinema) clipe(s) de cinema

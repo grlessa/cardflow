@@ -30,6 +30,9 @@ sem ficar arrastando pasta na mão e rezando pra nada corromper no caminho.
 O app é assinado e reconhecido pela Apple, então abre normal, sem aquele aviso de
 "desenvolvedor desconhecido".
 
+Se mesmo assim o Mac não deixar abrir (acontece em alguns casos), clique com o botão direito
+no Cardflow e escolha Abrir. Aí aparece a opção de abrir mesmo assim, e ele não pergunta de novo.
+
 ## Como usar
 
 1. Conecte o cartão e o disco onde quer salvar.
