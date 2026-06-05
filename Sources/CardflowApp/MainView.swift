@@ -55,7 +55,7 @@ struct MainView: View {
                 Divider()
                 Button("Excluir", role: .destructive) { confirmDelete = true }
                     .disabled(model.selectedPresetId == "factory-default")
-            } label: { Image(systemName: "ellipsis.circle") }
+            } label: { Image(systemName: "ellipsis") }
             .menuIndicator(.hidden).help("Gerenciar presets").disabled(model.isBusy)
             .confirmationDialog("Excluir o preset “\(model.activePreset.name)”?",
                                 isPresented: $confirmDelete, titleVisibility: .visible) {
