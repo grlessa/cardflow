@@ -63,6 +63,15 @@ public struct PresetStore {
         return base.appendingPathComponent("Cardflow/presets", isDirectory: true)
     }
 
+    /// Nome de arquivo sugerido ao EXPORTAR um preset. Usa o nome legível (saneado pra não virar
+    /// subpasta nem travessia), não o `id` interno — que pra presets do usuário é um UUID e não
+    /// diz nada a quem recebe o `.cfp`. Cai pra "preset" quando o nome fica vazio depois de limpar.
+    public static func exportFilename(for preset: Preset) -> String {
+        let cleaned = NameBuilder.sanitizePathComponent(preset.name)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(cleaned.isEmpty ? "preset" : cleaned).cfp"
+    }
+
     /// Valida schema suportado + tokens conhecidos nos templates (estrutura e renome).
     public static func validate(_ preset: Preset) throws {
         guard (1...maxSchemaVersion).contains(preset.schemaVersion) else {

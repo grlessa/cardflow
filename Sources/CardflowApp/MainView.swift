@@ -465,7 +465,7 @@ struct MainView: View {
 
     private func exportPresetPanel() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "\(model.activePreset.id).cfp"
+        panel.nameFieldStringValue = PresetStore.exportFilename(for: model.activePreset)
         panel.canCreateDirectories = true
         if panel.runModal() == .OK, let url = panel.url {
             try? model.exportActivePreset(to: url)

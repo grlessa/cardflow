@@ -94,6 +94,25 @@ import Foundation
         #expect(PresetStore.appPresetsDirectory().path.hasSuffix("Cardflow/presets"))
     }
 
+    // Exportar usa o NOME do preset no arquivo, não o `id` (UUID interno pra presets do usuário).
+    @Test func exportFilenameUsesNameNotInternalId() {
+        var p = Preset.factoryDefault
+        p.id = UUID().uuidString
+        p.name = "Casamento João"
+        let fname = PresetStore.exportFilename(for: p)
+        #expect(fname == "Casamento João.cfp")
+        #expect(!fname.contains(p.id))   // o UUID não vaza pro nome do arquivo
+    }
+
+    // Nome com "/" não cria subpasta; nome vazio depois de limpar cai pra "preset".
+    @Test func exportFilenameSanitizesAndFallsBack() {
+        var p = Preset.factoryDefault
+        p.name = "Culto 09/06"
+        #expect(PresetStore.exportFilename(for: p) == "Culto 09-06.cfp")
+        p.name = "   "
+        #expect(PresetStore.exportFilename(for: p) == "preset.cfp")
+    }
+
     // MARK: - Segurança: validação rejeita preset malicioso
 
     @Test func validateRejectsPathTraversalInFolderStructure() {
