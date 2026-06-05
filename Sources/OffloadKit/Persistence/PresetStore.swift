@@ -7,7 +7,7 @@ extension Preset {
             schemaVersion: 2, id: "factory-default", name: "Padrão", evento: "Sessão",
             media: .init(mode: .open, lockedTo: .both),
             rename: .init(enabled: false,
-                          template: "{evento}_{ano}{mes}{dia}_{horas}{minutos}{segundos}_{nome_original}",
+                          template: "{evento}_{data}_{hora}_{nome_original}",   // Data/Hora consolidados (menos peças)
                           counterPadding: 4),
             destinationRoles: ["Cópia"], folderStructure: "{evento}/{dia} {mes_abrev} {ano}/{tipo}",
             photoExtensions: ["jpg", "jpeg", "heic", "heif", "hif", "arw", "cr2", "cr3", "crw", "raf",

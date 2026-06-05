@@ -65,7 +65,7 @@ import Foundation
         let cfg = try ArgParser.parse(["--card", card.root.path, "--to", dest.path,
                                        "--preset", presetURL.path, "--yes"])
         try CardflowRunner.run(cfg, input: { _ in nil }, output: { _ in })
-        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Culto/FOTO/DSC00001_R.JPG").path))
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Culto/Foto/DSC00001_R.JPG").path))
         #expect(!FileManager.default.fileExists(atPath: dest.appendingPathComponent("Cardflow").path))
     }
 }

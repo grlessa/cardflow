@@ -52,18 +52,19 @@ public struct NameBuilder {
         "horas", "minutos", "segundos", "data", "hora",
     ]
 
+    // valor NATURAL (caixa normal) — pra o toggle Aa/AB/ab funcionar: Aa="Foto", AB="FOTO", ab="foto".
     private func tipoFolder(for type: FileType) -> String {
         switch type {
-        case .photo: return "FOTO"
-        case .video: return "VIDEO"
-        case .audio: return "AUDIO"
-        default: return "OUTROS"
+        case .photo: return "Foto"
+        case .video: return "Video"
+        case .audio: return "Audio"
+        default: return "Outros"
         }
     }
 
-    private func df(_ format: String, _ date: Date) -> String {
+    private func df(_ format: String, _ date: Date, locale: String = "en_US_POSIX") -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
+        f.locale = Locale(identifier: locale)   // numéricos: en_US_POSIX (estável); {data}: locale do preset (mês em pt-BR)
         f.timeZone = timeZone
         f.dateFormat = format
         return f.string(from: date)
@@ -100,8 +101,8 @@ public struct NameBuilder {
         case "horas": return df("HH", file.captureDate)
         case "minutos": return df("mm", file.captureDate)
         case "segundos": return df("ss", file.captureDate)
-        case "data": return df(preset.dateFormat, file.captureDate)
-        case "hora": return df("HHmmss", file.captureDate)
+        case "data": return df(preset.dateFormat, file.captureDate, locale: preset.locale)   // mês em pt-BR
+        case "hora": return df(preset.timeFormat, file.captureDate)
         default:
             if let v = ctx.sessionValues[name] { return v }
             if preset.sessionFields.contains(where: { $0.key == name }) { return "" }

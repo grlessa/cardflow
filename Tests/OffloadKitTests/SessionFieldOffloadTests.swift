@@ -27,7 +27,7 @@ import Foundation
                                       camera: "Cam01", sessionValues: ["operador": "Joao"])
         #expect(outcome.failures.isEmpty)
         // arquivo renomeado com o campo de sessão
-        let foto = dest.appendingPathComponent("Conferencia-Junho-2026/FOTO/Joao_DSC00001.JPG")
+        let foto = dest.appendingPathComponent("Conferencia-Junho-2026/Foto/Joao_DSC00001.JPG")
         #expect(FileManager.default.fileExists(atPath: foto.path))
     }
 }

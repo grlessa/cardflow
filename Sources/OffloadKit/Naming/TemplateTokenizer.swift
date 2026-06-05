@@ -30,6 +30,17 @@ public enum TemplateTokenizer {
         }.joined()
     }
 
+    /// Quebra um template de PASTAS em níveis: cada "/" no topo é uma pasta. Tokens nunca contêm "/"
+    /// (o formato de data fica fora do template), então dividir a string por "/" dá os níveis.
+    public static func levels(from template: String) -> [[TemplateSegment]] {
+        template.split(separator: "/", omittingEmptySubsequences: false).map { parse(String($0)) }
+    }
+
+    /// Junta os níveis de volta num template, pulando níveis VAZIOS (ex.: pasta recém-criada sem peça).
+    public static func joinLevels(_ levels: [[TemplateSegment]]) -> String {
+        levels.map { serialize($0) }.filter { !$0.isEmpty }.joined(separator: "/")
+    }
+
     /// Literais que são separador puro (auto-inseridos entre peças). Texto livre NÃO entra aqui.
     public static let separators: Set<String> = ["/", "_", "-", " "]
 

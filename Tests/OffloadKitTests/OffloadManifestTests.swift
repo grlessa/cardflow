@@ -24,7 +24,7 @@ import Foundation
         let sidecar = dest.appendingPathComponent("Conferencia-Junho-2026/.cardflow/sidecars/PRIVATE/M4ROOT/CLIP/C0001M01.XML")
         #expect(FileManager.default.fileExists(atPath: sidecar.path))
         // mídia continua em FOTO/VIDEO, sem sidecar no meio
-        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Conferencia-Junho-2026/FOTO/DSC00001.JPG").path))
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Conferencia-Junho-2026/Foto/DSC00001.JPG").path))
 
         // manifesto gravado e legível
         #expect(outcome.manifestPaths.count == 1)
@@ -48,7 +48,7 @@ import Foundation
 
         let fm = FileManager.default
         // mídia, sidecar e manifesto: TODOS na mesma árvore saneada "Culto 09-06"
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Culto 09-06/FOTO/DSC00001.JPG").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Culto 09-06/Foto/DSC00001.JPG").path))
         #expect(fm.fileExists(atPath: dest.appendingPathComponent("Culto 09-06/.cardflow/sidecars/PRIVATE/M4ROOT/CLIP/C0001M01.XML").path))
         #expect(outcome.manifestPaths.first?.contains("Culto 09-06/") == true)
         // a barra NÃO virou subpasta "Culto 09"/"06"

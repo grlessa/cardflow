@@ -53,4 +53,29 @@ import Testing
         let tidy = TemplateTokenizer.tidySeparators(segs)
         #expect(tidy.contains(.literal("_final")))   // sufixo NÃO some
     }
+
+    // MARK: - Níveis de pasta (construtor por linhas)
+
+    @Test func levelsSeparaPastasPorBarra() {
+        let lvls = TemplateTokenizer.levels(from: "{evento}/{dia} {mes_abrev} {ano}/{tipo}")
+        #expect(lvls.count == 3)
+        #expect(lvls[0] == [.token(name: "evento", modifiers: [])])
+        #expect(lvls[2] == [.token(name: "tipo", modifiers: [])])
+        #expect(lvls[1] == [.token(name: "dia", modifiers: []), .literal(" "),
+                            .token(name: "mes_abrev", modifiers: []), .literal(" "),
+                            .token(name: "ano", modifiers: [])])
+    }
+
+    @Test func joinLevelsReconstroiEPulaVazios() {
+        let lvls = TemplateTokenizer.levels(from: "{evento}/{dia} {mes_abrev} {ano}/{tipo}")
+        #expect(TemplateTokenizer.joinLevels(lvls) == "{evento}/{dia} {mes_abrev} {ano}/{tipo}")
+        // nível vazio (pasta recém-criada, sem peça) não vira "//" no template
+        let comVazio = lvls + [[]]
+        #expect(TemplateTokenizer.joinLevels(comVazio) == "{evento}/{dia} {mes_abrev} {ano}/{tipo}")
+    }
+
+    @Test func levelsRoundTripComTextoLivre() {
+        let t = "{evento}/Culto {dia}/{tipo}"
+        #expect(TemplateTokenizer.joinLevels(TemplateTokenizer.levels(from: t)) == t)
+    }
 }

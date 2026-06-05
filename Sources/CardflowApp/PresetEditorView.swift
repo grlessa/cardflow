@@ -81,13 +81,16 @@ struct PresetEditorView: View {
     private var nomeacao: some View {
         VStack(alignment: .leading, spacing: 16) {
             secao("Pastas") {
-                Text("Onde os arquivos vão ser organizados no disco.").font(.caption).foregroundStyle(.secondary)
-                PillBuilderView(model: model, row: .folder, sessionFields: model.draft.sessionFields)
+                Text("Cada linha é uma pasta, e a de baixo fica dentro da de cima. Use “+ Texto…” pra digitar um nome fixo (ex.: Culto).")
+                    .font(.caption).foregroundStyle(.secondary)
+                FolderLevelsBuilder(model: model, sessionFields: model.draft.sessionFields)
             }
             secao("Nome do arquivo") {
                 Toggle("Renomear os arquivos ao copiar", isOn: $model.draft.rename.enabled)
                 if model.draft.rename.enabled {
-                    PillBuilderView(model: model, row: .name, sessionFields: model.draft.sessionFields)
+                    Text("Os juntadores cinza (· - _) entre as peças definem como elas se unem. Toque num pra trocar.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    PillBuilderView(model: model, lane: .name, sessionFields: model.draft.sessionFields)
                 } else {
                     Text("Os arquivos mantêm o nome original da câmera.").font(.callout).foregroundStyle(.secondary)
                 }
@@ -162,16 +165,33 @@ struct PresetEditorView: View {
     }
 
     private var preview: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("PRÉVIA").font(.caption2.weight(.bold)).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 7) {
+            Text("PRÉVIA — onde um arquivo vai parar")
+                .font(.caption2.weight(.bold)).foregroundStyle(.tertiary)
             if let err = model.previewError {
                 Label(err, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
-            } else {
-                Text(model.previewText).font(.callout.monospaced()).lineLimit(2).textSelection(.enabled)
+            } else if let parts = model.previewParts {
+                FlowRow(spacing: 6) {
+                    ForEach(Array(parts.folders.enumerated()), id: \.offset) { _, folder in
+                        previewChip(folder, icon: "folder.fill", isFile: false)
+                        Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                    }
+                    previewChip(parts.file, icon: "doc.fill", isFile: true)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20).padding(.vertical, 10)
+    }
+
+    private func previewChip(_ text: String, icon: String, isFile: Bool) -> some View {
+        let color = isFile ? Color.accentColor : Color.secondary
+        return HStack(spacing: 4) {
+            Image(systemName: icon).font(.caption2).foregroundStyle(color)
+            Text(text).font(.callout).foregroundStyle(isFile ? Color.accentColor : .primary)
+        }
+        .padding(.horizontal, 9).frame(height: 26)
+        .background(Capsule().fill(color.opacity(0.13)))
     }
 
     private var footer: some View {

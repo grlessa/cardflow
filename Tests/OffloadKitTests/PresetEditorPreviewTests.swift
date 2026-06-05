@@ -39,7 +39,7 @@ import Foundation
         let nb = NameBuilder(preset: preset, timeZone: tz)
 
         let result = nb.preview(for: .previewSample, context: .previewContext)
-        #expect(result == .success("Evento/FOTO/DSC00001.JPG"))
+        #expect(result == .success("Evento/Foto/DSC00001.JPG"))
     }
 
     /// Token desconhecido não estoura — vira erro mostrável na UI.

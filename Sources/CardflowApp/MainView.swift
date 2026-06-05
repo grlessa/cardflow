@@ -279,7 +279,7 @@ struct MainView: View {
 
                 Divider().padding(.top, 2)
                 sectionLabel("VAI CRIAR")
-                Text(pathPreview(model)).font(.callout.monospaced())
+                Text(pathPreview(model)).font(.callout)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 if let backup = model.backupURL {
                     Text("+ backup em \(diskName(backup, model))")
@@ -515,11 +515,29 @@ struct MainView: View {
     }
 
     private func pathPreview(_ model: AppModel) -> String {
-        var s = model.activePreset.folderStructure
-        s = s.replacingOccurrences(of: "{evento}", with: model.effectiveEvento)
-        s = s.replacingOccurrences(of: "{tipo}", with: "FOTO|VIDEO")
         let dest = model.destinations.first(where: { $0.url == model.destinationURL })?.name ?? "disco"
-        return "\(dest) › \(s)"
+        var p = model.activePreset
+        p.evento = model.effectiveEvento
+        // renderiza a estrutura com o motor REAL (datas viram "28 Mai 2026", caixa certa), não o template cru.
+        guard case .success(let full) = NameBuilder(preset: p).preview(for: .previewSample, context: .previewContext) else {
+            return dest
+        }
+        var folders = full.split(separator: "/").map(String.init)
+        if !folders.isEmpty { folders.removeLast() }   // tira o nome do arquivo de exemplo, fica só a pasta
+        // se a última pasta é o {tipo}, mostra os tipos que vão ser criados (conforme o filtro de mídia)
+        if p.folderStructure.split(separator: "/").last.map(String.init) == "{tipo}", !folders.isEmpty {
+            folders[folders.count - 1] = tipoPreview(model.mediaChoice)
+        }
+        return ([dest] + folders).joined(separator: " › ")
+    }
+
+    private func tipoPreview(_ kind: Preset.Media.Kind) -> String {
+        switch kind {
+        case .photo: return "Foto"
+        case .video: return "Video"
+        case .audio: return "Audio"
+        case .both: return "Foto/Video"
+        }
     }
 
     private func stateKey(_ state: AppModel.OffloadState) -> Int {

@@ -16,7 +16,7 @@ import Foundation
     @Test func structureWithoutRenameKeepsOriginalName() throws {
         let nb = NameBuilder(preset: .sampleConferencia, timeZone: tz)
         let rel = try nb.relativeDestination(for: file(type: .video, rel: "DCIM/X/C0001.MP4"), context: ctx())
-        #expect(rel == "Conferencia-Junho-2026/VIDEO/C0001.MP4")
+        #expect(rel == "Conferencia-Junho-2026/Video/C0001.MP4")
     }
 
     @Test(arguments: [
@@ -113,7 +113,7 @@ import Foundation
         let nb = NameBuilder(preset: preset, timeZone: tz)
         let rel = try nb.relativeDestination(for: file(type: .photo, rel: "a/DSC1.JPG"), context: ctx())
         // a "/" do template (entre {evento} e {tipo}) fica; a "/" do VALOR vira "-"
-        #expect(rel == "Culto 09-06/FOTO/DSC1.JPG")
+        #expect(rel == "Culto 09-06/Foto/DSC1.JPG")
     }
 
     @Test func dataComFormatoDeBarraNaoQuebraOCaminho() throws {
@@ -165,6 +165,28 @@ import Foundation
         // legítimos NÃO lançam
         #expect(throws: Never.self) { try NameBuilder.validateNoTraversal(in: "{evento}/{dia} {mes_abrev} {ano}/{tipo}") }
         #expect(throws: Never.self) { try NameBuilder.validateNoTraversal(in: "..foto/{tipo}") }   // "..foto" não é travessia
+    }
+
+    @Test func horaUsaTimeFormatDoPreset() throws {
+        var p = Preset.flatDefault
+        p.rename = .init(enabled: true, template: "{hora}", counterPadding: 4)
+        p.timeFormat = "HH'h'mm"
+        let nb = NameBuilder(preset: p, timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
+        let file = MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.jpg"), relPath: "x.jpg",
+                             size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        let rel = try nb.relativeDestination(for: file, camera: "Cam", counter: 1)
+        #expect(rel.contains("17h26"))   // captureDate = 2026-05-28 17:26:40 -03
+    }
+
+    @Test func dataRenderizaMesEmPortugues() throws {
+        var p = Preset.flatDefault
+        p.rename = .init(enabled: true, template: "{data}", counterPadding: 4)
+        p.dateFormat = "dd 'de' MMMM 'de' yyyy"; p.locale = "pt_BR"
+        let nb = NameBuilder(preset: p, timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
+        let file = MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.jpg"), relPath: "x.jpg",
+                             size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        let rel = try nb.relativeDestination(for: file, camera: "Cam", counter: 1)
+        #expect(rel.lowercased().contains("maio"))   // mês em pt-BR, não "May"
     }
 
     @Test func tokenValueCannotIntroduceTraversal() throws {

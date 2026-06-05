@@ -30,7 +30,7 @@ import Foundation
         #expect(outcome.unrecognized == ["MISC/notas.txt"])
 
         // Confere fisicamente um arquivo no destino 1.
-        let foto = dest1.appendingPathComponent("Conferencia-Junho-2026/FOTO/DSC00001.JPG")
+        let foto = dest1.appendingPathComponent("Conferencia-Junho-2026/Foto/DSC00001.JPG")
         #expect(FileManager.default.fileExists(atPath: foto.path))
     }
 
@@ -43,12 +43,12 @@ import Foundation
 
         let service = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
                                   timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
-        // escolhendo Áudio: o .wav é copiado e verificado pra <evento>/AUDIO/
+        // escolhendo Áudio: o .wav é copiado e verificado pra <evento>/Audio/
         let dest = work.appendingPathComponent("SSD")
         let comAudio = try service.run(cardRoot: card, chosenMedia: .audio, destinations: [dest], camera: "Cam01")
         #expect(comAudio.verifiedCount == 1)
         #expect(comAudio.failures.isEmpty)
-        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Offload/AUDIO/REC001.WAV").path))
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Offload/Audio/REC001.WAV").path))
 
         // escolhendo Foto: o áudio NÃO entra (nem como não-reconhecido — é áudio, só não foi pedido)
         let dest2 = work.appendingPathComponent("SSD2")
@@ -74,7 +74,7 @@ import Foundation
         let card = try FakeCard(); defer { card.cleanup() }
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let dest = work.appendingPathComponent("SSD")
-        let target = dest.appendingPathComponent("Conferencia-Junho-2026/FOTO/DSC00001.JPG")
+        let target = dest.appendingPathComponent("Conferencia-Junho-2026/Foto/DSC00001.JPG")
         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         let precious = Data("PRECIOUS-DO-NOT-OVERWRITE".utf8)
         try precious.write(to: target)
@@ -143,8 +143,8 @@ import Foundation
         #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/\(cardName)/clip.sidecar").path))
         // .DS_Store dentro do bundle NÃO é copiado
         #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/\(cardName)/A001.RDM/A001_C001.RDC/.DS_Store").path))
-        // foto: achatada em {evento}/FOTO/
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/FOTO/DSC0001.JPG").path))
+        // foto: achatada em {evento}/Foto/
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Foto/DSC0001.JPG").path))
         // 4 preservados (R3D, RMD, braw, sidecar) + 1 foto = 5 verificações num destino
         #expect(outcome.verifiedCount == 5)
         #expect(outcome.failures.isEmpty)
@@ -371,7 +371,7 @@ import Foundation
         #expect(o.verifiedCount == 24)   // 12 vídeos × 2 destinos, todos conferidos byte a byte
         #expect(o.failures.isEmpty)
         for i in 0..<12 {
-            let rel = "Offload/VIDEO/C\(String(format: "%04d", i)).MP4"
+            let rel = "Offload/Video/C\(String(format: "%04d", i)).MP4"
             #expect(fm.fileExists(atPath: d1.appendingPathComponent(rel).path))
             #expect(fm.fileExists(atPath: d2.appendingPathComponent(rel).path))
         }
@@ -414,7 +414,7 @@ import Foundation
         #expect(o.verifiedCount == 0)                                   // nada conferido
         #expect(!o.failures.isEmpty)                                    // a falha É reportada → "não formate"
         #expect(o.failures.contains { $0.hasSuffix("C0001.MP4") })
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/VIDEO/C0001.MP4").path))  // corrompido removido
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0001.MP4").path))  // corrompido removido
     }
 }
 

@@ -34,5 +34,7 @@ import Foundation
         #expect(preset.media.mode == .open)
         #expect(preset.copySidecars == .aside)
         #expect(preset.videoExtensions == ["mp4", "mov"])
+        // compat: preset SEM timeFormat (versão antiga) decodifica com o padrão — presets antigos não quebram.
+        #expect(preset.timeFormat == "HHmmss")
     }
 }

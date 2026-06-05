@@ -38,9 +38,9 @@ import Foundation
         // sem --preset → preset de fábrica (evento "Sessão", organiza por data)
         let cfg = try ArgParser.parse(["--card", card.root.path, "--to", dest.path, "--yes"])
         try CardflowRunner.run(cfg, input: { _ in nil }, output: { _ in })
-        // caminho tem data variável; confirma que caiu sob Sessão/.../FOTO/ sem fixar a data.
+        // caminho tem data variável; confirma que caiu sob Sessão/.../Foto/ sem fixar a data.
         let all = (FileManager.default.enumerator(at: dest, includingPropertiesForKeys: nil)?
                        .allObjects as? [URL]) ?? []
-        #expect(all.contains { $0.path.contains("/Sessão/") && $0.path.contains("/FOTO/") })
+        #expect(all.contains { $0.path.contains("/Sessão/") && $0.path.contains("/Foto/") })
     }
 }

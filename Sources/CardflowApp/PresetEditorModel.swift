@@ -20,7 +20,8 @@ final class PresetEditorModel: Identifiable {
     var step: Step = .basico
 
     // Fonte da verdade do construtor de peças. Ao mudar, serializa de volta pro draft.
-    var folderSegments: [TemplateSegment] = [] { didSet { draft.folderStructure = TemplateTokenizer.serialize(folderSegments) } }
+    // Pastas: uma lista de NÍVEIS (cada nível = uma pasta/linha); junta com "/" só na serialização.
+    var folderLevels: [[TemplateSegment]] = [] { didSet { draft.folderStructure = TemplateTokenizer.joinLevels(folderLevels) } }
     var nameSegments: [TemplateSegment] = [] { didSet { draft.rename.template = TemplateTokenizer.serialize(nameSegments) } }
 
     nonisolated let id = UUID()   // identidade da apresentação (.sheet(item:))
@@ -30,7 +31,7 @@ final class PresetEditorModel: Identifiable {
 
     private init(draft: Preset, isNew: Bool, canDelete: Bool) {
         self.draft = draft; self.isNew = isNew; self.canDelete = canDelete
-        self.folderSegments = TemplateTokenizer.parse(draft.folderStructure)
+        self.folderLevels = TemplateTokenizer.levels(from: draft.folderStructure)
         self.nameSegments = TemplateTokenizer.parse(draft.rename.template)
     }
 
@@ -56,59 +57,107 @@ final class PresetEditorModel: Identifiable {
 
     // MARK: - Operações de edição de segmentos
 
-    enum Row { case folder, name }
+    /// Uma "lane" de peças: o nome do arquivo, ou um NÍVEL de pasta (uma linha do construtor).
+    enum Lane: Equatable, Hashable { case name; case folder(Int) }
 
-    private func segments(_ row: Row) -> [TemplateSegment] { row == .folder ? folderSegments : nameSegments }
-    private func setSegments(_ row: Row, _ segs: [TemplateSegment]) {
-        if row == .folder { folderSegments = segs } else { nameSegments = segs }
+    private func segs(_ lane: Lane) -> [TemplateSegment] {
+        switch lane {
+        case .name: return nameSegments
+        case .folder(let i): return folderLevels.indices.contains(i) ? folderLevels[i] : []
+        }
+    }
+    private func setSegs(_ lane: Lane, _ v: [TemplateSegment]) {
+        switch lane {
+        case .name: nameSegments = v
+        case .folder(let i): if folderLevels.indices.contains(i) { folderLevels[i] = v }
+        }
+    }
+    /// Separador padrão DENTRO de uma lane: espaço numa pasta, "_" num nome de arquivo.
+    private func defaultJoiner(_ lane: Lane) -> String { if case .folder = lane { return " " }; return "_" }
+
+    /// Adiciona um token no fim da lane (com o separador padrão antes, se já houver peças).
+    func addToken(_ name: String, to lane: Lane) {
+        var s = segs(lane)
+        if !s.isEmpty { s.append(.literal(defaultJoiner(lane))) }
+        s.append(.token(name: name, modifiers: []))
+        setSegs(lane, s)
     }
 
-    /// Adiciona um token no fim, inserindo o separador padrão antes se já houver conteúdo.
-    func addToken(_ name: String, to row: Row) {
-        var segs = segments(row)
-        if !segs.isEmpty { segs.append(.literal(row == .folder ? "/" : "_")) }
-        segs.append(.token(name: name, modifiers: []))
-        setSegments(row, segs)
+    /// Adiciona uma peça de TEXTO LIVRE editável (ex.: "Culto") no fim da lane.
+    func addText(to lane: Lane) {
+        var s = segs(lane)
+        if !s.isEmpty { s.append(.literal(defaultJoiner(lane))) }
+        s.append(.literal("texto"))
+        setSegs(lane, s)
     }
 
-    func removeSegment(at index: Int, in row: Row) {
-        var segs = segments(row)
-        guard segs.indices.contains(index) else { return }
-        segs.remove(at: index)
-        setSegments(row, TemplateTokenizer.tidySeparators(segs))
+    func removeSegment(at index: Int, in lane: Lane) {
+        var s = segs(lane)
+        guard s.indices.contains(index) else { return }
+        s.remove(at: index)
+        setSegs(lane, TemplateTokenizer.tidySeparators(s))
     }
 
-    func moveSegment(from: Int, to: Int, in row: Row) {
-        var segs = segments(row)
-        guard from != to, segs.indices.contains(from) else { return }
-        let item = segs.remove(at: from)
+    func moveSegment(from: Int, to: Int, in lane: Lane) {
+        var s = segs(lane)
+        guard from != to, s.indices.contains(from) else { return }
+        let item = s.remove(at: from)
         let dest = from < to ? to - 1 : to        // ajusta o deslocamento após o remove
-        segs.insert(item, at: max(0, min(dest, segs.count)))
-        setSegments(row, TemplateTokenizer.tidySeparators(segs))
+        s.insert(item, at: max(0, min(dest, s.count)))
+        setSegs(lane, TemplateTokenizer.tidySeparators(s))
     }
 
     /// Troca os modificadores de um token (caixa). nil = sem modificador de caixa.
-    func setCaseModifier(_ mod: String?, at index: Int, in row: Row) {
-        var segs = segments(row)
-        guard segs.indices.contains(index), case .token(let n, _) = segs[index] else { return }
-        segs[index] = .token(name: n, modifiers: mod.map { [$0] } ?? [])
-        setSegments(row, segs)
+    func setCaseModifier(_ mod: String?, at index: Int, in lane: Lane) {
+        var s = segs(lane)
+        guard s.indices.contains(index), case .token(let n, _) = s[index] else { return }
+        s[index] = .token(name: n, modifiers: mod.map { [$0] } ?? [])
+        setSegs(lane, s)
     }
 
-    func setSeparator(_ text: String, at index: Int, in row: Row) {
-        var segs = segments(row)
-        guard segs.indices.contains(index), case .literal = segs[index] else { return }
-        segs[index] = .literal(text)
-        setSegments(row, segs)
+    func setSeparator(_ text: String, at index: Int, in lane: Lane) {
+        var s = segs(lane)
+        guard s.indices.contains(index), case .literal = s[index] else { return }
+        s[index] = .literal(text)
+        setSegs(lane, s)
+    }
+
+    /// Edita o texto de uma peça de texto livre (tira "/" pra não criar pasta dentro de um nome/nível).
+    func setText(_ text: String, at index: Int, in lane: Lane) {
+        var s = segs(lane)
+        guard s.indices.contains(index), case .literal = s[index] else { return }
+        s[index] = .literal(text.replacingOccurrences(of: "/", with: ""))
+        setSegs(lane, s)
+    }
+
+    // MARK: - Níveis de pasta (cada nível é uma pasta/linha)
+
+    func addFolderLevel() { folderLevels.append([]) }
+    func removeFolderLevel(_ index: Int) {
+        guard folderLevels.indices.contains(index) else { return }
+        folderLevels.remove(at: index)
     }
 
     static let dateFormatPresets: [(label: String, format: String)] = [
         ("2026-05-28", "yyyy-MM-dd"),
         ("28-05-2026", "dd-MM-yyyy"),
-        ("20260528", "yyyyMMdd"),
-        ("2026-05-28_172640", "yyyy-MM-dd_HHmmss"),
+        ("28-05-26", "dd-MM-yy"),
+        ("28-05", "dd-MM"),                 // sem ano
+        ("28.05.2026", "dd.MM.yyyy"),       // separador "."
+        ("20260528", "yyyyMMdd"),           // sem separador
+        ("28 de maio de 2026", "dd 'de' MMMM 'de' yyyy"),
+        ("28 de maio", "dd 'de' MMMM"),     // por extenso, sem ano
+        ("maio de 2026", "MMMM 'de' yyyy"),
     ]
     func setDateFormat(_ format: String) { draft.dateFormat = format }
+
+    static let timeFormatPresets: [(label: String, format: String)] = [
+        ("172640", "HHmmss"),
+        ("17h26", "HH'h'mm"),
+        ("17h26m40s", "HH'h'mm'm'ss's'"),
+        ("17-26-40", "HH-mm-ss"),
+    ]
+    func setTimeFormat(_ format: String) { draft.timeFormat = format }
 
     // MARK: - Campos de sessão
 
@@ -129,7 +178,7 @@ final class PresetEditorModel: Identifiable {
                 return true
             })
         }
-        folderSegments = dropOrphans(folderSegments)
+        folderLevels = folderLevels.map(dropOrphans)
         nameSegments = dropOrphans(nameSegments)
     }
 
@@ -165,6 +214,14 @@ final class PresetEditorModel: Identifiable {
 
     /// Mensagem amigável quando o template tem token/modificador inválido.
     var previewError: String? { Self.message(for: previewResult) }
+
+    /// Prévia estruturada: as PASTAS (na ordem) e o NOME do arquivo, pra mostrar como caminho visual.
+    var previewParts: (folders: [String], file: String)? {
+        guard case .success(let s) = previewResult else { return nil }
+        var comps = s.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard let file = comps.popLast() else { return nil }
+        return (comps, file)
+    }
 
     private static func message(for result: Result<String, NamingError>) -> String? {
         guard case .failure(let e) = result else { return nil }

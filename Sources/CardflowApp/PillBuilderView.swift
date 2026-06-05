@@ -3,15 +3,63 @@ import AppKit
 import OffloadKit
 import UniformTypeIdentifiers
 
-/// Construtor visual de um template (nome OU pastas) por peças, sem expor "{}".
-/// Lê/escreve a fileira de segmentos via o PresetEditorModel; o modo define o separador padrão.
-struct PillBuilderView: View {
+/// Construtor de PASTAS em níveis: cada linha é uma pasta (a de baixo fica DENTRO da de cima).
+/// Tira o "/" da cabeça do usuário — pasta é linha, texto/peça é conteúdo da linha.
+struct FolderLevelsBuilder: View {
     @Bindable var model: PresetEditorModel
-    let row: PresetEditorModel.Row          // .folder ou .name
     let sessionFields: [Preset.SessionField]
 
-    private var segments: [TemplateSegment] { row == .folder ? model.folderSegments : model.nameSegments }
-    private var rowTag: String { row == .folder ? "folder" : "name" }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(model.folderLevels.enumerated()), id: \.offset) { i, _ in
+                HStack(alignment: .center, spacing: 7) {
+                    if i > 0 {   // conector em L (└─), estilo árvore de pastas — desce e entra na de baixo
+                        TreeBranch().padding(.leading, CGFloat(i - 1) * 22 + 4)
+                    }
+                    Image(systemName: "folder.fill").foregroundStyle(.secondary).font(.callout)
+                    PillBuilderView(model: model, lane: .folder(i), sessionFields: sessionFields)
+                    if model.folderLevels.count > 1 {
+                        Button { model.removeFolderLevel(i) } label: {
+                            Image(systemName: "minus.circle").font(.body).foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain).help("Remover esta pasta")
+                        .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
+                    }
+                }
+            }
+            Divider().padding(.top, 4)   // separa a estrutura do botão de adicionar
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)   // "nova pasta" fixo no canto direito
+                Button { model.addFolderLevel() } label: {
+                    Label("nova pasta", systemImage: "plus")
+                        .font(.callout.weight(.medium)).foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.45),
+                                                        style: StrokeStyle(lineWidth: 1.2, dash: [5, 3])))
+                }
+                .buttonStyle(.plain)
+                .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Construtor visual de UMA lane (o nome do arquivo, ou um nível de pasta) por peças, sem expor "{}".
+struct PillBuilderView: View {
+    @Bindable var model: PresetEditorModel
+    let lane: PresetEditorModel.Lane
+    let sessionFields: [Preset.SessionField]
+
+    private var segments: [TemplateSegment] {
+        switch lane { case .name: return model.nameSegments
+        case .folder(let i): return model.folderLevels.indices.contains(i) ? model.folderLevels[i] : [] }
+    }
+    private var laneTag: String {
+        switch lane { case .name: return "name"; case .folder(let i): return "folder-\(i)" }
+    }
 
     var body: some View {
         FlowRow(spacing: 6) {
@@ -28,23 +76,29 @@ struct PillBuilderView: View {
         Group {
             switch seg {
             case .literal(let text):
-                SeparatorChip(text: text, folder: row == .folder) { model.setSeparator($0, at: index, in: row) }
+                if TemplateTokenizer.separators.contains(text) {
+                    SeparatorChip(text: text) { model.setSeparator($0, at: index, in: lane) }
+                } else {   // texto livre digitado pelo usuário (ex.: "Culto")
+                    TextPill(text: text, model: model, index: index, lane: lane)
+                }
             case .token(let name, let mods):
-                TokenPill(name: name, modifiers: mods, sessionFields: sessionFields, model: model, index: index, row: row)
+                TokenPill(name: name, modifiers: mods, sessionFields: sessionFields, model: model, index: index, lane: lane)
             }
         }
-        .onDrag { NSItemProvider(object: "\(rowTag):\(index)" as NSString) }
-        .onDrop(of: [.text], delegate: ReorderDrop(targetIndex: index, rowTag: rowTag, row: row, model: model))
+        .onDrag { NSItemProvider(object: "\(laneTag):\(index)" as NSString) }
+        .onDrop(of: [.text], delegate: ReorderDrop(targetIndex: index, laneTag: laneTag, lane: lane, model: model))
     }
 
     private var addMenu: some View {
         Menu {
+            Button { model.addText(to: lane) } label: { Label("Texto…", systemImage: "character.cursor.ibeam") }
+            Divider()
             ForEach(TokenCatalog.categoryOrder, id: \.self) { cat in
-                let itens = TokenCatalog.all.filter { $0.category == cat && !escondido($0.name) }
+                let itens = TokenCatalog.all.filter { $0.category == cat }
                 if !itens.isEmpty {
                     Section(cat) {
                         ForEach(itens, id: \.name) { info in
-                            Button { model.addToken(info.name, to: row) } label: { Label(info.label, systemImage: info.systemImage) }
+                            Button { model.addToken(info.name, to: lane) } label: { Label(info.label, systemImage: info.systemImage) }
                         }
                     }
                 }
@@ -52,20 +106,32 @@ struct PillBuilderView: View {
             if !sessionFields.isEmpty {
                 Section("Campos personalizados") {
                     ForEach(sessionFields, id: \.key) { f in
-                        Button { model.addToken(f.key, to: row) } label: { Label(f.label.isEmpty ? f.key : f.label, systemImage: "person.text.rectangle") }
+                        Button { model.addToken(f.key, to: lane) } label: { Label(f.label.isEmpty ? f.key : f.label, systemImage: "person.text.rectangle") }
                     }
                 }
             }
         } label: {
-            Image(systemName: "plus").frame(width: 30, height: 28)
+            Image(systemName: "plus").font(.callout.weight(.semibold)).foregroundStyle(.secondary)
+                .frame(width: 30, height: 28)
                 .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
     }
+}
 
-    // tokens granulares de data ficam escondidos atrás da pill "Data" (o popover dela troca o formato)
-    private func escondido(_ name: String) -> Bool {
-        ["ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "horas", "minutos", "segundos", "hora"].contains(name)
+/// Conector em L (└─) entre pastas, estilo árvore de arquivos: linha vem de cima e entra na pasta.
+private struct TreeBranch: View {
+    var body: some View {
+        Path { p in
+            let midY: CGFloat = 14
+            p.move(to: CGPoint(x: 5, y: -3))         // vem de cima (da pasta anterior)
+            p.addLine(to: CGPoint(x: 5, y: midY))    // desce
+            p.addLine(to: CGPoint(x: 15, y: midY))   // entra (horizontal)
+        }
+        .stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        .frame(width: 16, height: 28)
+        .accessibilityHidden(true)
     }
 }
 
@@ -87,6 +153,31 @@ private struct GripDots: View {
     }
 }
 
+/// Peça de TEXTO LIVRE editável (ex.: "Culto"). Cinza, pra se distinguir das peças-token (azuis).
+/// Binding DIRETO ao modelo (sem @State) pra não dessincronizar quando peças são movidas/removidas.
+private struct TextPill: View {
+    let text: String
+    @Bindable var model: PresetEditorModel
+    let index: Int
+    let lane: PresetEditorModel.Lane
+
+    var body: some View {
+        HStack(spacing: 3) {
+            TextField("texto", text: Binding(
+                get: { text },
+                set: { model.setText($0, at: index, in: lane) }))
+                .textFieldStyle(.plain).font(.callout).frame(minWidth: 36).fixedSize()
+            Button { model.removeSegment(at: index, in: lane) } label: {
+                Image(systemName: "xmark.circle.fill").font(.caption2)
+            }
+            .buttonStyle(.plain).foregroundStyle(.secondary).help("Remover texto")
+        }
+        .padding(.leading, 9).padding(.trailing, 5).frame(height: 28)
+        .background(Capsule().fill(.quaternary))
+        .overlay(Capsule().strokeBorder(.secondary.opacity(0.3), lineWidth: 1))
+    }
+}
+
 /// Uma peça-token: rótulo humano + ícone; toque abre popover (remover / caixa / formato/contador).
 private struct TokenPill: View {
     let name: String
@@ -94,7 +185,7 @@ private struct TokenPill: View {
     let sessionFields: [Preset.SessionField]
     @Bindable var model: PresetEditorModel
     let index: Int
-    let row: PresetEditorModel.Row
+    let lane: PresetEditorModel.Lane
     @State private var showOptions = false
 
     private var label: String {
@@ -133,7 +224,7 @@ private struct TokenPill: View {
                 Text("Caixa").font(.caption).foregroundStyle(.secondary)
                 Picker("Caixa", selection: Binding(
                     get: { modifiers.contains("maiuscula") ? "maiuscula" : (modifiers.contains("minuscula") ? "minuscula" : "normal") },
-                    set: { model.setCaseModifier($0 == "normal" ? nil : $0, at: index, in: row) }
+                    set: { model.setCaseModifier($0 == "normal" ? nil : $0, at: index, in: lane) }
                 )) {
                     Text("Aa").tag("normal"); Text("AB").tag("maiuscula"); Text("ab").tag("minuscula")
                 }.pickerStyle(.segmented).labelsHidden()
@@ -147,7 +238,21 @@ private struct TokenPill: View {
                         HStack {
                             Image(systemName: model.draft.dateFormat == preset.format ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(model.draft.dateFormat == preset.format ? Color.accentColor : .secondary)
-                            Text(preset.label).font(.callout.monospaced())
+                            Text(preset.label).font(.callout)
+                            Spacer()
+                        }
+                    }.buttonStyle(.plain)
+                }
+            }
+            if name == "hora" {
+                Divider()
+                Text("Formato da hora").font(.caption).foregroundStyle(.secondary)
+                ForEach(PresetEditorModel.timeFormatPresets, id: \.format) { preset in
+                    Button { model.setTimeFormat(preset.format) } label: {
+                        HStack {
+                            Image(systemName: model.draft.timeFormat == preset.format ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(model.draft.timeFormat == preset.format ? Color.accentColor : .secondary)
+                            Text(preset.label).font(.callout)
                             Spacer()
                         }
                     }.buttonStyle(.plain)
@@ -160,7 +265,7 @@ private struct TokenPill: View {
                 Stepper("Passo: \(model.draft.rename.counterStep)", value: $model.draft.rename.counterStep, in: 1...100)
             }
             Divider()
-            Button(role: .destructive) { model.removeSegment(at: index, in: row); showOptions = false } label: {
+            Button(role: .destructive) { model.removeSegment(at: index, in: lane); showOptions = false } label: {
                 Label("Remover peça", systemImage: "trash")
             }.buttonStyle(.plain).foregroundStyle(.red)
         }
@@ -168,38 +273,41 @@ private struct TokenPill: View {
     }
 }
 
-/// Chip de separador (literal) entre peças. "/" só faz sentido nas PASTAS (no nome viraria subpasta).
+/// Juntador (separador) entre peças DENTRO de um nome/nível: une com espaço, "-" ou "_".
+/// Pequeno chip com fundo, pra ler como controle clicável (não como texto solto). Espaço vira "·".
 private struct SeparatorChip: View {
     let text: String
-    let folder: Bool
     let onChange: (String) -> Void
-    private var opcoes: [String] { folder ? ["/", "_", "-", " "] : ["_", "-", " "] }
     var body: some View {
         Menu {
-            ForEach(opcoes, id: \.self) { s in
-                Button(s == " " ? "espaço" : s) { onChange(s) }
-            }
+            Button("espaço") { onChange(" ") }
+            Button("hífen  -") { onChange("-") }
+            Button("underline  _") { onChange("_") }
         } label: {
-            Text(text == " " ? "␣" : text).font(.callout.monospaced()).foregroundStyle(.secondary)
-                .frame(width: 18, height: 28)
+            Text(text == " " ? "·" : text)
+                .font(.callout.weight(.bold).monospaced()).foregroundStyle(.secondary)
+                .frame(width: 20, height: 22)
+                .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.8)))
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("Como juntar as peças: espaço, hífen ou underline")
+        .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
     }
 }
 
-/// Drop delegate de reordenar: move só DENTRO da mesma fileira (rejeita arrastar pasta↔nome).
+/// Drop delegate de reordenar: move só DENTRO da mesma lane (rejeita arrastar entre pastas/nome).
 private struct ReorderDrop: DropDelegate {
     let targetIndex: Int
-    let rowTag: String
-    let row: PresetEditorModel.Row
+    let laneTag: String
+    let lane: PresetEditorModel.Lane
     let model: PresetEditorModel
     func performDrop(info: DropInfo) -> Bool {
         guard let item = info.itemProviders(for: [.text]).first else { return false }
         item.loadObject(ofClass: NSString.self) { obj, _ in
             guard let s = obj as? String else { return }
             let parts = s.components(separatedBy: ":")
-            guard parts.count == 2, parts[0] == rowTag, let from = Int(parts[1]) else { return }  // só mesma fileira
-            Task { @MainActor in model.moveSegment(from: from, to: targetIndex, in: row) }
+            guard parts.count == 2, parts[0] == laneTag, let from = Int(parts[1]) else { return }  // só mesma lane
+            Task { @MainActor in model.moveSegment(from: from, to: targetIndex, in: lane) }
         }
         return true
     }
