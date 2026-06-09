@@ -32,6 +32,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSRemovableVolumesUsageDescription</key><string>O Cardflow precisa ler os cartões de câmera para fazer a cópia.</string>
   <key>NSNetworkVolumesUsageDescription</key><string>O Cardflow precisa acessar discos de rede quando você usa um NAS como destino de backup.</string>
+  <key>NSDesktopFolderUsageDescription</key><string>O Cardflow precisa de acesso à Mesa quando você a escolhe como destino da cópia.</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>O Cardflow precisa de acesso aos Documentos quando você os escolhe como destino da cópia.</string>
 </dict>
 </plist>
 PLIST

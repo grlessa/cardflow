@@ -5,6 +5,7 @@ public enum OffloadError: Error, Equatable {
     case unsafeDestination(String)   // o caminho do preset tentou gravar FORA da pasta de destino
     case cancelled                   // o usuário parou o backup no meio
     case diskFullDuringCopy          // um disco de destino encheu DURANTE a cópia (ENOSPC)
+    case permissionDenied            // o macOS bloqueou o acesso à pasta de destino (TCC: Mesa/Documentos)
 }
 
 extension OffloadError: LocalizedError {
@@ -19,6 +20,8 @@ extension OffloadError: LocalizedError {
             return "Backup cancelado. Os arquivos já copiados estão no destino, mas o backup está incompleto — mantenha o cartão como está."
         case .diskFullDuringCopy:
             return "Um disco de destino encheu durante a cópia. Libere espaço e tente de novo. O cartão está intocado — mantenha-o como está."
+        case .permissionDenied:
+            return "O macOS bloqueou o acesso à pasta de destino. Libere em Ajustes › Privacidade › Arquivos e Pastas e tente de novo. O cartão está intocado."
         }
     }
 
@@ -28,6 +31,17 @@ extension OffloadError: LocalizedError {
         if ns.domain == NSCocoaErrorDomain && ns.code == CocoaError.fileWriteOutOfSpace.rawValue { return true }
         if ns.domain == NSPOSIXErrorDomain && ns.code == Int(ENOSPC) { return true }
         if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError { return isDiskFull(underlying) }
+        return false
+    }
+
+    /// O erro (ou algum aninhado) é "permissão negada" (TCC do macOS em Mesa/Documentos)? Vira mensagem
+    /// clara apontando Ajustes › Privacidade, em vez de um erro de I/O genérico em inglês.
+    static func isPermissionDenied(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain &&
+            (ns.code == CocoaError.fileReadNoPermission.rawValue || ns.code == CocoaError.fileWriteNoPermission.rawValue) { return true }
+        if ns.domain == NSPOSIXErrorDomain && (ns.code == Int(EACCES) || ns.code == Int(EPERM)) { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError { return isPermissionDenied(underlying) }
         return false
     }
 }
@@ -62,6 +76,10 @@ public struct CopyService {
     let spaceChecker: SpaceChecker
     private let copier: FileCopying
     let marginBytes: Int64
+
+    /// Reserva extra exigida num destino no disco de SISTEMA (Mesa/Documentos): encher o interno
+    /// trava o macOS, então pede uma folga bem maior que a margem dos discos externos.
+    public static let internalReserveBytes: Int64 = 5 * 1024 * 1024 * 1024   // ~5 GB
     private let clock: () -> Date
     private let activityKeeper: ActivityKeeping
     private let manifestStore: ManifestStore
@@ -372,6 +390,7 @@ public struct CopyService {
                     sessionValues: [String: String] = [:],
                     capturedSince: Date? = nil,
                     fastResume: Bool = true,
+                    internalDestinations: Set<URL> = [],
                     isCancelled: () -> Bool = { false },
                     onProgress: (OffloadProgress) -> Void = { _ in }) throws -> OffloadOutcome {
         let token = activityKeeper.begin(reason: "Cardflow offload")
@@ -410,9 +429,10 @@ public struct CopyService {
         let required = payload.reduce(Int64(0)) { $0 + $1.size }   // total que PODE ser escrito (barra de progresso)
         // checagem POR DESTINO, descontando o que aquele disco já tem verificado (não será reescrito).
         let needByDest = requiredPerDestination(payload: payload, priorByDest: priorByDest, destinations: destinations)
-        let shortfalls: [SpaceChecker.Shortfall] = try destinations.compactMap { dest in
-            try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? required,
-                                   destinations: [dest], marginBytes: marginBytes).first
+        let shortfalls: [SpaceChecker.Shortfall] = try destinations.compactMap { dest -> SpaceChecker.Shortfall? in
+            let margin = internalDestinations.contains(dest) ? Self.internalReserveBytes : marginBytes
+            return try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? required,
+                                          destinations: [dest], marginBytes: margin).first
         }
         if !shortfalls.isEmpty { throw OffloadError.notEnoughSpace(shortfalls) }
 
@@ -581,6 +601,7 @@ public struct CopyService {
             // disco cheio é um modo de falha comum em campo: troca o erro de I/O genérico (em inglês,
             // incompreensível pro leigo) por uma mensagem clara apontando o que fazer.
             if OffloadError.isDiskFull(error) { throw OffloadError.diskFullDuringCopy }
+            if OffloadError.isPermissionDenied(error) { throw OffloadError.permissionDenied }
             throw error
         }
 

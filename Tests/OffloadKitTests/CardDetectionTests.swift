@@ -3,6 +3,15 @@ import Foundation
 @testable import OffloadKit
 
 @Suite struct CardDetectionTests {
+    @Test func internalShortcutFlagDefaultsFalseAndCanBeSet() {
+        let normal = ExternalVolume(url: URL(fileURLWithPath: "/Volumes/SSD"), name: "SSD",
+                                    isRemovable: true, isInternal: false)
+        #expect(normal.isInternalShortcut == false)
+        let atalho = ExternalVolume(url: URL(fileURLWithPath: "/Users/x/Documents"), name: "Documentos",
+                                    isRemovable: false, isInternal: true, isInternalShortcut: true)
+        #expect(atalho.isInternalShortcut == true)
+    }
+
     @Test func detectsCardByCameraStructure() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir.appendingPathComponent("DCIM/100MSDCF"), withIntermediateDirectories: true)

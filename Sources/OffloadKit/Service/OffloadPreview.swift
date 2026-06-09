@@ -19,7 +19,8 @@ extension CopyService {
     /// `capturedSince`: se dado, só inclui arquivos PLANOS capturados a partir dessa data (filtro "só
     /// hoje"). Bundles de cinema ficam de fora do filtro pra não quebrar um clipe pela metade.
     public func preview(cardRoot: URL, chosenMedia: Preset.Media.Kind, destinations: [URL],
-                        capturedSince: Date? = nil, fastResume: Bool = true) throws -> OffloadPreview {
+                        capturedSince: Date? = nil, fastResume: Bool = true,
+                        internalDestinations: Set<URL> = []) throws -> OffloadPreview {
         let all = try scanner.scan(cardRoot: cardRoot)
         let dateOK = Self.dateFilter(capturedSince)
         let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
@@ -38,9 +39,10 @@ extension CopyService {
         let eventoRoot = NameBuilder.sanitizePathComponent(preset.evento)
         let priorByDest = fastResume ? priorVerifiedRecords(destinations, eventoRoot: eventoRoot) : [:]
         let needByDest = requiredPerDestination(payload: payload, priorByDest: priorByDest, destinations: destinations)
-        let shortfalls = try destinations.compactMap { dest in
-            try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? total,
-                                   destinations: [dest], marginBytes: marginBytes).first
+        let shortfalls = try destinations.compactMap { dest -> SpaceChecker.Shortfall? in
+            let margin = internalDestinations.contains(dest) ? Self.internalReserveBytes : marginBytes
+            return try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? total,
+                                          destinations: [dest], marginBytes: margin).first
         }
         // RETOMADA: quantas mídias selecionadas já estão verificadas em TODOS os destinos (= serão puladas).
         // >0 e < selecionadas → é uma retomada (o botão vira "Retomar").

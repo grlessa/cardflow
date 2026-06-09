@@ -8,12 +8,15 @@ public struct ExternalVolume: Equatable, Identifiable, Sendable {
     public var totalBytes: Int64?        // capacidade do volume (pra ordenar destinos por tamanho)
     public var physicalDeviceID: String? // disco físico (whole-disk BSD, ex.: "disk4") — backup ≠ mesmo disco
     public var volumeUUID: String?       // identidade estável do volume (lembrar destino entre sessões)
+    public var isInternalShortcut: Bool  // atalho de pasta no disco interno (Mesa/Documentos), não vem do watcher
     public var id: String { url.path }
     public init(url: URL, name: String, isRemovable: Bool, isInternal: Bool,
-                totalBytes: Int64? = nil, physicalDeviceID: String? = nil, volumeUUID: String? = nil) {
+                totalBytes: Int64? = nil, physicalDeviceID: String? = nil, volumeUUID: String? = nil,
+                isInternalShortcut: Bool = false) {
         self.url = url; self.name = name; self.isRemovable = isRemovable
         self.isInternal = isInternal; self.totalBytes = totalBytes
         self.physicalDeviceID = physicalDeviceID; self.volumeUUID = volumeUUID
+        self.isInternalShortcut = isInternalShortcut
     }
 }
 

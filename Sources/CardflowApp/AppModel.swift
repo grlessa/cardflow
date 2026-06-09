@@ -28,6 +28,7 @@ final class AppModel {
     var capturedSince: Date? { filterTodayOnly ? Calendar.current.startOfDay(for: Date()) : nil }
     var state: OffloadState = .idle
     var cardPreview: OffloadPreview?   // prévia do cartão detectado (contagem/tamanho)
+    var internalPermissionDenied = false   // macOS bloqueou acesso à pasta interna escolhida (Mesa/Documentos)
     var eventName: String = ""                   // pasta-mãe (sobrescreve o evento do preset nesta sessão)
     var sessionValues: [String: String] = [:]    // valores de campos personalizados do preset
     var destinationFreeBytes: Int64?
@@ -62,8 +63,36 @@ final class AppModel {
     /// Fontes conectadas (cartões/gravadores) e discos de destino, com overrides aplicados.
     var sources: [ExternalVolume] { watcher.volumes.filter { isSource($0) } }
     /// Destinos do MAIOR pro menor — o destino tende a ser o disco grande, então o padrão acerta.
+    /// No fim entram os atalhos internos (Mesa/Documentos), sempre disponíveis.
     var destinations: [ExternalVolume] {
         watcher.volumes.filter { !isSource($0) }.sorted { ($0.totalBytes ?? 0) > ($1.totalBytes ?? 0) }
+            + internalShortcuts()
+    }
+
+    /// Atalhos fixos de pasta no disco interno (Mesa/Documentos) que aparecem como destino. Não vêm do
+    /// VolumeWatcher (que só lista /Volumes/); são injetados aqui. Os dois compartilham o physicalDeviceID
+    /// REAL do disco de sistema → contam como o MESMO disco físico (bloqueia backup entre eles).
+    /// Cache: homeDir e o disco de sistema não mudam na sessão, então o DiskArbitration (wholeDiskBSD)
+    /// roda UMA vez, não a cada render (destinations é uma propriedade computada lida pelo SwiftUI).
+    @ObservationIgnored private var _internalShortcuts: [ExternalVolume]?
+    private func internalShortcuts() -> [ExternalVolume] {
+        if let cached = _internalShortcuts { return cached }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let bsd = PhysicalDisk.wholeDiskBSD(for: home) ?? "internal-system-disk"
+        func shortcut(_ folder: String, _ name: String) -> ExternalVolume {
+            ExternalVolume(url: home.appendingPathComponent(folder), name: name,
+                           isRemovable: false, isInternal: true, totalBytes: nil,
+                           physicalDeviceID: bsd, volumeUUID: nil, isInternalShortcut: true)
+        }
+        let result = [shortcut("Desktop", "Mesa"), shortcut("Documents", "Documentos")]
+        _internalShortcuts = result
+        return result
+    }
+
+    /// É um dos atalhos internos? (decide a reserva de 5GB na checagem de espaço).
+    func isInternalDestination(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return internalShortcuts().contains { $0.url == url }
     }
 
     /// A fonte ativa (a selecionada, ou a primeira detectada).
@@ -87,6 +116,7 @@ final class AppModel {
     var canStart: Bool {
         if case .running = state { return false }
         guard detectedCard != nil, destinationURL != nil else { return false }
+        if internalPermissionDenied { return false }   // macOS bloqueou a pasta interna → não deixa iniciar
         // sem prévia ainda (checagem de espaço em andamento) → não habilita ainda (evita iniciar às cegas)
         guard let sf = cardPreview?.shortfalls else { return false }
         return sf.isEmpty   // não deixa iniciar com disco sem espaço
@@ -120,7 +150,7 @@ final class AppModel {
     }
     private func volume(_ url: URL?) -> ExternalVolume? {
         guard let url else { return nil }
-        return watcher.volumes.first { $0.url == url }
+        return (watcher.volumes + internalShortcuts()).first { $0.url == url }
     }
     /// Principal e backup são CONFIRMADAMENTE o mesmo disco físico? (só true quando os dois IDs existem e batem)
     func samePhysicalDisk(_ a: URL?, _ b: URL?) -> Bool {
@@ -146,9 +176,14 @@ final class AppModel {
 
     private func freeAndTotal(of url: URL?) -> (Int64?, Int64?) {
         guard let url,
-              let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey])
+              let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey,
+                                                        .volumeAvailableCapacityKey, .volumeTotalCapacityKey])
         else { return (nil, nil) }
-        return (v.volumeAvailableCapacityForImportantUsage, v.volumeTotalCapacity.map { Int64($0) })
+        // mesmo fallback do motor: exFAT zera a chave "importantUsage" → usa a disponível genérica,
+        // senão a barra de capacidade mostraria 0 livre num SSD exFAT cheio de espaço.
+        let free = VolumeFreeSpace.choose(important: v.volumeAvailableCapacityForImportantUsage,
+                                          generic: v.volumeAvailableCapacity.map(Int64.init))
+        return (free, v.volumeTotalCapacity.map { Int64($0) })
     }
 
     func start() {
@@ -183,8 +218,9 @@ final class AppModel {
         if !s.sessionValues.isEmpty { sessionValues = s.sessionValues }
         eventName = activePreset.evento   // Pasta = evento do preset RESTAURADO (não fica preso no default)
         preferredDestUUID = s.destinationBindings["principal"]?.volumeUUID   // sticky mesmo se não plugado agora
-        if let d = s.destinationBindings["principal"]?.resolve(in: watcher.volumes) { destinationURL = d }
-        if let b = s.destinationBindings["backup"]?.resolve(in: watcher.volumes) { backupURL = b }
+        let bindables = watcher.volumes + internalShortcuts()   // resolve atalhos internos por caminho também
+        if let d = s.destinationBindings["principal"]?.resolve(in: bindables) { destinationURL = d }
+        if let b = s.destinationBindings["backup"]?.resolve(in: bindables) { backupURL = b }
     }
 
     /// Persiste a escolha de DISCO — chamado SÓ quando o usuário escolhe um disco no seletor (NÃO na
@@ -211,9 +247,9 @@ final class AppModel {
     }
 
     private func binding(for url: URL?) -> DiskBinding? {
-        guard let url, let v = watcher.volumes.first(where: { $0.url == url }) else { return nil }
+        guard let url, let v = (watcher.volumes + internalShortcuts()).first(where: { $0.url == url }) else { return nil }
         let uuid = (v.volumeUUID?.isEmpty == false) ? v.volumeUUID : nil   // UUID vazio = ausente (evita falso-match)
-        return DiskBinding(volumeUUID: uuid, lastKnownPath: v.url.path)
+        return DiskBinding(volumeUUID: uuid, lastKnownPath: v.url.path)   // atalho interno: UUID nil → casa por caminho
     }
 
     func importPreset(from url: URL) throws {
@@ -279,6 +315,18 @@ final class AppModel {
         destWasAutoSelected = false
         reconcileVolumes()
         saveDiskSelection()
+        probeInternalPermission(url)
+    }
+
+    /// Atalho interno protegido (Mesa/Documentos) dispara o prompt do macOS no 1º acesso. Faz um acesso
+    /// leve em background pra (a) provocar o prompt cedo e (b) detectar negação e avisar antes de copiar.
+    private func probeInternalPermission(_ url: URL?) {
+        guard let url, isInternalDestination(url) else { internalPermissionDenied = false; return }
+        Task.detached { [weak self] in
+            let ok = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) != nil
+            // só atualiza o aviso se o destino ainda for ESTE (evita um probe antigo sobrescrever o atual).
+            await MainActor.run { if self?.destinationURL == url { self?.internalPermissionDenied = !ok } }
+        }
     }
 
     /// Recarrega a lista (fábrica + salvos) e, opcionalmente, seleciona um preset.
@@ -322,8 +370,12 @@ final class AppModel {
         // trocou destino/backup → recalcula o ESPAÇO na hora (rápido) com o total já conhecido, pra
         // canStart/avisos não usarem shortfall obsoleto enquanto a nova prévia não chega.
         if dests != previewedDestinations, var pv = cardPreview {
-            pv.shortfalls = (try? SpaceChecker(provider: VolumeFreeSpace())
-                .check(requiredBytesPerDestination: pv.totalBytes, destinations: dests, marginBytes: 100 * 1024 * 1024)) ?? []
+            let checker = SpaceChecker(provider: VolumeFreeSpace())
+            pv.shortfalls = dests.compactMap { dest -> SpaceChecker.Shortfall? in
+                let margin = isInternalDestination(dest) ? CopyService.internalReserveBytes : 100 * 1024 * 1024
+                return (try? checker.check(requiredBytesPerDestination: pv.totalBytes,
+                                           destinations: [dest], marginBytes: margin))?.first
+            }
             cardPreview = pv
         }
         previewedDestinations = dests
@@ -331,9 +383,11 @@ final class AppModel {
         let preset = activePreset
         let media = preset.media.mode == .locked ? preset.media.lockedTo : mediaChoice
         let since = capturedSince
+        let internalDests = Set(dests.filter { isInternalDestination($0) })
         Task.detached { [weak self] in
             let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
-            let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests, capturedSince: since)
+            let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests,
+                                          capturedSince: since, internalDestinations: internalDests)
             await MainActor.run {
                 guard let self, self.previewGeneration == gen else { return }   // ignora resultado obsoleto
                 self.cardPreview = pv
@@ -354,6 +408,7 @@ final class AppModel {
         offloadStartedAt = Date(); lastElapsed = nil
         let cardName = detectedCard?.name ?? card.lastPathComponent   // capturado agora (some ao ejetar)
         let since = capturedSince                                     // filtro "só hoje", se ligado
+        let internalDests = Set(destinations.filter { isInternalDestination($0) })   // reserva de 5GB no interno
         isCancelling = false                                         // run novo: limpa feedback de Parar anterior
         state = .running(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0))
 
@@ -364,6 +419,7 @@ final class AppModel {
                     cardRoot: card, chosenMedia: media, destinations: destinations, camera: camera,
                     sessionValues: session,
                     capturedSince: since,
+                    internalDestinations: internalDests,
                     isCancelled: { Task.isCancelled },   // botão Parar cancela este Task → checado entre arquivos
                     onProgress: { p in
                         Task { @MainActor in
@@ -387,15 +443,18 @@ final class AppModel {
                     self.notifyFinished(outcome, cardName: cardName)
                 }
             } catch let error as OffloadError {
-                // pré-voo (espaço) acontece ANTES de copiar → cartão intocado. Os demais (ex.: caminho
-                // inválido) também lançam antes de escrever, mas avisamos por garantia (lado seguro).
-                let uncertain: Bool = { if case .notEnoughSpace = error { return false } else { return true } }()
+                // espaço (pré-voo) e permissão negada (TCC, na criação da pasta) acontecem ANTES de copiar
+                // → cartão intocado. Os demais (ex.: caminho inválido) também lançam antes de escrever, mas
+                // avisamos por garantia (lado seguro).
+                let isPermission: Bool = { if case .permissionDenied = error { return true } else { return false } }()
+                let cardSafe: Bool = isPermission || { if case .notEnoughSpace = error { return true } else { return false } }()
                 let msg = error.errorDescription ?? "\(error)"
                 let isCancel: Bool = { if case .cancelled = error { return true } else { return false } }()
                 await MainActor.run {
-                    self?.state = .failed(msg, cardUncertain: uncertain)
+                    if isPermission { self?.internalPermissionDenied = true }   // reacende o aviso pra liberar acesso
+                    self?.state = .failed(msg, cardUncertain: !cardSafe)
                     // cancelamento é do próprio usuário (ele está ali) → não dispara notificação de "falha".
-                    if !isCancel { self?.notifyFailed(uncertain: uncertain, cardName: cardName) }
+                    if !isCancel { self?.notifyFailed(uncertain: !cardSafe, cardName: cardName) }
                 }
             } catch let error as NamingError {
                 // erro de template (mesmo p/ todo arquivo) lança ANTES de copiar → cartão intocado.

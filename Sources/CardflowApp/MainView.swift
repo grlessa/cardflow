@@ -292,6 +292,12 @@ struct MainView: View {
                 } else if let free = model.destinationFreeBytes, let total = model.destinationTotalBytes, total > 0 {
                     CapacityBar(free: free, total: total)
                 }
+                if model.internalPermissionDenied {
+                    Label("o macOS bloqueou o acesso — libere em Ajustes › Privacidade › Arquivos e Pastas",
+                          systemImage: "lock.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let dest = model.destinations.first(where: { $0.url == model.destinationURL }) {
                     Button { model.useAsSource(dest) } label: {
                         Label("Usar como fonte", systemImage: "arrow.left.circle")
@@ -363,7 +369,15 @@ struct MainView: View {
             DriveIcon(size: 18, lit: selection.wrappedValue != nil)
             Menu {
                 if allowNone { Button(placeholder) { selection.wrappedValue = nil } }
-                ForEach(disks) { d in Button(d.name) { selection.wrappedValue = d.url } }
+                ForEach(disks.filter { !$0.isInternalShortcut }) { d in
+                    Button(d.name) { selection.wrappedValue = d.url }
+                }
+                let internos = disks.filter { $0.isInternalShortcut }
+                if !internos.isEmpty {
+                    Section("No computador") {
+                        ForEach(internos) { d in Button(d.name) { selection.wrappedValue = d.url } }
+                    }
+                }
             } label: {
                 Text(currentName ?? placeholder)
                     .foregroundStyle(currentName == nil ? Color.secondary : Color.primary)

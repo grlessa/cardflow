@@ -47,4 +47,13 @@ import Foundation
         // não montado → nil
         #expect(DiskBinding(volumeUUID: "UUID-Z", lastKnownPath: "/Volumes/sumiu").resolve(in: vols) == nil)
     }
+
+    // Atalho interno (Mesa/Documentos) não é volume montado: volumeUUID nil → persiste casando por caminho.
+    @Test func diskBindingResolvesInternalShortcutByPath() {
+        let docs = ExternalVolume(url: URL(fileURLWithPath: "/Users/x/Documents"), name: "Documentos",
+                                  isRemovable: false, isInternal: true, physicalDeviceID: "disk1",
+                                  volumeUUID: nil, isInternalShortcut: true)
+        #expect(DiskBinding(volumeUUID: nil, lastKnownPath: "/Users/x/Documents").resolve(in: [docs])?.path == "/Users/x/Documents")
+        #expect(DiskBinding(volumeUUID: nil, lastKnownPath: "/Users/x/Documents").resolve(in: []) == nil)   // sem crash
+    }
 }

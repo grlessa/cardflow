@@ -7,6 +7,16 @@ public protocol FreeSpaceProviding {
 /// Provider real: usa a capacidade disponível para uso "importante" do volume.
 public struct VolumeFreeSpace: FreeSpaceProviding {
     public init() {}
+
+    /// Escolhe o espaço livre entre as duas chaves. A "importantUsage" é da família APFS (conta
+    /// espaço purgeable, dá o número honesto de quanto cabe de verdade) — mas em exFAT/FAT, que é
+    /// o formato comum de SSD de cinema (Mac+Windows), ela vem ZERO mesmo com o disco vazio. Aí o
+    /// disponível genérico (suportado em todo filesystem) salva. Pega o maior: APFS mantém o número
+    /// rico; exFAT usa o genérico em vez de zerar e barrar qualquer cópia por "sem espaço".
+    public static func choose(important: Int64?, generic: Int64?) -> Int64 {
+        max(important ?? 0, generic ?? 0)
+    }
+
     public func availableBytes(at url: URL) throws -> Int64 {
         let fm = FileManager.default
         var dir = url
@@ -15,8 +25,10 @@ public struct VolumeFreeSpace: FreeSpaceProviding {
             if parent.path == dir.path { break }   // chegou na raiz
             dir = parent
         }
-        let values = try dir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        return values.volumeAvailableCapacityForImportantUsage ?? 0
+        let values = try dir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey,
+                                                       .volumeAvailableCapacityKey])
+        return Self.choose(important: values.volumeAvailableCapacityForImportantUsage,
+                           generic: values.volumeAvailableCapacity.map(Int64.init))
     }
 }
 

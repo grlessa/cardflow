@@ -356,6 +356,27 @@ import Foundation
 
     // Pipeline de verificação paralela sob carga: 12 arquivos × 2 destinos = 24 conferências
     // rodando concorrentes com as cópias. Tudo precisa ser conferido, presente e correto.
+    // Destino interno exige folga de 5GB; um disco com 1GB livre cabe a foto (margem externa 100MB)
+    // mas NÃO satisfaz a reserva interna de 5GB → shortfall só quando o destino é interno.
+    @Test func internalDestinationRequiresFiveGigReserve() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/IMG.JPG").path, contents: Data(count: 100))
+        let dest = work.appendingPathComponent("DEST")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        struct OneGig: FreeSpaceProviding { func availableBytes(at url: URL) throws -> Int64 { 1_000_000_000 } }
+        let svc = CopyService(preset: .factoryDefault, spaceProvider: OneGig(), timeZone: .current)
+
+        let externo = try svc.preview(cardRoot: card, chosenMedia: .photo, destinations: [dest])
+        #expect(externo.shortfalls.isEmpty)   // margem 100MB: foto cabe em 1GB
+
+        let interno = try svc.preview(cardRoot: card, chosenMedia: .photo, destinations: [dest],
+                                      internalDestinations: [dest])
+        #expect(interno.shortfalls.count == 1)   // reserva 5GB não cabe em 1GB → bloqueia
+    }
+
     @Test func pipelineVerifiesManyFilesToTwoDestinations() throws {
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let fm = FileManager.default

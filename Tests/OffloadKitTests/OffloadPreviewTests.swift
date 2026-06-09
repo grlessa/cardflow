@@ -75,6 +75,32 @@ import Foundation
         #expect(p.videos == 0)      // cinema não conta como vídeo
     }
 
+    // REPRO do bug do usuário: cartão grande (foto pequena + vídeo grande), disco que cabe a foto
+    // mas não o total. No modo "só fotos", NÃO pode acusar falta de espaço — o vídeo está fora.
+    @Test func previewSoFotosNaoAcusaFaltaDeEspacoSeFotosCabem() throws {
+        let card = FileManager.default.temporaryDirectory.appendingPathComponent("pv-space-" + UUID().uuidString)
+        let fm = FileManager.default
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/IMG.JPG").path, contents: Data(count: 100))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/CLIP.MP4").path, contents: Data(count: 10_000))
+        defer { try? fm.removeItem(at: card) }
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("pv-dest-" + UUID().uuidString)
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: dest) }
+        struct Fixed: FreeSpaceProviding { func availableBytes(at url: URL) throws -> Int64 { 1000 } }
+        let service = CopyService(preset: .factoryDefault, spaceProvider: Fixed(), timeZone: .current, marginBytes: 0)
+
+        let soFotos = try service.preview(cardRoot: card, chosenMedia: .photo, destinations: [dest])
+        #expect(soFotos.photos == 1)
+        #expect(soFotos.videos == 0)            // vídeo fora da seleção
+        #expect(soFotos.totalBytes == 100)      // espaço pedido = só a foto
+        #expect(soFotos.shortfalls.isEmpty)     // 100 < 1000 → cabe, NÃO bloqueia
+
+        let tudo = try service.preview(cardRoot: card, chosenMedia: .both, destinations: [dest])
+        #expect(tudo.totalBytes == 10_100)      // foto + vídeo
+        #expect(tudo.shortfalls.count == 1)     // 10_100 > 1000 → aí sim falta espaço
+    }
+
     @Test func previewFotoSozinhaZeraCinema() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("pv-cine2-" + UUID().uuidString)
         let fm = FileManager.default
