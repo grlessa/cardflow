@@ -17,6 +17,7 @@ public enum TokenCatalog {
         .init(name: "ext", label: "Extensão", category: "Arquivo", systemImage: "doc.badge.gearshape"),
         .init(name: "camera", label: "Câmera", category: "Origem", systemImage: "camera"),
         .init(name: "cartao", label: "Cartão", category: "Origem", systemImage: "sdcard"),
+        .init(name: "lote", label: "Lote (descarga)", category: "Origem", systemImage: "rectangle.stack"),
         .init(name: "pasta_origem", label: "Pasta de origem", category: "Origem", systemImage: "folder"),
         .init(name: "contador", label: "Nº sequencial", category: "Contador", systemImage: "number"),
         .init(name: "data", label: "Data", category: "Data e hora", systemImage: "calendar"),

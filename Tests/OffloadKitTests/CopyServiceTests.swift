@@ -377,6 +377,53 @@ import Foundation
         #expect(interno.shortfalls.count == 1)   // reserva 5GB não cabe em 1GB → bloqueia
     }
 
+    // Dois cartões de conteúdo disjunto (formatado entre eles) caem em Lote 01 e Lote 02; o mesmo
+    // cartão re-rodado continua no mesmo lote.
+    @Test func doisCartoesDisjuntosCaemEmLotesSeparados() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        func card(_ name: String, _ clip: String) throws -> URL {
+            let c = work.appendingPathComponent(name)
+            try fm.createDirectory(at: c.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+            fm.createFile(atPath: c.appendingPathComponent("DCIM/100/\(clip).MP4").path,
+                          contents: Data("\(clip)".utf8) + Data(count: 2000))
+            return c
+        }
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}/{tipo}"
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        let c1 = try card("CARD1", "C0001")
+        _ = try svc.run(cardRoot: c1, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/Video/C0001.MP4").path))
+
+        let c2 = try card("CARD2", "C0002")   // conteúdo disjunto (cartão formatado)
+        _ = try svc.run(cardRoot: c2, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/Video/C0002.MP4").path))
+
+        // re-rodar o CARD1 (mesmo conteúdo do Lote 01) não cria Lote 03
+        _ = try svc.run(cardRoot: c1, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 03").path))
+    }
+
+    // Opt-in: estrutura SEM {lote} não separa e preview.lote é nil (comportamento de antes intacto).
+    @Test func semTokenLoteNaoSeparaEPreviewLoteNil() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data(count: 1000))
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{tipo}"   // SEM {lote}
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        let pv = try svc.preview(cardRoot: card, chosenMedia: .video, destinations: [dest])
+        #expect(pv.lote == nil)
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Video/C0001.MP4").path))   // sem "Lote NN"
+    }
+
     @Test func pipelineVerifiesManyFilesToTwoDestinations() throws {
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let fm = FileManager.default

@@ -350,7 +350,7 @@ public struct CopyService {
     /// `{evento}/<pai>/<relPath>` em ALGUM destino com hash DIFERENTE, `<cartão> (2)`, `(3)`… Mantém o
     /// clipe inteiro junto e com nomes internos intactos (relink). Hasheia a origem só quando um caminho
     /// está ocupado (cartão novo = zero hash extra). Devolve o pai e se houve relocação (n > 1).
-    private func resolveBundleParent(eventoRoot: String, cardName: String, bundle: [MediaFile],
+    private func resolveBundleParent(eventoRoot: String, loteSeg: String, cardName: String, bundle: [MediaFile],
                                      destinations: [URL], claimed: [URL: [String: UInt64]]) throws -> (parent: String, relocated: Bool) {
         let fm = FileManager.default
         var sourceHashes: [String: UInt64] = [:]
@@ -365,7 +365,7 @@ public struct CopyService {
             let parent = n == 1 ? cardName : "\(cardName) (\(n))"
             var conflict = false
             outer: for file in bundle {
-                let rel = "\(eventoRoot)/\(parent)/\(file.relPath)"
+                let rel = "\(eventoRoot)/\(loteSeg)\(parent)/\(file.relPath)"
                 for dest in destinations {
                     let existing: UInt64?
                     if let h = claimed[dest]?[rel] {
@@ -383,6 +383,16 @@ public struct CopyService {
             if !conflict { return (parent, n > 1) }
             n += 1
         }
+    }
+
+    /// Resolve o lote do cartão quando a estrutura usa {lote}. nil se o template não usa o token.
+    /// Lê os manifestos já gravados no(s) destino(s) do evento e decide via LoteResolver (conteúdo).
+    func resolveLote(selected: [MediaFile], destinations: [URL], eventoRoot: String) -> LoteDecision? {
+        guard preset.folderStructure.contains("{lote}") else { return nil }
+        let manifests = destinations.flatMap { (try? manifestStore.loadAll(eventRootIn: $0, eventName: eventoRoot)) ?? [] }
+        let known = LoteResolver.knownLotes(from: manifests)
+        let cardFiles = Set(selected.map { LoteFileKey(relPath: $0.relPath, bytes: $0.size) })
+        return LoteResolver.resolve(cardFiles: cardFiles, known: known)
     }
 
     public func run(cardRoot: URL, chosenMedia: Preset.Media.Kind,
@@ -526,11 +536,17 @@ public struct CopyService {
             onProgress(OffloadProgress(phase: .copying, filesDone: 0, filesTotal: totalFiles, bytesDone: 0, bytesTotal: required))
         }
 
+        // resolve o lote (descarga) UMA vez por offload; nil quando a estrutura não usa {lote}.
+        let loteNumero = resolveLote(selected: selected, destinations: destinations, eventoRoot: eventoRoot)?.numero
+        // segmento de pasta do lote pros bundles de cinema (que não passam pelo template): "Lote NN/" ou "".
+        // posiciona o lote logo após o evento (cinema já é verbatim sob <evento>/<cartão>), então separa
+        // os clipes de cinema por descarga igual aos arquivos planos.
+        let loteSeg = loteNumero.map { "Lote " + String(format: "%02d", $0) + "/" } ?? ""
         do {
             // 1) arquivos planos: achata + renomeia (contador estável por arquivo)
             for file in selected where !file.preserve {
                 let context = NamingContext(camera: camera, counter: counterIndex[file.relPath] ?? 1,
-                                            cardName: cardRoot.lastPathComponent, sessionValues: sessionValues)
+                                            cardName: cardRoot.lastPathComponent, sessionValues: sessionValues, lote: loteNumero)
                 try copyOne(file, try nameBuilder.relativeDestination(for: file, context: context))
             }
 
@@ -545,11 +561,11 @@ public struct CopyService {
             for key in bundleOrder {
                 let bundle = bundles[key]!
                 let (parent, relocated) = try resolveBundleParent(
-                    eventoRoot: eventoRoot, cardName: cardName, bundle: bundle,
+                    eventoRoot: eventoRoot, loteSeg: loteSeg, cardName: cardName, bundle: bundle,
                     destinations: destinations, claimed: claimed)
                 if relocated { relocatedCinema.append(key) }
                 for file in bundle {
-                    try copyOne(file, "\(eventoRoot)/\(parent)/\(file.relPath)")
+                    try copyOne(file, "\(eventoRoot)/\(loteSeg)\(parent)/\(file.relPath)")
                 }
             }
 
@@ -591,7 +607,7 @@ public struct CopyService {
                 presetName: preset.name, camera: camera, startedAt: started, finishedAt: clock(),
                 source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fp, fileCount: selected.count, bytes: required),
                 destinations: destinations.map(\.path), files: records, unrecognized: unrecognized,
-                totals: totals, interrupted: true)
+                totals: totals, interrupted: true, lote: loteNumero)
             for dest in destinations {
                 guard (try? assertContained("\(eventoRoot)/.cardflow", in: [dest])) != nil else { continue }
                 _ = try? manifestStore.write(partialManifest, eventRootIn: dest, eventName: eventoRoot)
@@ -646,7 +662,7 @@ public struct CopyService {
                     presetName: preset.name, camera: camera, startedAt: started, finishedAt: finished,
                     source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fingerprint, fileCount: selected.count, bytes: required),
                     destinations: destinations.map(\.path),
-                    files: destFiles, unrecognized: unrecognized, totals: destTotals)
+                    files: destFiles, unrecognized: unrecognized, totals: destTotals, lote: loteNumero)
                 let url = try manifestStore.write(destManifest, eventRootIn: dest, eventName: eventoRoot)
                 manifestPaths.append(url.path)
             } catch {

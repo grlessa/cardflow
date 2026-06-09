@@ -29,6 +29,7 @@ final class AppModel {
     var state: OffloadState = .idle
     var cardPreview: OffloadPreview?   // prévia do cartão detectado (contagem/tamanho)
     var internalPermissionDenied = false   // macOS bloqueou acesso à pasta interna escolhida (Mesa/Documentos)
+    var acknowledgedIncompleteLote: Int?   // número do lote incompleto que o usuário JÁ confirmou entender
     var eventName: String = ""                   // pasta-mãe (sobrescreve o evento do preset nesta sessão)
     var sessionValues: [String: String] = [:]    // valores de campos personalizados do preset
     var destinationFreeBytes: Int64?
@@ -117,9 +118,18 @@ final class AppModel {
         if case .running = state { return false }
         guard detectedCard != nil, destinationURL != nil else { return false }
         if internalPermissionDenied { return false }   // macOS bloqueou a pasta interna → não deixa iniciar
+        if loteLossUnconfirmed { return false }         // lote anterior incompleto não confirmado → trava
         // sem prévia ainda (checagem de espaço em andamento) → não habilita ainda (evita iniciar às cegas)
         guard let sf = cardPreview?.shortfalls else { return false }
         return sf.isEmpty   // não deixa iniciar com disco sem espaço
+    }
+    /// Há um lote anterior incompleto detectado e ainda não confirmado pelo usuário? (trava o início).
+    /// Compara o NÚMERO do lote incompleto com o que foi confirmado — assim um transitório de I/O
+    /// (detecção some por um instante) não apaga a confirmação, e um lote incompleto diferente
+    /// (outro cartão) exige nova confirmação.
+    var loteLossUnconfirmed: Bool {
+        if let inc = cardPreview?.lote?.anteriorIncompleto { return inc != acknowledgedIncompleteLote }
+        return false
     }
     /// Algum destino (principal/backup) não cabe? Usa a checagem do motor (com margem real).
     func hasShortfall(_ url: URL?) -> Bool {
@@ -390,7 +400,7 @@ final class AppModel {
                                           capturedSince: since, internalDestinations: internalDests)
             await MainActor.run {
                 guard let self, self.previewGeneration == gen else { return }   // ignora resultado obsoleto
-                self.cardPreview = pv
+                self.cardPreview = pv   // a trava compara o NÚMERO confirmado, então não precisa resetar aqui
             }
         }
     }

@@ -243,6 +243,11 @@ struct MainView: View {
                         .font(.caption).foregroundStyle(Color.accentColor)
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                 }
+                if let lote = pv.lote {
+                    Label("Lote \(String(format: "%02d", lote.numero)) · \(lote.isNovo ? "novo" : "continua")",
+                          systemImage: "rectangle.stack")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if pv.junk > 0 {
                     Text("\(pv.junk) ignorado(s) · thumbnail/lixo")
                         .font(.caption2).foregroundStyle(.tertiary)
@@ -297,6 +302,17 @@ struct MainView: View {
                           systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if let inc = model.cardPreview?.lote?.anteriorIncompleto {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("O Lote \(String(format: "%02d", inc)) ficou incompleto e o cartão foi formatado — aqueles arquivos não estão mais no cartão.",
+                              systemImage: "exclamationmark.octagon.fill")
+                            .font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                        Toggle("Entendi, criar um lote novo mesmo assim",
+                               isOn: Binding(get: { model.acknowledgedIncompleteLote == inc },
+                                             set: { model.acknowledgedIncompleteLote = $0 ? inc : nil }))
+                            .font(.caption).toggleStyle(.checkbox)
+                    }
                 }
                 if let dest = model.destinations.first(where: { $0.url == model.destinationURL }) {
                     Button { model.useAsSource(dest) } label: {

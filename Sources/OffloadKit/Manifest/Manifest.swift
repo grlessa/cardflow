@@ -55,14 +55,18 @@ public struct Manifest: Codable, Equatable, Sendable {
     /// true quando o offload foi cortado no meio (crash/quit/cabo): o manifesto é um registro
     /// PARCIAL do que já tinha sido salvo e conferido até a interrupção, não de um backup completo.
     public var interrupted: Bool
+    /// Número do lote (descarga) deste offload. nil em manifesto antigo ou sem o token {lote}.
+    public var lote: Int?
 
     public init(schemaVersion: Int, offloadId: String, appVersion: String, presetName: String, camera: String,
                 startedAt: Date, finishedAt: Date, source: SourceInfo, destinations: [String],
-                files: [FileRecord], unrecognized: [String], totals: Totals, interrupted: Bool = false) {
+                files: [FileRecord], unrecognized: [String], totals: Totals, interrupted: Bool = false,
+                lote: Int? = nil) {
         self.schemaVersion = schemaVersion; self.offloadId = offloadId; self.appVersion = appVersion
         self.presetName = presetName; self.camera = camera; self.startedAt = startedAt; self.finishedAt = finishedAt
         self.source = source; self.destinations = destinations; self.files = files
         self.unrecognized = unrecognized; self.totals = totals; self.interrupted = interrupted
+        self.lote = lote
     }
 
     // decode tolerante: manifestos gravados antes deste campo (sem `interrupted`) ainda carregam.
@@ -81,5 +85,6 @@ public struct Manifest: Codable, Equatable, Sendable {
         unrecognized = try c.decode([String].self, forKey: .unrecognized)
         totals = try c.decode(Totals.self, forKey: .totals)
         interrupted = try c.decodeIfPresent(Bool.self, forKey: .interrupted) ?? false
+        lote = try c.decodeIfPresent(Int.self, forKey: .lote)
     }
 }

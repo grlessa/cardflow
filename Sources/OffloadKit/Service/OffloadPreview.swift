@@ -12,6 +12,7 @@ public struct OffloadPreview: Equatable {
     public var shortfalls: [SpaceChecker.Shortfall]
     public var alreadyPresent: Int = 0    // mídias já gravadas+conferidas no destino (= é uma RETOMADA)
     public var remainingBytes: Int64 = 0  // bytes que ainda falta copiar (total menos o que já está no destino)
+    public var lote: LoteDecision? = nil  // descarga detectada (nil quando a estrutura não usa {lote})
 }
 
 extension CopyService {
@@ -21,6 +22,7 @@ extension CopyService {
     public func preview(cardRoot: URL, chosenMedia: Preset.Media.Kind, destinations: [URL],
                         capturedSince: Date? = nil, fastResume: Bool = true,
                         internalDestinations: Set<URL> = []) throws -> OffloadPreview {
+        let destinations = destinations.reduce(into: [URL]()) { acc, u in if !acc.contains(u) { acc.append(u) } }   // dedup (igual ao run)
         let all = try scanner.scan(cardRoot: cardRoot)
         let dateOK = Self.dateFilter(capturedSince)
         let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
@@ -58,9 +60,10 @@ extension CopyService {
         let alreadyPresent = selected.filter(presentEverywhere).count
         // bytes que ainda faltam: o total menos o que já está verificado em todos os destinos.
         let remainingBytes = total - payload.filter(presentEverywhere).reduce(Int64(0)) { $0 + $1.size }
+        let loteDecision = resolveLote(selected: selected, destinations: destinations, eventoRoot: eventoRoot)
         return OffloadPreview(photos: photos, videos: videos, audios: audios, cinema: cinema, junk: junk,
                               selectedCount: selected.count, totalBytes: total,
                               unrecognized: unrecognized, shortfalls: shortfalls,
-                              alreadyPresent: alreadyPresent, remainingBytes: remainingBytes)
+                              alreadyPresent: alreadyPresent, remainingBytes: remainingBytes, lote: loteDecision)
     }
 }

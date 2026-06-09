@@ -4,6 +4,24 @@ import Foundation
 
 @Suite struct OffloadManifestTests {
     private struct Enough: FreeSpaceProviding { func availableBytes(at url: URL) throws -> Int64 { .max } }
+
+    @Test func manifestLoteRoundTripsAndDecodesNilFromOld() throws {
+        let m = Manifest(
+            schemaVersion: 2, offloadId: "fp", appVersion: "x", presetName: "p", camera: "Cam",
+            startedAt: Date(timeIntervalSince1970: 1), finishedAt: Date(timeIntervalSince1970: 2),
+            source: .init(volumeName: "SD", fingerprint: "fp", fileCount: 1, bytes: 100),
+            destinations: ["/d"], files: [], unrecognized: [],
+            totals: .init(photos: 0, videos: 0, audio: 0, sidecars: 0, verified: 0, failed: 0, skipped: 0),
+            interrupted: false, lote: 3)
+        let data = try JSONEncoder().encode(m)
+        #expect(try JSONDecoder().decode(Manifest.self, from: data).lote == 3)
+        // manifesto antigo (sem a chave "lote") decodifica como nil
+        var s = String(data: data, encoding: .utf8)!
+        s = s.replacingOccurrences(of: "\"lote\":3,", with: "")
+            .replacingOccurrences(of: ",\"lote\":3", with: "")
+            .replacingOccurrences(of: "\"lote\":3", with: "")
+        #expect(try JSONDecoder().decode(Manifest.self, from: Data(s.utf8)).lote == nil)
+    }
     func tempDir() throws -> URL {
         let d = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)

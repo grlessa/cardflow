@@ -24,8 +24,10 @@ public struct NamingContext {
     public var counter: Int        // índice 1-based da execução
     public var cardName: String
     public var sessionValues: [String: String]
-    public init(camera: String, counter: Int, cardName: String = "", sessionValues: [String: String] = [:]) {
-        self.camera = camera; self.counter = counter; self.cardName = cardName; self.sessionValues = sessionValues
+    public var lote: Int?          // número do lote (descarga), quando a estrutura usa {lote}
+    public init(camera: String, counter: Int, cardName: String = "", sessionValues: [String: String] = [:], lote: Int? = nil) {
+        self.camera = camera; self.counter = counter; self.cardName = cardName
+        self.sessionValues = sessionValues; self.lote = lote
     }
 }
 
@@ -38,7 +40,7 @@ public struct NameBuilder {
     }
 
     public static let knownTokens: Set<String> = [
-        "evento", "tipo", "camera", "cartao", "nome_original", "ext", "pasta_origem", "contador",
+        "evento", "tipo", "camera", "cartao", "lote", "nome_original", "ext", "pasta_origem", "contador",
         "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "horas", "minutos", "segundos", "data", "hora",
     ]
     public static let knownModifiers: Set<String> = ["maiuscula", "minuscula"]
@@ -46,7 +48,7 @@ public struct NameBuilder {
     /// Ordem de exibição dos tokens no picker do editor (mais comuns primeiro).
     /// `Set(tokenOrder) == knownTokens` é garantido por teste — não deixar um token de fora.
     public static let tokenOrder: [String] = [
-        "evento", "tipo", "camera", "cartao",
+        "evento", "tipo", "camera", "cartao", "lote",
         "nome_original", "ext", "contador", "pasta_origem",
         "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia",
         "horas", "minutos", "segundos", "data", "hora",
@@ -86,6 +88,7 @@ public struct NameBuilder {
         case "tipo": return tipoFolder(for: file.type)
         case "camera": return ctx.camera
         case "cartao": return ctx.cardName
+        case "lote": return "Lote " + String(format: "%02d", ctx.lote ?? 1)
         case "nome_original": return (last as NSString).deletingPathExtension
         case "ext": return (file.relPath as NSString).pathExtension
         case "pasta_origem": return ((file.relPath as NSString).deletingLastPathComponent as NSString).lastPathComponent

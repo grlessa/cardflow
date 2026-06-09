@@ -5,6 +5,16 @@ import Foundation
 @Suite struct NameBuilderTests {
     let tz = TimeZone(identifier: "America/Sao_Paulo")!  // 1_780_000_000 = 2026-05-28 17:26:40 -03
 
+    @Test func loteTokenRenderizaLoteComDoisDigitos() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{evento}/{lote}/{tipo}"
+        let nb = NameBuilder(preset: preset, timeZone: tz)
+        let f = MediaFile(sourceURL: URL(fileURLWithPath: "/c/clip.mov"), relPath: "clip.mov",
+                          size: 1, type: .video, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        let dest = try nb.relativeDestination(for: f, context: .init(camera: "Cam", counter: 1, lote: 3))
+        #expect(dest.contains("/Lote 03/"))
+    }
+
     func file(type: FileType, rel: String) -> MediaFile {
         MediaFile(sourceURL: URL(fileURLWithPath: "/card/\(rel)"), relPath: rel, size: 100,
                   type: type, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
