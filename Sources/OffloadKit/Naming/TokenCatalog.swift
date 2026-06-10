@@ -25,6 +25,8 @@ public enum TokenCatalog {
         .init(name: "turno", label: "Turno (Manhã/Tarde/Noite)", category: "Data e hora", systemImage: "sun.horizon"),
         // granulares: pra montar QUALQUER formato com as peças (sem ano, ordem diferente, etc.)
         .init(name: "dia", label: "Dia (28)", category: "Partes da data", systemImage: "calendar"),
+        .init(name: "dia_semana", label: "Dia da semana (Segunda)", category: "Partes da data", systemImage: "calendar"),
+        .init(name: "dia_semana_abrev", label: "Dia abrev. (Seg)", category: "Partes da data", systemImage: "calendar"),
         .init(name: "mes", label: "Mês (05)", category: "Partes da data", systemImage: "calendar"),
         .init(name: "mes_abrev", label: "Mês abrev. (Mai)", category: "Partes da data", systemImage: "calendar"),
         .init(name: "mes_nome", label: "Mês nome (Maio)", category: "Partes da data", systemImage: "calendar"),

@@ -41,7 +41,8 @@ public struct NameBuilder {
 
     public static let knownTokens: Set<String> = [
         "evento", "tipo", "camera", "cartao", "lote", "nome_original", "ext", "pasta_origem", "contador",
-        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "horas", "minutos", "segundos", "data", "hora", "turno",
+        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "dia_semana", "dia_semana_abrev",
+        "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
     public static let knownModifiers: Set<String> = ["maiuscula", "minuscula"]
 
@@ -50,7 +51,7 @@ public struct NameBuilder {
     public static let tokenOrder: [String] = [
         "evento", "tipo", "camera", "cartao", "lote",
         "nome_original", "ext", "contador", "pasta_origem",
-        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia",
+        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "dia_semana", "dia_semana_abrev",
         "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
 
@@ -62,6 +63,16 @@ public struct NameBuilder {
         case .audio: return "Audio"
         default: return "Outros"
         }
+    }
+
+    // Dia da semana em pt-BR (mapa fixo → "Segunda"/"Seg" limpos, sem "-feira" nem ponto que o
+    // DateFormatter traria). Fuso do builder. Calendar.weekday: 1=Domingo … 7=Sábado.
+    private func diaSemana(for date: Date, abbreviated: Bool) -> String {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
+        let full = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
+        let abbr = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+        let i = cal.component(.weekday, from: date) - 1
+        return (abbreviated ? abbr : full)[i]
     }
 
     // Turno pela hora LOCAL de captura (fuso do builder). Noite engole a madrugada (18h–6h).
@@ -111,6 +122,8 @@ public struct NameBuilder {
         case "mes_abrev": return month(file.captureDate, abbreviated: true)
         case "mes_nome": return month(file.captureDate, abbreviated: false)
         case "dia": return df("dd", file.captureDate)
+        case "dia_semana": return diaSemana(for: file.captureDate, abbreviated: false)
+        case "dia_semana_abrev": return diaSemana(for: file.captureDate, abbreviated: true)
         case "horas": return df("HH", file.captureDate)
         case "minutos": return df("mm", file.captureDate)
         case "segundos": return df("ss", file.captureDate)

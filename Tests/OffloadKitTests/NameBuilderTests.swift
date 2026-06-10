@@ -47,6 +47,34 @@ import Foundation
         #expect(dest.hasPrefix("NOITE/"))
     }
 
+    private func fileOnDay(_ day: Int) -> MediaFile {
+        var c = DateComponents(); c.year = 2026; c.month = 6; c.day = day; c.hour = 12
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        return MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.mov"), relPath: "x.mov",
+                         size: 1, type: .video, captureDate: cal.date(from: c)!)
+    }
+
+    @Test func diaSemanaPorExtensoEAbreviado() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{dia_semana}/{dia_semana_abrev}"
+        let nb = NameBuilder(preset: preset, timeZone: tz)
+        func parts(_ day: Int) throws -> [String] {
+            try nb.relativeDestination(for: fileOnDay(day), context: .init(camera: "Cam", counter: 1))
+                .split(separator: "/").map(String.init)
+        }
+        #expect(try parts(8) == ["Segunda", "Seg", "x.mov"])     // 2026-06-08 segunda
+        #expect(try parts(7).first == "Domingo")                 // 2026-06-07 domingo
+        #expect(try parts(13) == ["Sábado", "Sáb", "x.mov"])     // 2026-06-13 sábado
+    }
+
+    @Test func diaSemanaRespeitaToggle() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{dia_semana:maiuscula}"
+        let nb = NameBuilder(preset: preset, timeZone: tz)
+        let dest = try nb.relativeDestination(for: fileOnDay(8), context: .init(camera: "Cam", counter: 1))
+        #expect(dest.hasPrefix("SEGUNDA/"))   // 2026-06-08 segunda → maiúscula
+    }
+
     func file(type: FileType, rel: String) -> MediaFile {
         MediaFile(sourceURL: URL(fileURLWithPath: "/card/\(rel)"), relPath: rel, size: 100,
                   type: type, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
