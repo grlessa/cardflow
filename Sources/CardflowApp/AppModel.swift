@@ -47,7 +47,7 @@ final class AppModel {
     private var previewGeneration = 0   // descarta prévias de cartão obsoletas (last-writer-wins)
     private var previewedCardURL: URL?  // a fonte que a prévia atual representa (pra limpar ao trocar)
     private var previewedDestinations: [URL] = []   // destinos da prévia atual (pra recalcular espaço ao trocar)
-    private var suppressPresetResetOnce = false     // o editor mudou a seleção → não reseta a Pasta dessa vez
+    private var pendingProgrammaticPresetId: String?   // id setado por restore/editor; o onChange compara por VALOR (não vaza)
     private var offloadTask: Task<Void, Never>?     // a transferência em andamento (pra poder cancelar)
     var isCancelling = false                        // o usuário clicou Parar e estamos encerrando (feedback)
 
@@ -218,10 +218,8 @@ final class AppModel {
     /// Restaura preset/destino/backup/mídia da última sessão (uma vez, no start, após presets+volumes).
     func restoreSession() {
         guard let s = sessionStore.load() else { return }
-        // só seta o flag se a atribuição REALMENTE muda o id (senão o onChange não dispara, o flag não é
-        // consumido e vazaria pra próxima troca manual — bug do restore == factory-default).
         if let pid = s.activePresetId, pid != selectedPresetId, presets.contains(where: { $0.id == pid }) {
-            suppressPresetResetOnce = true       // o onChange vai disparar; não apaga o contexto restaurado
+            pendingProgrammaticPresetId = pid    // troca programática; se o onChange disparar, preserva o contexto
             selectedPresetId = pid
         }
         if let kind = Preset.Media.Kind(rawValue: s.lastMediaChoice) { mediaChoice = kind }
@@ -345,8 +343,8 @@ final class AppModel {
         presets = [.factoryDefault] + ((try? presetStore.list()) ?? [])
         if let id, id != selectedPresetId, presets.contains(where: { $0.id == id }) {
             // o editor mudou a seleção: preserveContext=true não pode apagar a Pasta que o voluntário
-            // já digitou. A troca dispara presetSelectionChanged (onChange) — o flag faz ele pular o reset.
-            if preserveContext { suppressPresetResetOnce = true }
+            // já digitou. A troca dispara presetSelectionChanged (onChange) — o id faz ele pular o reset.
+            if preserveContext { pendingProgrammaticPresetId = id }
             selectedPresetId = id
         }
         if eventName.trimmingCharacters(in: .whitespaces).isEmpty { eventName = activePreset.evento }
@@ -356,9 +354,17 @@ final class AppModel {
     }
 
     /// Chamado pelo onChange de selectedPresetId. Troca MANUAL do Picker reseta a Pasta/campos pro
-    /// padrão do preset; troca vinda do editor (suppressPresetResetOnce) preserva o que foi digitado.
+    /// padrão do preset; troca programática (restore/editor) preserva o que foi digitado.
     func presetSelectionChanged() {
-        if suppressPresetResetOnce { suppressPresetResetOnce = false; refreshCardPreview(); return }
+        // troca programática (restore/editor marcou este id) → preserva o contexto digitado, só atualiza
+        // a prévia. Comparar por VALOR, em vez de um flag de uso único, evita o vazamento quando o
+        // onChange não dispara no startup — assim a próxima troca MANUAL não é engolida.
+        if selectedPresetId == pendingProgrammaticPresetId {
+            pendingProgrammaticPresetId = nil
+            refreshCardPreview()
+            return
+        }
+        pendingProgrammaticPresetId = nil   // troca MANUAL invalida um programático que tenha vazado
         eventName = activePreset.evento
         sessionValues = [:]
         refreshCardPreview()
