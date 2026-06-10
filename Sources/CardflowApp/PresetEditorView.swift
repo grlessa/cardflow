@@ -110,12 +110,9 @@ struct PresetEditorView: View {
     // 3. Avançado
     private var avancado: some View {
         VStack(alignment: .leading, spacing: 16) {
-            secao("Extensões reconhecidas") {
-                Text("Quais tipos de arquivo o Cardflow identifica (padrão do sistema).").font(.caption).foregroundStyle(.secondary)
-                extLinha("Fotos", model.draft.photoExtensions)
-                extLinha("Vídeos", model.draft.videoExtensions)
-                extLinha("Áudio", model.draft.audioExtensions)
-                extLinha("Sidecars (XMP, THM…)", model.draft.sidecarExtensions)
+            secao("Campos personalizados") {
+                Text("Viram peças que você pode usar na nomeação (ex.: Fotógrafo).").font(.caption).foregroundStyle(.secondary)
+                sessionFieldsEditor
             }
             secao("Opções") {
                 Toggle("Copiar arquivos-irmãos (sidecars) junto", isOn: Binding(
@@ -128,9 +125,12 @@ struct PresetEditorView: View {
                     }.labelsHidden()
                 }
             }
-            secao("Campos personalizados") {
-                Text("Viram peças que você pode usar na nomeação (ex.: Fotógrafo).").font(.caption).foregroundStyle(.secondary)
-                sessionFieldsEditor
+            secao("Extensões reconhecidas") {
+                Text("Quais tipos de arquivo o Cardflow identifica (padrão do sistema).").font(.caption).foregroundStyle(.secondary)
+                extLinha("Fotos", model.draft.photoExtensions)
+                extLinha("Vídeos", model.draft.videoExtensions)
+                extLinha("Áudio", model.draft.audioExtensions)
+                extLinha("Sidecars (XMP, THM…)", model.draft.sidecarExtensions)
             }
         }
     }
