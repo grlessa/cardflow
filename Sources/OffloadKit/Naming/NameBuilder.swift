@@ -41,7 +41,7 @@ public struct NameBuilder {
 
     public static let knownTokens: Set<String> = [
         "evento", "tipo", "camera", "cartao", "lote", "nome_original", "ext", "pasta_origem", "contador",
-        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "horas", "minutos", "segundos", "data", "hora",
+        "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
     public static let knownModifiers: Set<String> = ["maiuscula", "minuscula"]
 
@@ -51,7 +51,7 @@ public struct NameBuilder {
         "evento", "tipo", "camera", "cartao", "lote",
         "nome_original", "ext", "contador", "pasta_origem",
         "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia",
-        "horas", "minutos", "segundos", "data", "hora",
+        "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
 
     // valor NATURAL (caixa normal) — pra o toggle Aa/AB/ab funcionar: Aa="Foto", AB="FOTO", ab="foto".
@@ -61,6 +61,16 @@ public struct NameBuilder {
         case .video: return "Video"
         case .audio: return "Audio"
         default: return "Outros"
+        }
+    }
+
+    // Turno pela hora LOCAL de captura (fuso do builder). Noite engole a madrugada (18h–6h).
+    private func turnoFolder(for date: Date) -> String {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
+        switch cal.component(.hour, from: date) {
+        case 6..<12: return "Manhã"
+        case 12..<18: return "Tarde"
+        default: return "Noite"   // 18–23 e 0–5
         }
     }
 
@@ -106,6 +116,7 @@ public struct NameBuilder {
         case "segundos": return df("ss", file.captureDate)
         case "data": return df(preset.dateFormat, file.captureDate, locale: preset.locale)   // mês em pt-BR
         case "hora": return df(preset.timeFormat, file.captureDate)
+        case "turno": return turnoFolder(for: file.captureDate)
         default:
             if let v = ctx.sessionValues[name] { return v }
             if preset.sessionFields.contains(where: { $0.key == name }) { return "" }

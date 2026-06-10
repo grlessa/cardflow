@@ -15,6 +15,38 @@ import Foundation
         #expect(dest.contains("/Lote 03/"))
     }
 
+    private func fileAt(hour: Int, minute: Int = 30) -> MediaFile {
+        var c = DateComponents(); c.year = 2026; c.month = 5; c.day = 28; c.hour = hour; c.minute = minute
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        return MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.mov"), relPath: "x.mov",
+                         size: 1, type: .video, captureDate: cal.date(from: c)!)
+    }
+
+    @Test func turnoMapeiaHoraLocalParaPeriodoIncluindoBordas() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{turno}/{tipo}"
+        let nb = NameBuilder(preset: preset, timeZone: tz)
+        func turno(_ hour: Int, _ minute: Int = 30) throws -> String {
+            String(try nb.relativeDestination(for: fileAt(hour: hour, minute: minute),
+                                              context: .init(camera: "Cam", counter: 1)).split(separator: "/").first!)
+        }
+        #expect(try turno(8) == "Manhã")
+        #expect(try turno(15) == "Tarde")
+        #expect(try turno(21) == "Noite")
+        #expect(try turno(2) == "Noite")          // madrugada → noite
+        #expect(try turno(6, 0) == "Manhã")       // borda
+        #expect(try turno(12, 0) == "Tarde")      // borda
+        #expect(try turno(18, 0) == "Noite")      // borda
+    }
+
+    @Test func turnoRespeitaToggleDeCaixa() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{turno:maiuscula}/{tipo}"
+        let nb = NameBuilder(preset: preset, timeZone: tz)
+        let dest = try nb.relativeDestination(for: fileAt(hour: 21), context: .init(camera: "Cam", counter: 1))
+        #expect(dest.hasPrefix("NOITE/"))
+    }
+
     func file(type: FileType, rel: String) -> MediaFile {
         MediaFile(sourceURL: URL(fileURLWithPath: "/card/\(rel)"), relPath: rel, size: 100,
                   type: type, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
