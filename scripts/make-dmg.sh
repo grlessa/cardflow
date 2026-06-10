@@ -18,13 +18,47 @@ source scripts/_notarize.sh   # notarize_with_log (busca o log da Apple na recus
 
 [ -d "$APP" ] || { echo "❌ Cardflow.app não existe. Rode scripts/sign-and-notarize.sh primeiro."; exit 1; }
 
-echo "==> Montando o DMG (app + atalho para a pasta Aplicativos)…"
+echo "==> Montando o DMG bonito (fundo + arraste-pra-Aplicativos)…"
+hdiutil detach "/Volumes/$VOLNAME" >/dev/null 2>&1 || true   # limpa um mount anterior, evita "Cardflow 1"
 STAGE="$(mktemp -d)"
 cp -R "$APP" "$STAGE/Cardflow.app"
 ln -s /Applications "$STAGE/Applications"   # o usuário só arrasta o ícone pra cá
+mkdir -p "$STAGE/.background"
+swift scripts/make-installer-bg.swift "$STAGE/.background/bg.png" mono >/dev/null   # gera o fundo @2x (seta azul mono)
 rm -f "$DMG"
-hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+
+# DMG read-write pra estilizar a janela no Finder (fundo + posição dos ícones) antes de comprimir.
+RWDIR="$(mktemp -d)"; RW="$RWDIR/rw.dmg"
+SIZE=$(( $(du -sm "$STAGE" | cut -f1) + 30 ))   # tamanho do app + folga
+hdiutil create -srcfolder "$STAGE" -volname "$VOLNAME" -fs HFS+ -format UDRW -size "${SIZE}m" -ov "$RW" >/dev/null
 rm -rf "$STAGE"
+
+DEVICE="$(hdiutil attach -readwrite -noverify -noautoopen "$RW" | grep -E '^/dev/' | head -1 | awk '{print $1}')"
+osascript <<APPLESCRIPT
+tell application "Finder"
+  tell disk "$VOLNAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {200, 120, 860, 588}
+    set vopts to the icon view options of container window
+    set arrangement of vopts to not arranged
+    set icon size of vopts to 128
+    set text size of vopts to 13
+    set background picture of vopts to file ".background:bg.png"
+    set position of item "Cardflow.app" of container window to {175, 200}
+    set position of item "Applications" of container window to {485, 200}
+    update without registering applications
+    delay 1
+    close
+  end tell
+end tell
+APPLESCRIPT
+sync
+hdiutil detach "$DEVICE" >/dev/null
+hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG" >/dev/null
+rm -rf "$RWDIR"
 echo "   $DMG"
 
 if [ "${SKIP_NOTARIZE:-0}" = "1" ]; then
