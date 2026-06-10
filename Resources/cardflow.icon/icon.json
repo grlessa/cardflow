@@ -2,7 +2,17 @@
   "fill-specializations" : [
     {
       "value" : {
-        "solid" : "srgb:0.30997,0.73825,1.00000,1.00000"
+        "automatic-gradient" : "srgb:0.30997,0.73825,1.00000,1.00000",
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 1
+          },
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.3
+          }
+        }
       }
     },
     {
@@ -50,10 +60,10 @@
             {
               "idiom" : "macOS",
               "value" : {
-                "scale" : 2.09,
+                "scale" : 2.8,
                 "translation-in-points" : [
-                  3.134999999999991,
-                  129.29458582748697
+                  120.69502494344852,
+                  254.03286783238713
                 ]
               }
             }
@@ -91,9 +101,10 @@
         "kind" : "layer-color",
         "opacity" : 1
       },
+      "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.35
+        "value" : 0.4
       }
     }
   ],
