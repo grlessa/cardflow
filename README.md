@@ -53,7 +53,8 @@ não tem cadastro nem rastreamento de nenhum tipo.
 
 ## Pra quem quer os detalhes técnicos
 
-App nativo de macOS feito em Swift e SwiftUI, sem dependências externas.
+App nativo de macOS feito em Swift e SwiftUI. O motor (`OffloadKit`) é Swift puro e sem
+dependências externas; o app usa Sparkle só para a atualização in-app.
 
 ### Como a conferência funciona
 

@@ -50,4 +50,5 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+codesign --force --deep --sign - "$APP" >/dev/null
 echo "Pronto. Rode:  open \"$APP\""

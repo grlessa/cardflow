@@ -141,6 +141,23 @@ public struct CopyService {
         return out
     }
 
+    /// Para cada arquivo já presente, indica se a única prova dele vem de manifesto interrompido.
+    /// Se também houver manifesto completo, o completo vence: esse arquivo não deve pintar como retomada.
+    func priorInterruptedPresence(_ destinations: [URL], eventoRoot: String) -> [URL: [String: Bool]] {
+        var out: [URL: [String: Bool]] = [:]
+        for dest in destinations {
+            var bySource: [String: Bool] = [:]
+            for m in ((try? manifestStore.loadAll(eventRootIn: dest, eventName: eventoRoot)) ?? []) {
+                for f in m.files where f.status == "verified" || f.status == "present" {
+                    let existing = bySource[f.sourceRelPath]
+                    bySource[f.sourceRelPath] = (existing ?? true) && m.interrupted
+                }
+            }
+            out[dest] = bySource
+        }
+        return out
+    }
+
     /// Bytes que cada destino ainda PRECISA receber: total do payload menos o que já está verificado lá
     /// (mesmo arquivo de origem, mesmo tamanho). Sem isto, retomar num disco apertado seria barrado por
     /// "sem espaço" contando o que já está no disco.

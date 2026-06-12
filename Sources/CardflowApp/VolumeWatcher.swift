@@ -6,8 +6,10 @@ import OffloadKit
 final class VolumeWatcher {
     var volumes: [ExternalVolume] = []
     private var observers: [NSObjectProtocol] = []
+    var observerCount: Int { observers.count }
 
     func start() {
+        guard observers.isEmpty else { return }
         refresh()
         let nc = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {

@@ -13,7 +13,7 @@ public enum Report {
         lines.append("Vai copiar: \(media) = \(p.selectedCount) arquivo(s), \(humanBytes(p.totalBytes)) por destino.")
         lines.append("Destinos: " + destinations.map(\.path).joined(separator: ", "))
         if !p.unrecognized.isEmpty {
-            lines.append("⚠️ Arquivos não reconhecidos (não serão copiados): " + p.unrecognized.joined(separator: ", "))
+            lines.append("⚠️ Arquivos não reconhecidos (copiados para .cardflow/desconhecidos): " + p.unrecognized.joined(separator: ", "))
         }
         for s in p.shortfalls {
             lines.append("❌ Sem espaço em \(s.destination.path): precisa \(humanBytes(s.required)), tem \(humanBytes(s.available)).")
@@ -38,7 +38,7 @@ public enum Report {
     }
 
     public static func verdict(_ o: OffloadOutcome) -> (ok: Bool, line: String) {
-        if o.failures.isEmpty {
+        if o.canSafelyFormatCard {
             return (true, "✅ Tudo verificado em todos os destinos. Pode formatar o cartão com segurança.")
         } else {
             return (false, "❌ \(o.failures.count) falha(s) na verificação. NÃO formate o cartão.")

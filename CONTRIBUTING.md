@@ -4,7 +4,8 @@ Obrigado pelo interesse no Cardflow. Algumas coisas que ajudam a manter o app co
 
 ## Rodar e testar
 
-O projeto é Swift puro (SwiftPM), sem dependências externas. Precisa de Xcode (macOS 14+).
+O projeto é SwiftPM. O motor (`OffloadKit`) é Swift puro e sem dependências externas; o app
+macOS usa Sparkle só para atualização in-app. Precisa de Xcode (macOS 14+).
 
 ```bash
 swift build          # compila o motor, o app e a CLI

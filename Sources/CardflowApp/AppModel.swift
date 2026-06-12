@@ -120,6 +120,7 @@ final class AppModel {
         if loteLossUnconfirmed { return false }         // lote anterior incompleto não confirmado → trava
         // sem prévia ainda (checagem de espaço em andamento) → não habilita ainda (evita iniciar às cegas)
         guard let sf = cardPreview?.shortfalls else { return false }
+        if isAlreadyCopied { return false }             // mesmo cartão/preset/destino já está completo
         return sf.isEmpty   // não deixa iniciar com disco sem espaço
     }
     /// Há um lote anterior incompleto detectado e ainda não confirmado pelo usuário? (trava o início).
@@ -140,10 +141,64 @@ final class AppModel {
     /// O botão vira "Retomar" pra o usuário confiar que o sistema entendeu que era pra continuar.
     var isResume: Bool {
         guard let pv = cardPreview else { return false }
-        return pv.alreadyPresent > 0 && pv.alreadyPresent < pv.selectedCount
+        return pv.alreadyPresent > 0 && pv.alreadyPresent < pv.selectedCount && !isComplementalCopy
+    }
+    /// É complemento: o usuário mudou a seleção (ex.: copiou Foto antes e agora marcou Tudo).
+    /// O motor ainda pula o que já existe, mas a linguagem não deve sugerir cópia interrompida.
+    var isComplementalCopy: Bool {
+        guard let pv = cardPreview, mediaChoice == .both else { return false }
+        guard pv.alreadyPresent > 0 && pv.alreadyPresent < pv.selectedCount else { return false }
+        guard pv.alreadyPresentFromInterrupted == 0 else { return false }
+        return alreadyPresentMediaPhrase(pv) != nil
+    }
+    /// Tudo que está selecionado já existe no destino atual. Não é "retomada": não há nada novo a copiar.
+    var isAlreadyCopied: Bool {
+        guard let pv = cardPreview else { return false }
+        return pv.selectedCount > 0 && pv.alreadyPresent >= pv.selectedCount
+    }
+    var alreadyCopiedTitle: String? {
+        isAlreadyCopied ? "Já está copiado" : nil
+    }
+    var alreadyCopiedDetail: String? {
+        guard isAlreadyCopied, let pv = cardPreview else { return nil }
+        return "\(pv.selectedCount) arquivo(s) já estão no destino. Nada novo para copiar."
+    }
+    /// Opção avançada: só aparece quando há uma retomada parcial. Em cópia nova, não há nada para
+    /// reconferir; em cópia já completa, o botão principal nem deveria iniciar outro offload.
+    var showsVerifiedResumeOption: Bool { isResume }
+    var resumeCardTitle: String? {
+        if isComplementalCopy { return "Complemento detectado" }
+        return isResume ? "Retomada detectada" : nil
+    }
+    var resumeCardDetail: String? {
+        guard (isResume || isComplementalCopy), let pv = cardPreview else { return nil }
+        let novos = max(0, pv.selectedCount - pv.alreadyPresent)
+        if isComplementalCopy, let phrase = alreadyPresentMediaPhrase(pv) {
+            return "\(pv.alreadyPresent) \(phrase.lower) já \(phrase.copied) · \(novos) novos · faltam \(Format.humanBytes(pv.remainingBytes))"
+        }
+        return "\(pv.alreadyPresent) já copiados · \(novos) novos · faltam \(Format.humanBytes(pv.remainingBytes))"
+    }
+    var resumeActionHint: String? {
+        if isComplementalCopy, let phrase = alreadyPresentMediaPhrase(cardPreview) {
+            return "\(phrase.sentenceStart) já \(phrase.copied) serão \(phrase.ignored). Copia só o que falta."
+        }
+        return isResume ? "Continua de onde parou. Copia só o que falta." : nil
+    }
+    var verifiedResumeHelpText: String {
+        "Mais lento. Confere os arquivos já copiados antes de continuar."
     }
     /// Está copiando? (pra travar os controles durante o processo)
     var isBusy: Bool { if case .running = state { return true }; return false }
+
+    private func alreadyPresentMediaPhrase(_ preview: OffloadPreview?) -> (lower: String, sentenceStart: String, copied: String, ignored: String)? {
+        guard let pv = preview else { return nil }
+        var labels: [(lower: String, sentenceStart: String, copied: String, ignored: String, count: Int)] = []
+        if pv.photos > 0 { labels.append(("fotos", "Fotos", "copiadas", "ignoradas", pv.photos)) }
+        if pv.videos > 0 { labels.append(("vídeos", "Vídeos", "copiados", "ignorados", pv.videos)) }
+        if pv.audios > 0 { labels.append(("áudios", "Áudios", "copiados", "ignorados", pv.audios)) }
+        let matches = labels.filter { $0.count == pv.alreadyPresent }.map { ($0.lower, $0.sentenceStart, $0.copied, $0.ignored) }
+        return matches.first
+    }
     /// Pasta-mãe efetiva (o que o usuário digitou, ou o evento do preset), saneada:
     /// "Culto 09/06" vira "Culto 09-06" pra não criar subpasta acidental — e bater com
     /// o que o token {evento} produz (que o motor já saneia).
@@ -321,8 +376,12 @@ final class AppModel {
         Task.detached { [weak self] in
             let ok = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) != nil
             // só atualiza o aviso se o destino ainda for ESTE (evita um probe antigo sobrescrever o atual).
-            await MainActor.run { if self?.destinationURL == url { self?.internalPermissionDenied = !ok } }
+            await self?.applyInternalPermissionProbe(url: url, denied: !ok)
         }
+    }
+
+    private func applyInternalPermissionProbe(url: URL, denied: Bool) {
+        if destinationURL == url { internalPermissionDenied = denied }
     }
 
     /// Recarrega a lista (fábrica + salvos) e, opcionalmente, seleciona um preset.
@@ -391,15 +450,19 @@ final class AppModel {
         Task.detached { [weak self] in
             let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
             let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests,
-                                          capturedSince: since, internalDestinations: internalDests)
-            await MainActor.run {
-                guard let self, self.previewGeneration == gen else { return }   // ignora resultado obsoleto
-                self.cardPreview = pv   // a trava compara o NÚMERO confirmado, então não precisa resetar aqui
-            }
+                                          capturedSince: since,
+                                          internalDestinations: internalDests)
+            // a trava compara o NÚMERO confirmado, então não precisa resetar aqui.
+            await self?.applyPreview(pv, generation: gen)
         }
     }
 
-    func startOffload() {
+    private func applyPreview(_ preview: OffloadPreview?, generation: Int) {
+        guard previewGeneration == generation else { return }   // ignora resultado obsoleto
+        cardPreview = preview
+    }
+
+    func startOffload(fastResume: Bool = true) {
         let destinations = offloadDestinations
         guard let card = detectedCard?.url, !destinations.isEmpty else { return }
         var preset = activePreset
@@ -423,29 +486,14 @@ final class AppModel {
                     cardRoot: card, chosenMedia: media, destinations: destinations, camera: camera,
                     sessionValues: session,
                     capturedSince: since,
+                    fastResume: fastResume,
                     internalDestinations: internalDests,
                     isCancelled: { Task.isCancelled },   // botão Parar cancela este Task → checado entre arquivos
                     onProgress: { p in
-                        Task { @MainActor in
-                            guard let self, case .running(let cur) = self.state else { return }
-                            // ignora progresso fora de ordem (Tasks não-estruturadas não preservam
-                            // ordem de entrega) — senão a barra por bytes recuaria/piscaria e passaria
-                            // sensação de travamento, levando o leigo a abortar um offload saudável.
-                            if p.phase.order > cur.phase.order || (p.phase == cur.phase && p.bytesDone >= cur.bytesDone) {
-                                self.state = .running(p)
-                            }
-                        }
+                        Task { @MainActor [weak self] in self?.applyProgress(p) }
                     }
                 )
-                await MainActor.run {
-                    guard let self else { return }
-                    if let s = self.offloadStartedAt { self.lastElapsed = Date().timeIntervalSince(s) }
-                    self.state = .finished(outcome)
-                    // decisão ÚNICA (mesma da UI): só ejeta quando é seguro formatar. Cartão vazio /
-                    // filtro errado não pode dar luz verde + ejeção (enganaria o operador).
-                    if outcome.canSafelyFormatCard { self.ejectCard(at: card) }
-                    self.notifyFinished(outcome, cardName: cardName)
-                }
+                await self?.finishOffload(outcome, card: card, cardName: cardName)
             } catch let error as OffloadError {
                 // espaço (pré-voo) e permissão negada (TCC, na criação da pasta) acontecem ANTES de copiar
                 // → cartão intocado. Os demais (ex.: caminho inválido) também lançam antes de escrever, mas
@@ -454,22 +502,46 @@ final class AppModel {
                 let cardSafe: Bool = isPermission || { if case .notEnoughSpace = error { return true } else { return false } }()
                 let msg = error.errorDescription ?? "\(error)"
                 let isCancel: Bool = { if case .cancelled = error { return true } else { return false } }()
-                await MainActor.run {
-                    if isPermission { self?.internalPermissionDenied = true }   // reacende o aviso pra liberar acesso
-                    self?.state = .failed(msg, cardUncertain: !cardSafe)
-                    // cancelamento é do próprio usuário (ele está ali) → não dispara notificação de "falha".
-                    if !isCancel { self?.notifyFailed(uncertain: !cardSafe, cardName: cardName) }
-                }
+                await self?.failOffload(message: msg, cardUncertain: !cardSafe,
+                                        notify: !isCancel, cardName: cardName,
+                                        permissionDenied: isPermission)
             } catch let error as NamingError {
                 // erro de template (mesmo p/ todo arquivo) lança ANTES de copiar → cartão intocado.
                 let msg = error.errorDescription ?? "\(error)"
-                await MainActor.run { self?.state = .failed(msg, cardUncertain: false); self?.notifyFailed(uncertain: false, cardName: cardName) }
+                await self?.failOffload(message: msg, cardUncertain: false, notify: true, cardName: cardName)
             } catch {
                 // falha durante a cópia (disco removido, I/O, etc.) → estado do destino incerto.
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                await MainActor.run { self?.state = .failed(msg, cardUncertain: true); self?.notifyFailed(uncertain: true, cardName: cardName) }
+                await self?.failOffload(message: msg, cardUncertain: true, notify: true, cardName: cardName)
             }
         }
+    }
+
+    private func applyProgress(_ p: OffloadProgress) {
+        guard case .running(let cur) = state else { return }
+        // ignora progresso fora de ordem (Tasks não-estruturadas não preservam
+        // ordem de entrega) — senão a barra por bytes recuaria/piscaria e passaria
+        // sensação de travamento, levando o leigo a abortar um offload saudável.
+        if p.phase.order > cur.phase.order || (p.phase == cur.phase && p.bytesDone >= cur.bytesDone) {
+            state = .running(p)
+        }
+    }
+
+    private func finishOffload(_ outcome: OffloadOutcome, card: URL, cardName: String) {
+        if let s = offloadStartedAt { lastElapsed = Date().timeIntervalSince(s) }
+        state = .finished(outcome)
+        // decisão ÚNICA (mesma da UI): só ejeta quando é seguro formatar. Cartão vazio /
+        // filtro errado não pode dar luz verde + ejeção (enganaria o operador).
+        if outcome.canSafelyFormatCard { ejectCard(at: card) }
+        notifyFinished(outcome, cardName: cardName)
+    }
+
+    private func failOffload(message: String, cardUncertain: Bool, notify: Bool,
+                             cardName: String, permissionDenied: Bool = false) {
+        if permissionDenied { internalPermissionDenied = true }   // reacende o aviso pra liberar acesso
+        state = .failed(message, cardUncertain: cardUncertain)
+        // cancelamento é do próprio usuário (ele está ali) → não dispara notificação de "falha".
+        if notify { notifyFailed(uncertain: cardUncertain, cardName: cardName) }
     }
 
     /// Aviso do sistema ao terminar — pra quem saiu de perto durante a cópia (vários minutos).
@@ -514,6 +586,11 @@ final class AppModel {
             target = d
         } else { return }
         NSWorkspace.shared.open(target)
+    }
+
+    func revealCurrentDestinationInFinder() {
+        guard let destinationURL else { return }
+        NSWorkspace.shared.open(destinationURL)
     }
 
     /// Ejeta o cartão (volume) ao terminar com sucesso. Se o disco estiver ocupado, não trava: avisa.

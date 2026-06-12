@@ -46,6 +46,26 @@ import Foundation
         #expect(p.junk == 2)     // as 2 thumbnails viram lixo (transparência)
     }
 
+    @Test func previewListaArquivosIgnoradosComoLixo() throws {
+        let card = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: card) }
+        let fm = FileManager.default
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100MSDCF"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: card.appendingPathComponent("PRIVATE/M4ROOT/THMBNL"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100MSDCF/DSC00001.JPG").path, contents: Data(count: 5000))
+        fm.createFile(atPath: card.appendingPathComponent(".DS_Store").path, contents: Data(count: 10))
+        fm.createFile(atPath: card.appendingPathComponent("PRIVATE/M4ROOT/THMBNL/LF_0001T01.JPG").path, contents: Data(count: 90_000))
+
+        let service = CopyService(preset: .factoryDefault, spaceProvider: Enough(), timeZone: .current)
+        let p = try service.preview(cardRoot: card, chosenMedia: .both, destinations: [URL(fileURLWithPath: "/x")])
+
+        #expect(p.junk == 2)
+        #expect(p.junkPaths == [
+            ".DS_Store",
+            "PRIVATE/M4ROOT/THMBNL/LF_0001T01.JPG"
+        ])
+    }
+
     @Test func previewOnlyVideoExcludesPhotos() throws {
         let card = try FakeCard(); defer { card.cleanup() }
         let service = CopyService(preset: .sampleConferencia, spaceProvider: Enough(), timeZone: .current)
@@ -53,6 +73,40 @@ import Foundation
         #expect(p.photos == 0)
         #expect(p.videos == 1)
         #expect(p.selectedCount == 1)
+    }
+
+    @Test func previewMarksAlreadyPresentFromInterruptedManifest() throws {
+        let card = try FakeCard(); defer { card.cleanup() }
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("pv-interrupted-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let preset = Preset.sampleConferencia
+        let eventName = NameBuilder.sanitizePathComponent(preset.evento)
+        let manifest = Manifest(
+            schemaVersion: 2,
+            offloadId: "partial",
+            appVersion: "test",
+            presetName: preset.name,
+            camera: "Cam01",
+            startedAt: Date(timeIntervalSince1970: 0),
+            finishedAt: Date(timeIntervalSince1970: 1),
+            source: .init(volumeName: "CARD", fingerprint: "fp", fileCount: 2, bytes: 3_072),
+            destinations: [dest.path],
+            files: [
+                .init(sourceRelPath: "DCIM/100MSDCF/DSC00001.JPG", destRelPath: "x/1.JPG", type: .photo, bytes: 2_048, xxhash64: "1", status: "verified"),
+                .init(sourceRelPath: "DCIM/100MSDCF/DSC00002.JPG", destRelPath: "x/2.JPG", type: .photo, bytes: 1_024, xxhash64: "2", status: "verified")
+            ],
+            unrecognized: [],
+            totals: .init(photos: 2, videos: 0, audio: 0, sidecars: 0, verified: 2, failed: 0, skipped: 0),
+            interrupted: true)
+        try ManifestStore().write(manifest, eventRootIn: dest, eventName: eventName)
+
+        let service = CopyService(preset: preset, spaceProvider: Enough(), timeZone: .current)
+        let p = try service.preview(cardRoot: card.root, chosenMedia: .both, destinations: [dest])
+
+        #expect(p.alreadyPresent == 2)
+        #expect(p.alreadyPresentFromInterrupted == 2)
     }
 
     @Test func previewContaPacotesDeCinemaSeparado() throws {

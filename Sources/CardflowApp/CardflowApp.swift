@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum AppWindowSize {
+    static let minimum = CGSize(width: 960, height: 780)
+    static let preferred = CGSize(width: 1120, height: 860)
+}
+
 @main
 struct CardflowApp: App {
     @State private var model = AppModel()
@@ -9,10 +14,10 @@ struct CardflowApp: App {
             MainView()
                 .environment(model)
                 .environmentObject(updates)
-                .frame(minWidth: 820, minHeight: 720)
+                .frame(minWidth: AppWindowSize.minimum.width, minHeight: AppWindowSize.minimum.height)
                 .onAppear { model.start(); updates.probe() }
         }
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 960, height: 800)
+        .defaultSize(width: AppWindowSize.preferred.width, height: AppWindowSize.preferred.height)
     }
 }

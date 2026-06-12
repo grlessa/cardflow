@@ -18,6 +18,13 @@ import Foundation
         #expect(v.line.contains("NÃO formate"))
     }
 
+    @Test func verdictNotOkWhenNothingWasSaved() {
+        let o = OffloadOutcome(verifiedCount: 0, failures: [], unrecognized: [], skipped: [])
+        let v = Report.verdict(o)
+        #expect(v.ok == false)
+        #expect(v.line.contains("NÃO formate"))
+    }
+
     @Test func summaryMentionsCountsAndShortfall() {
         let pv = OffloadPreview(photos: 2, videos: 1, audios: 0, cinema: 0, junk: 0, selectedCount: 3, totalBytes: 7168,
                                 unrecognized: ["MISC/notas.txt"], shortfalls: [])
@@ -25,6 +32,8 @@ import Foundation
         #expect(s.contains("2 foto"))
         #expect(s.contains("1 vídeo"))
         #expect(s.contains("notas.txt"))
+        #expect(s.contains("copiados para .cardflow/desconhecidos"))
+        #expect(!s.contains("não serão copiados"))
     }
 
     @Test func summaryMentionsCinemaClipsWhenPresent() {

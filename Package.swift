@@ -50,6 +50,11 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .testTarget(
+            name: "CardflowAppTests",
+            dependencies: ["CardflowApp"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .executableTarget(
             name: "make-appcast",
             dependencies: ["OffloadKit"],

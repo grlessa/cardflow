@@ -6,13 +6,48 @@ public struct OffloadPreview: Equatable {
     public var audios: Int
     public var cinema: Int                // pacotes de cinema preservados (verbatim)
     public var junk: Int                  // lixo/thumbnail ignorado (transparência)
+    public var junkPaths: [String] = []    // caminhos ignorados, para inspeção na UI
     public var selectedCount: Int
     public var totalBytes: Int64          // bytes que cada destino vai receber
     public var unrecognized: [String]
     public var shortfalls: [SpaceChecker.Shortfall]
-    public var alreadyPresent: Int = 0    // mídias já gravadas+conferidas no destino (= é uma RETOMADA)
+    public var alreadyPresent: Int = 0    // mídias já gravadas+conferidas no destino (retomada ou complemento)
+    public var alreadyPresentFromInterrupted: Int = 0 // subconjunto vindo só de manifesto interrompido
     public var remainingBytes: Int64 = 0  // bytes que ainda falta copiar (total menos o que já está no destino)
     public var lote: LoteDecision? = nil  // descarga detectada (nil quando a estrutura não usa {lote})
+
+    public init(photos: Int, videos: Int, audios: Int, cinema: Int, junk: Int,
+                junkPaths: [String] = [],
+                selectedCount: Int, totalBytes: Int64,
+                unrecognized: [String], shortfalls: [SpaceChecker.Shortfall],
+                alreadyPresent: Int = 0, alreadyPresentFromInterrupted: Int = 0,
+                remainingBytes: Int64 = 0, lote: LoteDecision? = nil) {
+        self.photos = photos
+        self.videos = videos
+        self.audios = audios
+        self.cinema = cinema
+        self.junk = junk
+        self.junkPaths = junkPaths
+        self.selectedCount = selectedCount
+        self.totalBytes = totalBytes
+        self.unrecognized = unrecognized
+        self.shortfalls = shortfalls
+        self.alreadyPresent = alreadyPresent
+        self.alreadyPresentFromInterrupted = alreadyPresentFromInterrupted
+        self.remainingBytes = remainingBytes
+        self.lote = lote
+    }
+
+    public init(photos: Int, videos: Int, audios: Int, cinema: Int, junk: Int,
+                selectedCount: Int, totalBytes: Int64,
+                unrecognized: [String], shortfalls: [SpaceChecker.Shortfall],
+                alreadyPresent: Int = 0, remainingBytes: Int64 = 0, lote: LoteDecision? = nil) {
+        self.init(photos: photos, videos: videos, audios: audios, cinema: cinema, junk: junk,
+                  junkPaths: [], selectedCount: selectedCount, totalBytes: totalBytes,
+                  unrecognized: unrecognized, shortfalls: shortfalls,
+                  alreadyPresent: alreadyPresent, alreadyPresentFromInterrupted: 0,
+                  remainingBytes: remainingBytes, lote: lote)
+    }
 }
 
 extension CopyService {
@@ -30,7 +65,9 @@ extension CopyService {
         let videos = selected.filter { $0.type == .video }.count
         let audios = selected.filter { $0.type == .audio }.count
         let cinema = PreservePlanner.bundleCount(selected)   // pacotes preservados selecionados
-        let junk = all.filter { $0.type == .junk && !$0.preserve }.count
+        let junkFiles = all.filter { $0.type == .junk && !$0.preserve }
+        let junk = junkFiles.count
+        let junkPaths = junkFiles.map(\.relPath).sorted()
         let unrecognizedFiles = all.filter { $0.type == .unknown && !$0.preserve && dateOK($0) }
         let unrecognized = unrecognizedFiles.map(\.relPath).sorted()
         // não-reconhecidos também são copiados (rede de segurança #3) → contam no espaço necessário.
@@ -40,14 +77,15 @@ extension CopyService {
         // retomada num disco apertado deixaria o botão Iniciar bloqueado por "sem espaço".
         let eventoRoot = NameBuilder.sanitizePathComponent(preset.evento)
         let priorByDest = fastResume ? priorVerifiedRecords(destinations, eventoRoot: eventoRoot) : [:]
+        let interruptedPresenceByDest = fastResume ? priorInterruptedPresence(destinations, eventoRoot: eventoRoot) : [:]
         let needByDest = requiredPerDestination(payload: payload, priorByDest: priorByDest, destinations: destinations)
         let shortfalls = try destinations.compactMap { dest -> SpaceChecker.Shortfall? in
             let margin = internalDestinations.contains(dest) ? Self.internalReserveBytes : marginBytes
             return try spaceChecker.check(requiredBytesPerDestination: needByDest[dest] ?? total,
                                           destinations: [dest], marginBytes: margin).first
         }
-        // RETOMADA: quantas mídias selecionadas já estão verificadas em TODOS os destinos (= serão puladas).
-        // >0 e < selecionadas → é uma retomada (o botão vira "Retomar").
+        // Quantas mídias selecionadas já estão verificadas em TODOS os destinos (= serão puladas).
+        // A UI decide se isso é retomada, complemento de mídia ou cópia já completa.
         var presentByDest: [URL: [String: Int64]] = [:]
         for dest in destinations {
             var byteBySrc: [String: Int64] = [:]
@@ -58,12 +96,22 @@ extension CopyService {
             !destinations.isEmpty && destinations.allSatisfy { presentByDest[$0]?[f.relPath] == f.size }
         }
         let alreadyPresent = selected.filter(presentEverywhere).count
+        func presentFromInterruptedEverywhere(_ f: MediaFile) -> Bool {
+            presentEverywhere(f) && destinations.allSatisfy { dest in
+                interruptedPresenceByDest[dest]?[f.relPath] == true
+            }
+        }
+        let alreadyPresentFromInterrupted = selected.filter(presentFromInterruptedEverywhere).count
         // bytes que ainda faltam: o total menos o que já está verificado em todos os destinos.
         let remainingBytes = total - payload.filter(presentEverywhere).reduce(Int64(0)) { $0 + $1.size }
         let loteDecision = resolveLote(selected: selected, destinations: destinations, eventoRoot: eventoRoot)
         return OffloadPreview(photos: photos, videos: videos, audios: audios, cinema: cinema, junk: junk,
+                              junkPaths: junkPaths,
                               selectedCount: selected.count, totalBytes: total,
                               unrecognized: unrecognized, shortfalls: shortfalls,
-                              alreadyPresent: alreadyPresent, remainingBytes: remainingBytes, lote: loteDecision)
+                              alreadyPresent: alreadyPresent,
+                              alreadyPresentFromInterrupted: alreadyPresentFromInterrupted,
+                              remainingBytes: remainingBytes, lote: loteDecision)
     }
+
 }
