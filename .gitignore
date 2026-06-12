@@ -28,11 +28,5 @@ Cardflow.app/
 Cardflow.dmg
 Cardflow.zip
 
-# Sessão local do Claude Code (não versionar)
-.remember/
-
-# Capturas do Playwright (verificação visual)
-.playwright-mcp/
-
 # Ferramentas do Sparkle baixadas (binários, não versionar)
 scripts/sparkle-bin/
