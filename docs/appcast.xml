@@ -3,16 +3,20 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>0.2.0</title>
-      <sparkle:version>233</sparkle:version>
-      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <title>0.2.1</title>
+      <sparkle:version>236</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Fri, 12 Jun 2026 02:30:03 +0000</pubDate>
-      <description><![CDATA[<h2>Atualização automática</h2>
-<p>Agora o Cardflow se atualiza sozinho. Quando sair uma versão nova, aparece um aviso dentro do app: você clica em Instalar e ele baixa, confere e reabre já na versão nova. Sem abrir o navegador e sem baixar o DMG na mão.</p>
-<p>O app continua funcionando offline. A internet só entra para buscar atualização.</p>
+      <pubDate>Fri, 12 Jun 2026 14:53:29 +0000</pubDate>
+      <description><![CDATA[<h2>Mais confiança no que foi salvo</h2>
+<ul>
+  <li><b>Reconferir tudo:</b> uma opção nova pra reler o cartão e o destino do zero, ignorando o que já tinha sido conferido. Útil quando você desconfia que mexeram no SSD.</li>
+  <li><b>Resultado mais claro no fim:</b> quantos arquivos foram conferidos, quantos já estavam lá e onde ficou o manifesto da cópia.</li>
+  <li><b>Arquivos desconhecidos</b> agora aparecem como copiados pra revisão, não como erro.</li>
+  <li>A tela principal respeita a opção de reduzir movimento do sistema.</li>
+</ul>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.0/Cardflow.dmg" sparkle:edSignature="ENwFycM4p0caRcB2L6wegKbqp7QVZITR5hG5ip+GPLFhlw1atJe4aiCSW9tPgOgmsmQPJRX87LdBJ/GyLqavCg==" length="5724726" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.1/Cardflow.dmg" sparkle:edSignature="K5mpl1M/dVlJbzmBh5Hh1eYKDP0NHt1G2XaQTQ/1MzXLSxAS4iMj9bSyRhpMXdait8uwMb523FDMvW9QHclPBw==" length="5813720" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
