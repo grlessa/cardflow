@@ -1,0 +1,18 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Cardflow</title>
+    <item>
+      <title>0.2.0</title>
+      <sparkle:version>233</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 12 Jun 2026 02:30:03 +0000</pubDate>
+      <description><![CDATA[<h2>Atualização automática</h2>
+<p>Agora o Cardflow se atualiza sozinho. Quando sair uma versão nova, aparece um aviso dentro do app: você clica em Instalar e ele baixa, confere e reabre já na versão nova. Sem abrir o navegador e sem baixar o DMG na mão.</p>
+<p>O app continua funcionando offline. A internet só entra para buscar atualização.</p>
+]]></description>
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.0/Cardflow.dmg" sparkle:edSignature="ENwFycM4p0caRcB2L6wegKbqp7QVZITR5hG5ip+GPLFhlw1atJe4aiCSW9tPgOgmsmQPJRX87LdBJ/GyLqavCg==" length="5724726" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
