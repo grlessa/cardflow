@@ -5,6 +5,7 @@ import OffloadKit
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
+    @EnvironmentObject private var updates: UpdateController
     @State private var editor: PresetEditorModel?
     @State private var confirmDelete = false
     @State private var importError = false
@@ -464,17 +465,17 @@ struct MainView: View {
     }
 
     @ViewBuilder private var updateBannerArea: some View {
-        if let up = model.availableUpdate { updateBanner(up) }
+        if let version = updates.availableVersion { updateBanner(version) }
     }
 
-    private func updateBanner(_ up: UpdateInfo) -> some View {
+    private func updateBanner(_ version: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.down.circle.fill").foregroundStyle(.tint)
-            Text("Versão \(up.version) disponível").font(.callout.weight(.medium))
+            Text("Versão \(version) disponível").font(.callout.weight(.medium))
             Spacer()
-            Button("Baixar") { NSWorkspace.shared.open(up.pageURL) }
+            Button("Instalar") { updates.install() }
                 .buttonStyle(.borderedProminent).controlSize(.small)
-            Button { model.availableUpdate = nil } label: { Image(systemName: "xmark") }
+            Button { updates.availableVersion = nil } label: { Image(systemName: "xmark") }
                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Dispensar")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)

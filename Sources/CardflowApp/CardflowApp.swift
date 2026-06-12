@@ -3,14 +3,16 @@ import SwiftUI
 @main
 struct CardflowApp: App {
     @State private var model = AppModel()
+    @StateObject private var updates = UpdateController()
     var body: some Scene {
         WindowGroup {
             MainView()
                 .environment(model)
-                .frame(minWidth: 820, minHeight: 720)   // min REAL da janela (com .contentMinSize)
-                .onAppear { model.start() }
+                .environmentObject(updates)
+                .frame(minWidth: 820, minHeight: 720)
+                .onAppear { model.start(); updates.probe() }
         }
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 960, height: 800)            // tamanho de abertura confortável
+        .defaultSize(width: 960, height: 800)
     }
 }

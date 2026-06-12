@@ -21,9 +21,18 @@ if [ -z "$IDENTITY" ]; then
 fi
 echo "   Usando: $IDENTITY"
 
-echo "==> 3/5  Assinando (hardened runtime + timestamp)…"
-codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP"
-codesign --verify --strict --verbose=2 "$APP"
+echo "==> 3/5  Assinando (de dentro pra fora; hardened runtime + timestamp)…"
+SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
+FW="$APP/Contents/Frameworks/Sparkle.framework"
+# Componentes aninhados do Sparkle primeiro (a ordem importa). Assina só o que existe.
+[ -e "$FW/Versions/B/XPCServices/Downloader.xpc" ] && "${SIGN[@]}" "$FW/Versions/B/XPCServices/Downloader.xpc"
+[ -e "$FW/Versions/B/XPCServices/Installer.xpc" ]  && "${SIGN[@]}" "$FW/Versions/B/XPCServices/Installer.xpc"
+[ -e "$FW/Versions/B/Autoupdate" ]                 && "${SIGN[@]}" "$FW/Versions/B/Autoupdate"
+[ -e "$FW/Versions/B/Updater.app" ]                && "${SIGN[@]}" "$FW/Versions/B/Updater.app"
+"${SIGN[@]}" "$FW"
+# Por fim o app inteiro, sem --deep (cada parte foi assinada acima individualmente).
+"${SIGN[@]}" "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
 
 echo "==> 4/5  Notarizando (Apple verifica; leva alguns minutos)…"
 ZIP="$(pwd)/Cardflow.zip"; rm -f "$ZIP"

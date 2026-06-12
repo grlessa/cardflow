@@ -38,7 +38,6 @@ final class AppModel {
     var backupTotalBytes: Int64?
     var cardEjected = false            // cartão foi ejetado automaticamente ao terminar com sucesso
     var ejectError: String?           // ejeção falhou (disco ocupado) → avisa pra ejetar à mão
-    var availableUpdate: UpdateInfo?  // versão mais nova no GitHub (checagem discreta no start)
     var offloadStartedAt: Date?       // início da transferência (cronômetro ao vivo)
     var lastElapsed: TimeInterval?    // duração total da última transferência (mostrada no fim)
     var forcedSources: Set<String> = []        // discos que o usuário marcou como fonte (override)
@@ -201,18 +200,7 @@ final class AppModel {
         reloadPresets()
         restoreSession()    // restaura o que foi lembrado (destino só se o disco estiver plugado)
         reconcileVolumes()  // valida + auto-maior só se a restauração não setou destino
-        checkForUpdates()   // discreto: pergunta ao GitHub se há versão nova (falha silenciosa)
         Notifier.requestAuthorizationIfNeeded()   // pra avisar quando o offload terminar (a pessoa sai de perto)
-    }
-
-    /// Checagem de atualização: a única chamada de rede do app. Não envia nada; só lê a versão
-    /// da última release no GitHub. Falhou (offline, repo privado)? Não mostra nada.
-    func checkForUpdates() {
-        let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? OffloadKit.version
-        Task { [weak self] in
-            let info = await UpdateChecker.checkForUpdate(current: current)
-            await MainActor.run { self?.availableUpdate = info }
-        }
     }
 
     /// Restaura preset/destino/backup/mídia da última sessão (uma vez, no start, após presets+volumes).

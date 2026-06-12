@@ -12,6 +12,10 @@ let package = Package(
         .library(name: "OffloadKit", targets: ["OffloadKit"]),
         .executable(name: "cardflow", targets: ["cardflow"]),
         .executable(name: "CardflowApp", targets: ["CardflowApp"]),
+        .executable(name: "make-appcast", targets: ["make-appcast"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
         .target(
@@ -40,6 +44,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "CardflowApp",
+            dependencies: [
+                "OffloadKit",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .executableTarget(
+            name: "make-appcast",
             dependencies: ["OffloadKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
