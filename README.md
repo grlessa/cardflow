@@ -1,3 +1,5 @@
+**Português** · [English](README.en.md) · [Español](README.es.md)
+
 # Cardflow
 
 Copie seus cartões de câmera sem medo de perder gravação.
