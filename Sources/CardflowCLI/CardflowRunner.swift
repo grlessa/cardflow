@@ -7,6 +7,12 @@ public enum CardflowRunError: Error, Equatable {
     case sameDisk([String])
 }
 
+public enum CardflowHelp {
+    /// Texto de ajuda (--help) localizado. Mora aqui (e não no main.swift do executável)
+    /// porque o catálogo de strings está no bundle `.module` do target CardflowCLI.
+    public static var text: String { CLIStrings.string("cli.help") }
+}
+
 public enum CardflowRunner {
     /// Constrói o preset (default ou de --preset) aplicando overrides de evento/rename.
     static func buildPreset(_ config: CardflowConfig) throws -> Preset {
@@ -36,26 +42,27 @@ public enum CardflowRunner {
             if let bsd = PhysicalDisk.wholeDiskBSD(for: url) { byDisk[bsd, default: []].append(url.lastPathComponent) }
         }
         if let dup = byDisk.values.first(where: { $0.count > 1 }) {
-            output("Abortado: destinos no mesmo disco físico (\(dup.joined(separator: ", "))) — o backup precisa ser outro disco.")
+            output(CLIStrings.string("cli.abort.sameDisk %@", dup.joined(separator: ", ")))
             throw CardflowRunError.sameDisk(dup)
         }
-        let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
+        let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace(), locale: CLIStrings.effectiveLocale)
 
         let preview = try service.preview(cardRoot: card, chosenMedia: config.media, destinations: destinations)
         output(Report.summary(preview: preview, destinations: destinations))
 
         if !preview.shortfalls.isEmpty {
-            output("Abortado: espaço insuficiente.")
+            output(CLIStrings.string("cli.abort.noSpace"))
             throw CardflowRunError.noSpace
         }
         if config.dryRun {
-            output("(dry-run) Nada foi copiado.")
+            output(CLIStrings.string("cli.dryRun.nothingCopied"))
             return
         }
         if !config.assumeYes {
-            let answer = (input("Confirmar cópia? [s/N] ") ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let prompt = CLIStrings.string("cli.confirm.prompt")
+            let answer = (input(prompt) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard answer == "s" || answer == "sim" || answer == "y" else {
-                output("Cancelado pelo usuário.")
+                output(CLIStrings.string("cli.cancelled"))
                 return
             }
         }

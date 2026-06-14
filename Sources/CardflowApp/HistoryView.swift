@@ -9,17 +9,17 @@ struct HistoryView: View {
 
     private static let dateFmt: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
-        f.dateFormat = "dd 'de' MMM 'de' yyyy, HH:mm"
+        f.locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "pt-BR")
+        f.setLocalizedDateFormatFromTemplate("dd MMM yyyy HH:mm")
         return f
     }()
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Histórico de cópias").font(.title2.weight(.semibold))
+                Text("history.title").font(.title2.weight(.semibold))
                 Spacer()
-                Button("Fechar", action: onClose).keyboardShortcut(.cancelAction)
+                Button("history.close", action: onClose).keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 12)
             Divider()
@@ -27,7 +27,7 @@ struct HistoryView: View {
                 Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "clock.badge.questionmark").font(.system(size: 36)).foregroundStyle(.secondary)
-                    Text("Nenhuma cópia registrada neste disco ainda").foregroundStyle(.secondary)
+                    Text("history.empty").foregroundStyle(.secondary)
                 }
                 Spacer()
             } else {
@@ -52,7 +52,7 @@ struct HistoryView: View {
                 .font(.title3)
             VStack(alignment: .leading, spacing: 2) {
                 Text(m.presetName).font(.callout.weight(.semibold))
-                Text("\(Self.dateFmt.string(from: m.finishedAt)) · cartão \(m.source.volumeName)")
+                Text(String(localized: "history.row.dateCard \(Self.dateFmt.string(from: m.finishedAt)) \(m.source.volumeName)"))
                     .font(.caption).foregroundStyle(.secondary)
                 Text(resumo(m)).font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
@@ -63,10 +63,10 @@ struct HistoryView: View {
     }
 
     private func resumo(_ m: Manifest) -> String {
-        var p = ["\(m.totals.verified) verificado(s)"]
-        if m.totals.skipped > 0 { p.append("\(m.totals.skipped) já presente(s)") }
-        if m.totals.failed > 0 { p.append("\(m.totals.failed) falha(s)") }
-        if m.interrupted { p.append("INTERROMPIDO") }
+        var p = [String(localized: "history.summary.verified \(m.totals.verified)")]
+        if m.totals.skipped > 0 { p.append(String(localized: "history.summary.skipped \(m.totals.skipped)")) }
+        if m.totals.failed > 0 { p.append(String(localized: "history.summary.failed \(m.totals.failed)")) }
+        if m.interrupted { p.append(String(localized: "history.summary.interrupted")) }
         return p.joined(separator: " · ")
     }
 }

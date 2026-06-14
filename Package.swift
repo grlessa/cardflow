@@ -7,6 +7,7 @@ import PackageDescription
 // Documentado pra não parecer descuido — ver CONTRIBUTING.md.
 let package = Package(
     name: "OffloadKit",
+    defaultLocalization: "pt-BR",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "OffloadKit", targets: ["OffloadKit"]),
@@ -30,6 +31,14 @@ let package = Package(
         .target(
             name: "CardflowCLI",
             dependencies: ["OffloadKit"],
+            // `swift build` NÃO compila .xcstrings (validado: o .bundle saía só com o .xcstrings
+            // cru, sem .lproj). A CLI roda via `swift run` (sem .app), então não há make-app.sh
+            // pra compilar o catálogo. Solução: commitamos os <lang>.lproj/Localizable.strings
+            // gerados por `xcrun xcstringstool compile` (ver Resources/README.md) — esses SIM o
+            // `.process` empacota no bundle .module, e String(localized:bundle:.module) resolve
+            // em runtime. O .xcstrings fica só como fonte de edição, EXCLUÍDO do target.
+            exclude: ["Resources/Localizable.xcstrings", "Resources/README.md"],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
@@ -48,6 +57,9 @@ let package = Package(
                 "OffloadKit",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
+            // os String Catalogs do app são compilados pro bundle pelo scripts/make-app.sh
+            // (xcstringstool), não pelo SwiftPM — então o SwiftPM ignora os .xcstrings.
+            exclude: ["Resources/Localizable.xcstrings", "Resources/InfoPlist.xcstrings"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

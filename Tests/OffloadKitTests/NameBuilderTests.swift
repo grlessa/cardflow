@@ -15,6 +15,18 @@ import Foundation
         #expect(dest.contains("/Lote 03/"))
     }
 
+    @Test func loteSegueIdioma() throws {
+        var preset = Preset.flatDefault
+        preset.folderStructure = "{evento}/{lote}/{tipo}"
+        let f = MediaFile(sourceURL: URL(fileURLWithPath: "/c/clip.mov"), relPath: "clip.mov",
+                          size: 1, type: .video, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        let en = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "en"))
+        #expect(try en.relativeDestination(for: f, context: .init(camera: "Cam", counter: 1, lote: 3)).contains("/Batch 03/"))
+        // default (pt) segue cravado "Lote"
+        let pt = NameBuilder(preset: preset, timeZone: tz)
+        #expect(try pt.relativeDestination(for: f, context: .init(camera: "Cam", counter: 1, lote: 3)).contains("/Lote 03/"))
+    }
+
     private func fileAt(hour: Int, minute: Int = 30) -> MediaFile {
         var c = DateComponents(); c.year = 2026; c.month = 5; c.day = 28; c.hour = hour; c.minute = minute
         var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
@@ -47,6 +59,18 @@ import Foundation
         #expect(dest.hasPrefix("NOITE/"))
     }
 
+    @Test func turnoSegueIdioma() throws {
+        var preset = Preset.sampleConferencia
+        preset.folderStructure = "{turno}"; preset.rename = .init(enabled: false, template: "", counterPadding: 4)
+        let f = fileAt(hour: 9)   // 09h = manhã
+        let nbEn = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "en"))
+        #expect(try nbEn.relativeDestination(for: f, context: ctx()).hasPrefix("Morning/"))
+        let nbEs = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "es"))
+        #expect(try nbEs.relativeDestination(for: f, context: ctx()).hasPrefix("Mañana/"))
+        let nbPt = NameBuilder(preset: preset, timeZone: tz)
+        #expect(try nbPt.relativeDestination(for: f, context: ctx()).hasPrefix("Manhã/"))
+    }
+
     private func fileOnDay(_ day: Int) -> MediaFile {
         var c = DateComponents(); c.year = 2026; c.month = 6; c.day = day; c.hour = 12
         var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
@@ -73,6 +97,16 @@ import Foundation
         let nb = NameBuilder(preset: preset, timeZone: tz)
         let dest = try nb.relativeDestination(for: fileOnDay(8), context: .init(camera: "Cam", counter: 1))
         #expect(dest.hasPrefix("SEGUNDA/"))   // 2026-06-08 segunda → maiúscula
+    }
+
+    @Test func diaSemanaSegueIdioma() throws {
+        var preset = Preset.sampleConferencia
+        preset.folderStructure = "{dia_semana}/{dia_semana_abrev}"; preset.rename = .init(enabled: false, template: "", counterPadding: 4)
+        // 2026-05-28 = quinta-feira
+        let nbEn = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "en"))
+        #expect(try nbEn.relativeDestination(for: file(type: .photo, rel: "a/x.JPG"), context: ctx()).hasPrefix("Thursday/Thu/"))
+        let nbPt = NameBuilder(preset: preset, timeZone: tz)
+        #expect(try nbPt.relativeDestination(for: file(type: .photo, rel: "a/x.JPG"), context: ctx()).hasPrefix("Quinta/Qui/"))
     }
 
     func file(type: FileType, rel: String) -> MediaFile {
@@ -114,12 +148,34 @@ import Foundation
         #expect(rel == "X/\(expected).JPG")
     }
 
+    @Test func mesNomeSegueLocaleInjetado() throws {
+        var preset = Preset.sampleConferencia
+        preset.rename = .init(enabled: true, template: "{mes_nome}", counterPadding: 4)
+        preset.folderStructure = "X"
+        let nbEn = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "en"))
+        let relEn = try nbEn.relativeDestination(for: file(type: .photo, rel: "a/x.JPG"), context: ctx())
+        #expect(relEn == "X/May.JPG")
+        let nbPt = NameBuilder(preset: preset, timeZone: tz)   // default pt-BR
+        let relPt = try nbPt.relativeDestination(for: file(type: .photo, rel: "a/x.JPG"), context: ctx())
+        #expect(relPt == "X/Maio.JPG")
+    }
+
+    @Test func tipoFolderSegueIdioma() throws {
+        var preset = Preset.sampleConferencia
+        preset.folderStructure = "{tipo}"; preset.rename = .init(enabled: false, template: "", counterPadding: 4)
+        let nbEn = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "en"))
+        let relEn = try nbEn.relativeDestination(for: file(type: .photo, rel: "a/x.JPG"), context: ctx())
+        #expect(relEn.hasPrefix("Photo/"))
+        let nbEs = NameBuilder(preset: preset, timeZone: tz, locale: Locale(identifier: "es"))
+        let relEs = try nbEs.relativeDestination(for: file(type: .video, rel: "a/x.MOV"), context: ctx())
+        #expect(relEs.hasPrefix("Video/"))   // es: Video (sem acento, nome seguro)
+    }
+
     @Test func monthNamesAreCleanAndCapitalized() throws {
         var preset = Preset.sampleConferencia
-        preset.locale = "pt_BR"
         preset.rename = .init(enabled: true, template: "{mes_abrev}_{mes_nome}", counterPadding: 4)
         preset.folderStructure = "X"
-        let nb = NameBuilder(preset: preset, timeZone: tz)
+        let nb = NameBuilder(preset: preset, timeZone: tz)   // sem locale explícito → pt-BR base
         let rel = try nb.relativeDestination(for: file(type: .photo, rel: "a/DSC1.JPG"), context: ctx())
         // maio em pt-BR; abreviado sem ponto e capitalizado
         #expect(rel == "X/Mai_Maio.JPG")
@@ -251,7 +307,7 @@ import Foundation
     @Test func dataRenderizaMesEmPortugues() throws {
         var p = Preset.flatDefault
         p.rename = .init(enabled: true, template: "{data}", counterPadding: 4)
-        p.dateFormat = "dd 'de' MMMM 'de' yyyy"; p.locale = "pt_BR"
+        p.dateFormat = "dd 'de' MMMM 'de' yyyy"
         let nb = NameBuilder(preset: p, timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
         let file = MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.jpg"), relPath: "x.jpg",
                              size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
@@ -317,5 +373,10 @@ import Foundation
         let nfc = NameBuilder.sanitizePathComponent(nfd)
         #expect(nfc == "Café")
         #expect(nfc.unicodeScalars.count == 4)   // C a f é(precomposto)
+    }
+
+    @Test func sanitizeRemoveCaracteresProibidosExFAT() {
+        #expect(NameBuilder.sanitizePathComponent(#"a\b*c?d"e<f>g|h"#) == "a-b-c-d-e-f-g-h")
+        #expect(NameBuilder.sanitizePathComponent("Março").contains("ç"))   // acento preservado (NFC)
     }
 }

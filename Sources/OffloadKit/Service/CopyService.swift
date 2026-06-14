@@ -72,6 +72,8 @@ public struct CopyService {
     let preset: Preset
     let scanner: CardScanner
     let nameBuilder: NameBuilder
+    /// Idioma efetivo da descarga — usado pro rótulo do lote nos bundles de cinema (verbatim, fora do template).
+    let locale: Locale
     private let resolver = CollisionResolver()
     let spaceChecker: SpaceChecker
     private let copier: FileCopying
@@ -91,10 +93,12 @@ public struct CopyService {
                 activityKeeper: ActivityKeeping = SystemActivityKeeper(),
                 manifestStore: ManifestStore = ManifestStore(),
                 copier: FileCopying = FileCopier(),
-                appVersion: String = OffloadKit.version) {
+                appVersion: String = OffloadKit.version,
+                locale: Locale = Locale(identifier: "pt-BR")) {
         self.preset = preset
         self.scanner = CardScanner(classifier: FileClassifier(preset: preset))
-        self.nameBuilder = NameBuilder(preset: preset, timeZone: timeZone)
+        self.locale = locale
+        self.nameBuilder = NameBuilder(preset: preset, timeZone: timeZone, locale: locale)
         self.spaceChecker = SpaceChecker(provider: spaceProvider)
         self.copier = copier
         self.marginBytes = marginBytes
@@ -558,7 +562,7 @@ public struct CopyService {
         // segmento de pasta do lote pros bundles de cinema (que não passam pelo template): "Lote NN/" ou "".
         // posiciona o lote logo após o evento (cinema já é verbatim sob <evento>/<cartão>), então separa
         // os clipes de cinema por descarga igual aos arquivos planos.
-        let loteSeg = loteNumero.map { "Lote " + String(format: "%02d", $0) + "/" } ?? ""
+        let loteSeg = loteNumero.map { NameBuilder.loteLabel(for: locale) + " " + String(format: "%02d", $0) + "/" } ?? ""
         do {
             // 1) arquivos planos: achata + renomeia (contador estável por arquivo)
             for file in selected where !file.preserve {
@@ -627,7 +631,7 @@ public struct CopyService {
                 totals: totals, interrupted: true, lote: loteNumero)
             for dest in destinations {
                 guard (try? assertContained("\(eventoRoot)/.cardflow", in: [dest])) != nil else { continue }
-                _ = try? manifestStore.write(partialManifest, eventRootIn: dest, eventName: eventoRoot)
+                _ = try? manifestStore.write(partialManifest, eventRootIn: dest, eventName: eventoRoot, locale: locale)
             }
             // cancelamento no meio de um arquivo (botão Parar) chega como CancellationError → normaliza.
             if error is CancellationError { throw OffloadError.cancelled }
@@ -680,7 +684,7 @@ public struct CopyService {
                     source: .init(volumeName: cardRoot.lastPathComponent, fingerprint: fingerprint, fileCount: selected.count, bytes: required),
                     destinations: destinations.map(\.path),
                     files: destFiles, unrecognized: unrecognized, totals: destTotals, lote: loteNumero)
-                let url = try manifestStore.write(destManifest, eventRootIn: dest, eventName: eventoRoot)
+                let url = try manifestStore.write(destManifest, eventRootIn: dest, eventName: eventoRoot, locale: locale)
                 manifestPaths.append(url.path)
             } catch {
                 manifestFailures.append(dest.lastPathComponent)   // mídia já verificada; só o registro falhou

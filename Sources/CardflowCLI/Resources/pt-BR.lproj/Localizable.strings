@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>cli.abort.noSpace</key>
+	<string>Abortado: espaço insuficiente.</string>
+	<key>cli.abort.sameDisk %@</key>
+	<string>Abortado: destinos no mesmo disco físico (%@) — o backup precisa ser outro disco.</string>
+	<key>cli.cancelled</key>
+	<string>Cancelado pelo usuário.</string>
+	<key>cli.confirm.prompt</key>
+	<string>Confirmar cópia? [s/N] </string>
+	<key>cli.dryRun.nothingCopied</key>
+	<string>(dry-run) Nada foi copiado.</string>
+	<key>cli.error.badValue %@</key>
+	<string>valor inválido: %@</string>
+	<key>cli.error.missing %@</key>
+	<string>falta o argumento obrigatório: %@</string>
+	<key>cli.error.noSpace</key>
+	<string>espaço insuficiente no destino.</string>
+	<key>cli.error.prefix</key>
+	<string>erro:</string>
+	<key>cli.error.preset.fileTooLarge</key>
+	<string>este arquivo de preset é grande demais para ser válido e não foi importado.</string>
+	<key>cli.error.preset.invalidTemplate %@</key>
+	<string>preset inválido: %@</string>
+	<key>cli.error.preset.unsupportedSchema %lld</key>
+	<string>este preset foi feito numa versão incompatível do app (schema %lld).</string>
+	<key>cli.error.sameDisk %@</key>
+	<string>destinos no mesmo disco físico (%@) — o backup precisa ser outro disco.</string>
+	<key>cli.error.verificationFailed %lld</key>
+	<string>%lld falha(s) na verificação. NÃO formate o cartão.</string>
+	<key>cli.help</key>
+	<string>cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)
+
+uso:
+  cardflow --card &lt;caminho&gt; --to &lt;destino&gt; [--to &lt;destino2&gt;] \
+           [--media tudo|foto|video|audio] [--camera &lt;nome&gt;] [--evento &lt;nome&gt;] \
+           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset &lt;arquivo.cfp&gt;]</string>
+	<key>report.outcome.cardAlreadyCopied</key>
+	<string>Este cartão já tinha sido copiado (nada novo).</string>
+	<key>report.outcome.failures %@</key>
+	<string>Falharam: %@</string>
+	<key>report.outcome.header %1$lld %2$lld %3$lld %4$lld</key>
+	<string>Verificados: %1$lld · Pulados (já existiam): %2$lld · Falhas: %3$lld · Sidecars: %4$lld</string>
+	<key>report.outcome.manifestFailures %@</key>
+	<string>⚠️ Manifesto NÃO salvo em: %@ (a mídia foi verificada; só o registro falhou — disco cheio/somente-leitura?)</string>
+	<key>report.outcome.manifestPath %@</key>
+	<string>Manifesto: %@</string>
+	<key>report.outcome.relocatedCinema %1$lld %2$@</key>
+	<string>⚠️ %1$lld clipe(s) de cinema movido(s) pra evitar sobrescrever filmagem diferente (confira o relink no editor): %2$@</string>
+	<key>report.outcome.unrecognized %@</key>
+	<string>Não reconhecidos: %@</string>
+	<key>report.summary.cinema %lld</key>
+	<string> + %lld clipe(s) de cinema</string>
+	<key>report.summary.destinations %@</key>
+	<string>Destinos: %@</string>
+	<key>report.summary.media %1$lld %2$lld</key>
+	<string>%1$lld foto(s) + %2$lld vídeo(s)</string>
+	<key>report.summary.mediaAudio %lld</key>
+	<string> + %lld áudio(s)</string>
+	<key>report.summary.shortfall %1$@ %2$@ %3$@</key>
+	<string>❌ Sem espaço em %1$@: precisa %2$@, tem %3$@.</string>
+	<key>report.summary.totals %1$@ %2$lld %3$@</key>
+	<string>Vai copiar: %1$@ = %2$lld arquivo(s), %3$@ por destino.</string>
+	<key>report.summary.unrecognized %@</key>
+	<string>⚠️ Arquivos não reconhecidos (copiados para .cardflow/desconhecidos): %@</string>
+	<key>report.verdict.notOk %lld</key>
+	<string>❌ %lld falha(s) na verificação. NÃO formate o cartão.</string>
+	<key>report.verdict.ok</key>
+	<string>✅ Tudo verificado em todos os destinos. Pode formatar o cartão com segurança.</string>
+</dict>
+</plist>

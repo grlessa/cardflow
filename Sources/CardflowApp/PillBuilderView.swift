@@ -22,7 +22,7 @@ struct FolderLevelsBuilder: View {
                         Button { model.removeFolderLevel(i) } label: {
                             Image(systemName: "minus.circle").font(.body).foregroundStyle(.tertiary)
                         }
-                        .buttonStyle(.plain).help("Remover esta pasta")
+                        .buttonStyle(.plain).help("pill.folder.remove.help")
                         .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
                     }
                 }
@@ -31,7 +31,7 @@ struct FolderLevelsBuilder: View {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)   // "nova pasta" fixo no canto direito
                 Button { model.addFolderLevel() } label: {
-                    Label("nova pasta", systemImage: "plus")
+                    Label("pill.folder.add", systemImage: "plus")
                         .font(.callout.weight(.medium)).foregroundStyle(Color.accentColor)
                         .padding(.horizontal, 14).padding(.vertical, 7)
                         .background(Capsule().fill(Color.accentColor.opacity(0.12)))
@@ -91,20 +91,20 @@ struct PillBuilderView: View {
 
     private var addMenu: some View {
         Menu {
-            Button { model.addText(to: lane) } label: { Label("Texto…", systemImage: "character.cursor.ibeam") }
+            Button { model.addText(to: lane) } label: { Label("pill.add.text", systemImage: "character.cursor.ibeam") }
             Divider()
             ForEach(TokenCatalog.categoryOrder, id: \.self) { cat in
                 let itens = TokenCatalog.all.filter { $0.category == cat }
                 if !itens.isEmpty {
-                    Section(cat) {
+                    Section(LocalizedStringKey(cat)) {
                         ForEach(itens, id: \.name) { info in
-                            Button { model.addToken(info.name, to: lane) } label: { Label(info.label, systemImage: info.systemImage) }
+                            Button { model.addToken(info.name, to: lane) } label: { Label(LocalizedStringKey(info.label), systemImage: info.systemImage) }
                         }
                     }
                 }
             }
             if !sessionFields.isEmpty {
-                Section("Campos personalizados") {
+                Section("pill.section.customFields") {
                     ForEach(sessionFields, id: \.key) { f in
                         Button { model.addToken(f.key, to: lane) } label: { Label(f.label.isEmpty ? f.key : f.label, systemImage: "person.text.rectangle") }
                     }
@@ -163,14 +163,14 @@ private struct TextPill: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            TextField("texto", text: Binding(
+            TextField("pill.text.placeholder", text: Binding(
                 get: { text },
                 set: { model.setText($0, at: index, in: lane) }))
                 .textFieldStyle(.plain).font(.callout).frame(minWidth: 36).fixedSize()
             Button { model.removeSegment(at: index, in: lane) } label: {
                 Image(systemName: "xmark.circle.fill").font(.caption2)
             }
-            .buttonStyle(.plain).foregroundStyle(.secondary).help("Remover texto")
+            .buttonStyle(.plain).foregroundStyle(.secondary).help("pill.text.remove.help")
         }
         .padding(.leading, 9).padding(.trailing, 5).frame(height: 28)
         .background(Capsule().fill(.quaternary))
@@ -201,7 +201,7 @@ private struct TokenPill: View {
             HStack(spacing: 4) {
                 GripDots()
                 Image(systemName: systemImage).font(.caption2)
-                Text(label).font(.callout)
+                Text(LocalizedStringKey(label)).font(.callout)
                 if !caseLabel.isEmpty { Text(caseLabel).font(.caption2.bold()).foregroundStyle(.secondary) }
             }
             .padding(.leading, 6).padding(.trailing, 10).frame(height: 28)
@@ -221,8 +221,8 @@ private struct TokenPill: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(label).font(.headline)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Caixa").font(.caption).foregroundStyle(.secondary)
-                Picker("Caixa", selection: Binding(
+                Text("pill.case.label").font(.caption).foregroundStyle(.secondary)
+                Picker("pill.case.label", selection: Binding(
                     get: { modifiers.contains("maiuscula") ? "maiuscula" : (modifiers.contains("minuscula") ? "minuscula" : "normal") },
                     set: { model.setCaseModifier($0 == "normal" ? nil : $0, at: index, in: lane) }
                 )) {
@@ -232,7 +232,7 @@ private struct TokenPill: View {
 
             if name == "data" {
                 Divider()
-                Text("Formato da data").font(.caption).foregroundStyle(.secondary)
+                Text("pill.dateFormat.label").font(.caption).foregroundStyle(.secondary)
                 ForEach(PresetEditorModel.dateFormatPresets, id: \.format) { preset in
                     Button { model.setDateFormat(preset.format) } label: {
                         HStack {
@@ -246,7 +246,7 @@ private struct TokenPill: View {
             }
             if name == "hora" {
                 Divider()
-                Text("Formato da hora").font(.caption).foregroundStyle(.secondary)
+                Text("pill.timeFormat.label").font(.caption).foregroundStyle(.secondary)
                 ForEach(PresetEditorModel.timeFormatPresets, id: \.format) { preset in
                     Button { model.setTimeFormat(preset.format) } label: {
                         HStack {
@@ -260,13 +260,13 @@ private struct TokenPill: View {
             }
             if name == "contador" {
                 Divider()
-                Stepper("Dígitos: \(model.draft.rename.counterPadding)", value: $model.draft.rename.counterPadding, in: 1...8)
-                Stepper("Começa em: \(model.draft.rename.counterStart)", value: $model.draft.rename.counterStart, in: 0...100_000)
-                Stepper("Passo: \(model.draft.rename.counterStep)", value: $model.draft.rename.counterStep, in: 1...100)
+                Stepper("pill.counter.digits \(model.draft.rename.counterPadding)", value: $model.draft.rename.counterPadding, in: 1...8)
+                Stepper("pill.counter.start \(model.draft.rename.counterStart)", value: $model.draft.rename.counterStart, in: 0...100_000)
+                Stepper("pill.counter.step \(model.draft.rename.counterStep)", value: $model.draft.rename.counterStep, in: 1...100)
             }
             Divider()
             Button(role: .destructive) { model.removeSegment(at: index, in: lane); showOptions = false } label: {
-                Label("Remover peça", systemImage: "trash")
+                Label("pill.segment.remove", systemImage: "trash")
             }.buttonStyle(.plain).foregroundStyle(.red)
         }
         .padding(14).frame(width: 280)
@@ -280,9 +280,9 @@ private struct SeparatorChip: View {
     let onChange: (String) -> Void
     var body: some View {
         Menu {
-            Button("espaço") { onChange(" ") }
-            Button("hífen  -") { onChange("-") }
-            Button("underline  _") { onChange("_") }
+            Button("pill.separator.space") { onChange(" ") }
+            Button("pill.separator.hyphen") { onChange("-") }
+            Button("pill.separator.underline") { onChange("_") }
         } label: {
             Text(text == " " ? "·" : text)
                 .font(.callout.weight(.bold).monospaced()).foregroundStyle(.secondary)
@@ -290,7 +290,7 @@ private struct SeparatorChip: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.8)))
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Como juntar as peças: espaço, hífen ou underline")
+        .help("pill.separator.help")
         .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
     }
 }
@@ -323,7 +323,7 @@ struct TagListView: View {
                     .padding(.horizontal, 8).frame(height: 26)
                     .background(Capsule().fill(.quaternary))
             }
-            if tags.isEmpty { Text("nenhuma").font(.callout).foregroundStyle(.tertiary) }
+            if tags.isEmpty { Text("pill.tags.none").font(.callout).foregroundStyle(.tertiary) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -72,6 +72,22 @@ import Foundation
         #expect(s.contains("Cam01"))
     }
 
+    // O recibo .txt segue o idioma efetivo: em en, rótulos e cabeçalho ficam em inglês.
+    @Test func humanSummaryFollowsEnglishLocale() {
+        let s = ManifestStore().humanSummary(sampleManifest(), locale: Locale(identifier: "en"))
+        #expect(s.contains("Offload: Conf"))
+        #expect(s.contains("camera Cam01"))
+        #expect(s.contains("Card: SONY_64G"))
+        #expect(s.contains("1 photo(s)"))
+        #expect(s.contains("1 video(s)"))
+        #expect(s.contains("cinema clip(s)"))
+        #expect(s.contains("Verified:"))
+        #expect(s.contains("Unrecognized:"))
+        // não vaza pt-BR no recibo em inglês
+        #expect(!s.contains("Cartão"))
+        #expect(!s.contains("Verificados"))
+    }
+
     @Test func fingerprintIsStableAndOrderIndependent() {
         let a = MediaFile(sourceURL: URL(fileURLWithPath: "/a"), relPath: "B.JPG", size: 10, type: .photo, captureDate: .init(timeIntervalSince1970: 0))
         let b = MediaFile(sourceURL: URL(fileURLWithPath: "/b"), relPath: "A.JPG", size: 20, type: .photo, captureDate: .init(timeIntervalSince1970: 0))

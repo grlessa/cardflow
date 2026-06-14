@@ -16,7 +16,8 @@ public struct ManifestStore {
     }
 
     @discardableResult
-    public func write(_ manifest: Manifest, eventRootIn destinationRoot: URL, eventName: String) throws -> URL {
+    public func write(_ manifest: Manifest, eventRootIn destinationRoot: URL, eventName: String,
+                      locale: Locale = Locale(identifier: "pt-BR")) throws -> URL {
         let dir = cardflowDir(in: destinationRoot, eventName: eventName)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let enc = JSONEncoder()
@@ -29,7 +30,9 @@ public struct ManifestStore {
         // escrita atômica: um crash no meio nunca deixa um manifesto JSON truncado/inválido no disco.
         try enc.encode(manifest).write(to: jsonURL, options: .atomic)
         let txtURL = dir.appendingPathComponent("manifest-\(stamp).txt")
-        try Data(humanSummary(manifest).utf8).write(to: txtURL, options: .atomic)
+        // o recibo .txt é arquivo GRAVADO → texto por idioma via tabela fixa por Locale (determinístico),
+        // como turnoFolder/tipoFolder. O JSON acima NÃO muda — só o resumo humano segue o idioma.
+        try Data(humanSummary(manifest, locale: locale).utf8).write(to: txtURL, options: .atomic)
         return jsonURL
     }
 
@@ -54,17 +57,62 @@ public struct ManifestStore {
         return out.sorted { $0.finishedAt > $1.finishedAt }
     }
 
-    public func humanSummary(_ m: Manifest) -> String {
+    // O recibo .txt é arquivo GRAVADO no destino → strings por idioma vêm de uma tabela fixa por
+    // Locale (determinístico), igual a turnoFolder/tipoFolder no NameBuilder. NÃO é catálogo de app.
+    // Default pt-BR pra os testes/CLI que asseveram pt-BR seguirem verdes sem mudança.
+    public func humanSummary(_ m: Manifest, locale: Locale = Locale(identifier: "pt-BR")) -> String {
+        let t = ReceiptStrings(locale: locale)
         let cabecalho = m.interrupted
-            ? "Offload INTERROMPIDO: \(m.presetName) · câmera \(m.camera)\n(registro parcial — o backup não terminou; mantenha o cartão como está)"
-            : "Offload: \(m.presetName) · câmera \(m.camera)"
+            ? "\(t.offloadInterrupted): \(m.presetName) · \(t.camera) \(m.camera)\n(\(t.partialNote))"
+            : "\(t.offload): \(m.presetName) · \(t.camera) \(m.camera)"
         return """
         \(cabecalho)
-        Início: \(m.startedAt)  Fim: \(m.finishedAt)
-        Cartão: \(m.source.volumeName) (\(m.source.fileCount) arquivos)
-        \(m.totals.photos) foto(s) + \(m.totals.videos) vídeo(s) + \(m.totals.audio) áudio(s) + \(m.totals.cinema) clipe(s) de cinema
-        Verificados: \(m.totals.verified) · Pulados: \(m.totals.skipped) · Falhas: \(m.totals.failed) · Sidecars: \(m.totals.sidecars)
-        Não reconhecidos: \(m.unrecognized.count)
+        \(t.start): \(m.startedAt)  \(t.end): \(m.finishedAt)
+        \(t.card): \(m.source.volumeName) (\(m.source.fileCount) \(t.files))
+        \(m.totals.photos) \(t.photos) + \(m.totals.videos) \(t.videos) + \(m.totals.audio) \(t.audios) + \(m.totals.cinema) \(t.cinemaClips)
+        \(t.verified): \(m.totals.verified) · \(t.skipped): \(m.totals.skipped) · \(t.failed): \(m.totals.failed) · \(t.sidecars): \(m.totals.sidecars)
+        \(t.unrecognized): \(m.unrecognized.count)
         """
+    }
+
+    // Tabela fixa do recibo por idioma (pt/en/es). Determinística — entra em arquivo gravado.
+    // Glossário do projeto: Cartão/Card/Tarjeta, Verificar/Verify/Verificar, Pasta/Folder/Carpeta.
+    private struct ReceiptStrings {
+        let offload, offloadInterrupted, partialNote, camera: String
+        let start, end, card, files: String
+        let photos, videos, audios, cinemaClips: String
+        let verified, skipped, failed, sidecars, unrecognized: String
+
+        init(locale: Locale) {
+            switch locale.language.languageCode?.identifier ?? "pt" {
+            case "en":
+                offload = "Offload"
+                offloadInterrupted = "Offload INTERRUPTED"
+                partialNote = "partial record — the backup did not finish; keep the card as is"
+                camera = "camera"
+                start = "Start"; end = "End"; card = "Card"; files = "files"
+                photos = "photo(s)"; videos = "video(s)"; audios = "audio(s)"; cinemaClips = "cinema clip(s)"
+                verified = "Verified"; skipped = "Skipped"; failed = "Failed"
+                sidecars = "Sidecars"; unrecognized = "Unrecognized"
+            case "es":
+                offload = "Descarga"
+                offloadInterrupted = "Descarga INTERRUMPIDA"
+                partialNote = "registro parcial — el backup no terminó; mantén la tarjeta como está"
+                camera = "cámara"
+                start = "Inicio"; end = "Fin"; card = "Tarjeta"; files = "archivos"
+                photos = "foto(s)"; videos = "video(s)"; audios = "audio(s)"; cinemaClips = "clip(s) de cine"
+                verified = "Verificados"; skipped = "Omitidos"; failed = "Fallos"
+                sidecars = "Sidecars"; unrecognized = "No reconocidos"
+            default:
+                offload = "Offload"
+                offloadInterrupted = "Offload INTERROMPIDO"
+                partialNote = "registro parcial — o backup não terminou; mantenha o cartão como está"
+                camera = "câmera"
+                start = "Início"; end = "Fim"; card = "Cartão"; files = "arquivos"
+                photos = "foto(s)"; videos = "vídeo(s)"; audios = "áudio(s)"; cinemaClips = "clipe(s) de cinema"
+                verified = "Verificados"; skipped = "Pulados"; failed = "Falhas"
+                sidecars = "Sidecars"; unrecognized = "Não reconhecidos"
+            }
+        }
     }
 }

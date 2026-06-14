@@ -16,6 +16,13 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/Mac
 # ícone: Assets.car (Liquid Glass dinâmico, macOS 26+) + cardflow.icns (fallback). Gere com scripts/make-icon.sh.
 [ -f Resources/Assets.car ] && /bin/cp -f Resources/Assets.car "$APP/Contents/Resources/Assets.car"
 [ -f Resources/cardflow.icns ] && /bin/cp -f Resources/cardflow.icns "$APP/Contents/Resources/cardflow.icns"
+# Localização: compila o String Catalog em <lang>.lproj/Localizable.strings dentro do bundle.
+for cat in Sources/CardflowApp/Resources/*.xcstrings; do
+  [ -f "$cat" ] || continue
+  xcrun xcstringstool compile "$cat" --output-directory "$APP/Contents/Resources"
+done
+# valida cada .strings gerado (arquivo malformado falha SILENCIOSAMENTE em runtime)
+find "$APP/Contents/Resources" -name '*.strings' -print0 | xargs -0 -I{} plutil -lint "{}"
 # FONTE ÚNICA da versão: lê de OffloadKit.swift (a mesma string que o motor grava no manifesto e que
 # o update-checker compara). CFBundleVersion = contagem de commits (sobe sozinho a cada release).
 VERSION="$(sed -n 's/.*public static let version = "\(.*\)".*/\1/p' Sources/OffloadKit/OffloadKit.swift)"
@@ -29,6 +36,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>CFBundleDevelopmentRegion</key><string>pt-BR</string>
+  <key>CFBundleLocalizations</key><array><string>pt-BR</string><string>en</string><string>es</string></array>
   <key>CFBundleName</key><string>Cardflow</string>
   <key>CFBundleIdentifier</key><string>com.cardflow.app</string>
   <key>CFBundleExecutable</key><string>Cardflow</string>

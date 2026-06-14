@@ -35,10 +35,14 @@ import Testing
                                            unrecognized: [], shortfalls: [],
                                            alreadyPresent: 10, remainingBytes: 445_100_000)
 
-        #expect(model.resumeCardTitle == "Retomada detectada")
-        #expect(model.resumeCardDetail == "10 já copiados · 26 novos · faltam 445.1 MB")
-        #expect(model.resumeActionHint == "Continua de onde parou. Copia só o que falta.")
-        #expect(model.verifiedResumeHelpText == "Mais lento. Confere os arquivos já copiados antes de continuar.")
+        // Pós-i18n o texto mora no catálogo (resolvido só no .app). No teste, String(localized:)
+        // cai na chave; então verificamos a chave do estado + os números que o model calcula.
+        #expect(model.resumeCardTitle == "main.resume.title")
+        let detail = model.resumeCardDetail ?? ""
+        #expect(detail.hasPrefix("main.resume.detail"))
+        #expect(detail.contains("10") && detail.contains("26") && detail.contains("445.1 MB"))
+        #expect(model.resumeActionHint == "main.resume.hint")
+        #expect(model.verifiedResumeHelpText == "main.resume.verifiedHelp")
     }
 
     @Test func copiedPhotosThenAllIsComplementNotResume() {
@@ -53,9 +57,12 @@ import Testing
         #expect(model.isComplementalCopy)
         #expect(model.isResume == false)
         #expect(model.showsVerifiedResumeOption == false)
-        #expect(model.resumeCardTitle == "Complemento detectado")
-        #expect(model.resumeCardDetail == "36 fotos já copiadas · 181 novos · faltam 168.3 GB")
-        #expect(model.resumeActionHint == "Fotos já copiadas serão ignoradas. Copia só o que falta.")
+        // complemento usa a chave de complemento (≠ retomada) — distingue o estado no nível da mensagem
+        #expect(model.resumeCardTitle == "main.resume.complementTitle")
+        let detail = model.resumeCardDetail ?? ""
+        #expect(detail.hasPrefix("main.resume.complementDetail"))
+        #expect(detail.contains("36") && detail.contains("181") && detail.contains("168.3 GB"))
+        #expect(model.resumeActionHint?.hasPrefix("main.resume.complementHint") == true)
     }
 
     @Test func interruptedAllAfterPhotosStillShowsResume() {
@@ -71,8 +78,8 @@ import Testing
         #expect(model.isComplementalCopy == false)
         #expect(model.isResume)
         #expect(model.showsVerifiedResumeOption)
-        #expect(model.resumeCardTitle == "Retomada detectada")
-        #expect(model.resumeActionHint == "Continua de onde parou. Copia só o que falta.")
+        #expect(model.resumeCardTitle == "main.resume.title")
+        #expect(model.resumeActionHint == "main.resume.hint")
     }
 
     @Test func alreadyCopiedPreviewBlocksStartAndExplainsStatus() {
@@ -93,7 +100,9 @@ import Testing
 
         #expect(model.isAlreadyCopied)
         #expect(model.canStart == false)
-        #expect(model.alreadyCopiedTitle == "Já está copiado")
-        #expect(model.alreadyCopiedDetail == "36 arquivo(s) já estão no destino. Nada novo para copiar.")
+        #expect(model.alreadyCopiedTitle == "main.alreadyCopied.title")
+        let detail = model.alreadyCopiedDetail ?? ""
+        #expect(detail.hasPrefix("main.alreadyCopied.detail"))
+        #expect(detail.contains("36"))
     }
 }

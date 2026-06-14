@@ -1,0 +1,688 @@
+{
+  "sourceLanguage" : "pt-BR",
+  "strings" : {
+    "cli.abort.noSpace" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aborted: not enough space."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelado: espacio insuficiente."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abortado: espaço insuficiente."
+          }
+        }
+      }
+    },
+    "cli.abort.sameDisk %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aborted: destinations on the same physical disk (%@) — the backup needs another disk."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelado: destinos en el mismo disco físico (%@) — el respaldo necesita otro disco."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abortado: destinos no mesmo disco físico (%@) — o backup precisa ser outro disco."
+          }
+        }
+      }
+    },
+    "cli.error.badValue %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "invalid value: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "valor inválido: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "valor inválido: %@"
+          }
+        }
+      }
+    },
+    "cli.error.missing %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "missing required argument: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "falta el argumento obligatorio: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "falta o argumento obrigatório: %@"
+          }
+        }
+      }
+    },
+    "cli.error.noSpace" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "not enough space at the destination."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "espacio insuficiente en el destino."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "espaço insuficiente no destino."
+          }
+        }
+      }
+    },
+    "cli.error.preset.fileTooLarge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "this preset file is too large to be valid and was not imported."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este archivo de preset es demasiado grande para ser válido y no se importó."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este arquivo de preset é grande demais para ser válido e não foi importado."
+          }
+        }
+      }
+    },
+    "cli.error.preset.invalidTemplate %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "invalid preset: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "preset inválido: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "preset inválido: %@"
+          }
+        }
+      }
+    },
+    "cli.error.preset.unsupportedSchema %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "this preset was made on an incompatible app version (schema %lld)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este preset se hizo en una versión incompatible de la app (schema %lld)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este preset foi feito numa versão incompatível do app (schema %lld)."
+          }
+        }
+      }
+    },
+    "cli.error.prefix" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "error:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "error:"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "erro:"
+          }
+        }
+      }
+    },
+    "cli.error.sameDisk %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "destinations on the same physical disk (%@) — the backup needs another disk."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "destinos en el mismo disco físico (%@) — el respaldo necesita otro disco."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "destinos no mesmo disco físico (%@) — o backup precisa ser outro disco."
+          }
+        }
+      }
+    },
+    "cli.error.verificationFailed %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld verification failure(s). Do NOT format the card."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fallo(s) en la verificación. NO formatees la tarjeta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld falha(s) na verificação. NÃO formate o cartão."
+          }
+        }
+      }
+    },
+    "cli.cancelled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled by the user."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelado por el usuario."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelado pelo usuário."
+          }
+        }
+      }
+    },
+    "cli.confirm.prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm the copy? [y/N] "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Confirmar la copia? [s/N] "
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmar cópia? [s/N] "
+          }
+        }
+      }
+    },
+    "cli.dryRun.nothingCopied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(dry-run) Nothing was copied."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(dry-run) No se copió nada."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(dry-run) Nada foi copiado."
+          }
+        }
+      }
+    },
+    "cli.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cardflow — verified card copy (the OffloadKit engine on the command line)\n\nusage:\n  cardflow --card <path> --to <destination> [--to <destination2>] \\\n           [--media tudo|foto|video|audio] [--camera <name>] [--evento <name>] \\\n           [--set field=value] [--rename] [--dry-run] [--yes] [--preset <file.cfp>]"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cardflow — copia verificada de la tarjeta (el motor OffloadKit en la línea de comandos)\n\nuso:\n  cardflow --card <ruta> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nombre>] [--evento <nombre>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <archivo.cfp>]"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)\n\nuso:\n  cardflow --card <caminho> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nome>] [--evento <nome>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <arquivo.cfp>]"
+          }
+        }
+      }
+    },
+    "report.outcome.cardAlreadyCopied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This card had already been copied (nothing new)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta tarjeta ya se había copiado (nada nuevo)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este cartão já tinha sido copiado (nada novo)."
+          }
+        }
+      }
+    },
+    "report.outcome.failures %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fallaron: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falharam: %@"
+          }
+        }
+      }
+    },
+    "report.outcome.header %1$lld %2$lld %3$lld %4$lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified: %1$lld · Skipped (already present): %2$lld · Failures: %3$lld · Sidecars: %4$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verificados: %1$lld · Omitidos (ya existían): %2$lld · Fallos: %3$lld · Sidecars: %4$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verificados: %1$lld · Pulados (já existiam): %2$lld · Falhas: %3$lld · Sidecars: %4$lld"
+          }
+        }
+      }
+    },
+    "report.outcome.manifestFailures %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Manifest NOT saved to: %@ (the media was verified; only the record failed — disk full / read-only?)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Manifiesto NO guardado en: %@ (el contenido se verificó; solo falló el registro — ¿disco lleno / solo lectura?)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Manifesto NÃO salvo em: %@ (a mídia foi verificada; só o registro falhou — disco cheio/somente-leitura?)"
+          }
+        }
+      }
+    },
+    "report.outcome.manifestPath %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manifest: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manifiesto: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manifesto: %@"
+          }
+        }
+      }
+    },
+    "report.outcome.relocatedCinema %1$lld %2$@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ %1$lld cinema clip(s) moved to avoid overwriting different footage (check the relink in the editor): %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ %1$lld clip(s) de cine movido(s) para no sobrescribir tomas distintas (revisa el revínculo en el editor): %2$@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ %1$lld clipe(s) de cinema movido(s) pra evitar sobrescrever filmagem diferente (confira o relink no editor): %2$@"
+          }
+        }
+      }
+    },
+    "report.outcome.unrecognized %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unrecognized: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reconocidos: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não reconhecidos: %@"
+          }
+        }
+      }
+    },
+    "report.summary.cinema %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld cinema clip(s)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld clip(s) de cine"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld clipe(s) de cinema"
+          }
+        }
+      }
+    },
+    "report.summary.destinations %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destinations: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destinos: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destinos: %@"
+          }
+        }
+      }
+    },
+    "report.summary.media %1$lld %2$lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld photo(s) + %2$lld video(s)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld foto(s) + %2$lld video(s)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld foto(s) + %2$lld vídeo(s)"
+          }
+        }
+      }
+    },
+    "report.summary.mediaAudio %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld audio(s)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld audio(s)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " + %lld áudio(s)"
+          }
+        }
+      }
+    },
+    "report.summary.shortfall %1$@ %2$@ %3$@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ No space on %1$@: needs %2$@, has %3$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Sin espacio en %1$@: necesita %2$@, tiene %3$@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Sem espaço em %1$@: precisa %2$@, tem %3$@."
+          }
+        }
+      }
+    },
+    "report.summary.totals %1$@ %2$lld %3$@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will copy: %1$@ = %2$lld file(s), %3$@ per destination."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se copiará: %1$@ = %2$lld archivo(s), %3$@ por destino."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vai copiar: %1$@ = %2$lld arquivo(s), %3$@ por destino."
+          }
+        }
+      }
+    },
+    "report.summary.unrecognized %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Unrecognized files (copied to .cardflow/desconhecidos): %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Archivos no reconocidos (copiados a .cardflow/desconhecidos): %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Arquivos não reconhecidos (copiados para .cardflow/desconhecidos): %@"
+          }
+        }
+      }
+    },
+    "report.verdict.notOk %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ %lld verification failure(s). Do NOT format the card."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ %lld fallo(s) en la verificación. NO formatees la tarjeta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ %lld falha(s) na verificação. NÃO formate o cartão."
+          }
+        }
+      }
+    },
+    "report.verdict.ok" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Everything verified on every destination. Safe to format the card."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Todo verificado en todos los destinos. Puedes formatear la tarjeta con seguridad."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Tudo verificado em todos os destinos. Pode formatar o cartão com segurança."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

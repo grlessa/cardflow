@@ -54,7 +54,6 @@ public struct Preset: Codable, Equatable, Sendable {
     public var copySidecars: SidecarPolicy
     public var dateFormat: String
     public var timeFormat: String   // formato do token {hora} (ex.: "HHmmss", "HH'h'mm")
-    public var locale: String
     public var sessionFields: [SessionField]
 
     public init(
@@ -63,7 +62,7 @@ public struct Preset: Codable, Equatable, Sendable {
         photoExtensions: [String], videoExtensions: [String], audioExtensions: [String],
         sidecarExtensions: [String], copySidecars: SidecarPolicy, dateFormat: String,
         timeFormat: String = "HHmmss",
-        locale: String = "pt_BR", sessionFields: [SessionField] = []
+        sessionFields: [SessionField] = []
     ) {
         self.schemaVersion = schemaVersion; self.id = id; self.name = name; self.evento = evento
         self.media = media; self.rename = rename; self.destinationRoles = destinationRoles
@@ -72,7 +71,6 @@ public struct Preset: Codable, Equatable, Sendable {
         self.sidecarExtensions = sidecarExtensions; self.copySidecars = copySidecars
         self.dateFormat = dateFormat
         self.timeFormat = timeFormat
-        self.locale = locale
         self.sessionFields = sessionFields
     }
 
@@ -93,7 +91,6 @@ public struct Preset: Codable, Equatable, Sendable {
         copySidecars = try c.decode(SidecarPolicy.self, forKey: .copySidecars)
         dateFormat = try c.decode(String.self, forKey: .dateFormat)
         timeFormat = try c.decodeIfPresent(String.self, forKey: .timeFormat) ?? "HHmmss"   // compat: preset antigo
-        locale = try c.decodeIfPresent(String.self, forKey: .locale) ?? "pt_BR"
         sessionFields = try c.decodeIfPresent([SessionField].self, forKey: .sessionFields) ?? []
     }
 }

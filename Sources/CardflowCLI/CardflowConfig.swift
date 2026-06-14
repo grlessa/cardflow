@@ -20,6 +20,24 @@ public enum CLIError: Error, Equatable {
 }
 
 public enum ArgParser {
+    /// Remove os args de NSGlobalDomain que o macOS injeta em argv (ex.: `-AppleLanguages "(en)"`,
+    /// `-AppleLocale "en"`). O runtime já os leu pra resolver `Locale.preferredLanguages`; aqui só
+    /// evitamos que o parser da CLI trate a flag como argumento inválido. Tira a flag E o valor.
+    public static func dropSystemDefaultsArgs(_ args: [String]) -> [String] {
+        let systemFlags: Set<String> = ["-AppleLanguages", "-AppleLocale", "-AppleTextDirection"]
+        var out: [String] = []
+        var i = 0
+        while i < args.count {
+            if systemFlags.contains(args[i]) {
+                i += 2   // pula a flag e o valor (ex.: "(en)")
+                continue
+            }
+            out.append(args[i])
+            i += 1
+        }
+        return out
+    }
+
     public static func parse(_ args: [String]) throws -> CardflowConfig {
         var card: String?
         var destinations: [String] = []

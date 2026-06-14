@@ -34,9 +34,12 @@ public struct NamingContext {
 public struct NameBuilder {
     private let preset: Preset
     let timeZone: TimeZone
+    private let locale: Locale
 
-    public init(preset: Preset, timeZone: TimeZone = .current) {
+    /// `locale` controla o idioma de mês/dia ({mes_nome}, {mes_abrev}, {data}). Sem injeção, cai no pt-BR base.
+    public init(preset: Preset, timeZone: TimeZone = .current, locale: Locale? = nil) {
         self.preset = preset; self.timeZone = timeZone
+        self.locale = locale ?? Locale(identifier: "pt-BR")
     }
 
     public static let knownTokens: Set<String> = [
@@ -56,49 +59,78 @@ public struct NameBuilder {
     ]
 
     // valor NATURAL (caixa normal) — pra o toggle Aa/AB/ab funcionar: Aa="Foto", AB="FOTO", ab="foto".
+    // Sem acento de propósito: vira nome de pasta, e nome de pasta tem que ser seguro.
     private func tipoFolder(for type: FileType) -> String {
-        switch type {
-        case .photo: return "Foto"
-        case .video: return "Video"
-        case .audio: return "Audio"
-        default: return "Outros"
+        let lang = locale.language.languageCode?.identifier ?? "pt"
+        switch (type, lang) {
+        case (.photo, "en"): return "Photo"
+        case (.photo, _):    return "Foto"
+        case (.video, _):    return "Video"
+        case (.audio, _):    return "Audio"
+        case (_, "en"):      return "Other"
+        case (_, "es"):      return "Otros"
+        default:             return "Outros"
         }
     }
 
-    // Dia da semana em pt-BR (mapa fixo → "Segunda"/"Seg" limpos, sem "-feira" nem ponto que o
-    // DateFormatter traria). Fuso do builder. Calendar.weekday: 1=Domingo … 7=Sábado.
+    // Dia da semana por idioma (tabelas fixas → "Segunda"/"Seg" limpos, sem "-feira" nem ponto que o
+    // DateFormatter traria em pt). Fuso do builder. Calendar.weekday: 1=Domingo … 7=Sábado.
     private func diaSemana(for date: Date, abbreviated: Bool) -> String {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
-        let full = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
-        let abbr = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
-        let i = cal.component(.weekday, from: date) - 1
+        let i = cal.component(.weekday, from: date) - 1   // 0=Domingo
+        let lang = locale.language.languageCode?.identifier ?? "pt"
+        let full: [String], abbr: [String]
+        switch lang {
+        case "en":
+            full = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+            abbr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        case "es":
+            full = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+            abbr = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+        default:
+            full = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
+            abbr = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+        }
         return (abbreviated ? abbr : full)[i]
     }
 
+    // Rótulo do lote (descarga) por idioma — vira nome de pasta, então tabela fixa por Locale
+    // igual a turnoFolder/tipoFolder. Compartilhado: o CopyService reusa pros bundles de cinema.
+    // pt "Lote", en "Batch", es "Lote".
+    public static func loteLabel(for locale: Locale) -> String {
+        let lang = locale.language.languageCode?.identifier ?? "pt"
+        return lang == "en" ? "Batch" : "Lote"
+    }
+
     // Turno pela hora LOCAL de captura (fuso do builder). Noite engole a madrugada (18h–6h).
+    // Strings por idioma — mesmo critério de faixa horária em todos.
     private func turnoFolder(for date: Date) -> String {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
-        switch cal.component(.hour, from: date) {
-        case 6..<12: return "Manhã"
-        case 12..<18: return "Tarde"
-        default: return "Noite"   // 18–23 e 0–5
+        let lang = locale.language.languageCode?.identifier ?? "pt"
+        let h = cal.component(.hour, from: date)
+        let idx = (6..<12).contains(h) ? 0 : (12..<18).contains(h) ? 1 : 2   // manhã / tarde / noite
+        switch lang {
+        case "en": return ["Morning", "Afternoon", "Night"][idx]
+        case "es": return ["Mañana", "Tarde", "Noche"][idx]
+        default:   return ["Manhã", "Tarde", "Noite"][idx]
         }
     }
 
-    private func df(_ format: String, _ date: Date, locale: String = "en_US_POSIX") -> String {
+    private func df(_ format: String, _ date: Date, locale: Locale = Locale(identifier: "en_US_POSIX")) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: locale)   // numéricos: en_US_POSIX (estável); {data}: locale do preset (mês em pt-BR)
+        f.locale = locale
         f.timeZone = timeZone
         f.dateFormat = format
         return f.string(from: date)
     }
 
     private func month(_ date: Date, abbreviated: Bool) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: preset.locale)
-        f.timeZone = timeZone
-        f.dateFormat = abbreviated ? "MMM" : "MMMM"
-        let raw = f.string(from: date).replacingOccurrences(of: ".", with: "")
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
+        let m = cal.component(.month, from: date) - 1   // 0-based
+        let f = DateFormatter(); f.locale = locale
+        let symbols = abbreviated ? f.shortStandaloneMonthSymbols : f.standaloneMonthSymbols
+        guard let raw0 = symbols?[safe: m] else { return "" }
+        let raw = raw0.replacingOccurrences(of: ".", with: "")
         return raw.isEmpty ? raw : raw.prefix(1).uppercased() + raw.dropFirst()
     }
 
@@ -109,7 +141,7 @@ public struct NameBuilder {
         case "tipo": return tipoFolder(for: file.type)
         case "camera": return ctx.camera
         case "cartao": return ctx.cardName
-        case "lote": return "Lote " + String(format: "%02d", ctx.lote ?? 1)
+        case "lote": return Self.loteLabel(for: locale) + " " + String(format: "%02d", ctx.lote ?? 1)
         case "nome_original": return (last as NSString).deletingPathExtension
         case "ext": return (file.relPath as NSString).pathExtension
         case "pasta_origem": return ((file.relPath as NSString).deletingLastPathComponent as NSString).lastPathComponent
@@ -127,7 +159,7 @@ public struct NameBuilder {
         case "horas": return df("HH", file.captureDate)
         case "minutos": return df("mm", file.captureDate)
         case "segundos": return df("ss", file.captureDate)
-        case "data": return df(preset.dateFormat, file.captureDate, locale: preset.locale)   // mês em pt-BR
+        case "data": return df(preset.dateFormat, file.captureDate, locale: locale)   // mês segue o idioma do builder
         case "hora": return df(preset.timeFormat, file.captureDate)
         case "turno": return turnoFolder(for: file.captureDate)
         default:
@@ -157,8 +189,10 @@ public struct NameBuilder {
     /// Também neutraliza um valor que seja exatamente "." ou ".." — senão um {evento}="…"
     /// viraria um componente de path de travessia (subir de pasta).
     public static func sanitizePathComponent(_ s: String) -> String {
-        var cleaned = s.replacingOccurrences(of: "/", with: "-")
-                       .replacingOccurrences(of: ":", with: "-")
+        var cleaned = s
+        for ch in ["/", ":", "\\", "*", "?", "\"", "<", ">", "|"] {
+            cleaned = cleaned.replacingOccurrences(of: ch, with: "-")
+        }
         // remove caracteres de controle (TAB, newline, \r, NUL e cia.): criam arquivos que parecem
         // corrompidos, difíceis de selecionar no Finder, e quebram scripts. NUL é categoria de controle.
         cleaned.unicodeScalars.removeAll { $0.properties.generalCategory == .control }
@@ -321,4 +355,8 @@ public extension MediaFile {
 public extension NamingContext {
     /// Contexto de exemplo casado com `MediaFile.previewSample`.
     static let previewContext = NamingContext(camera: "A7IV", counter: 1, cardName: "SONY")
+}
+
+private extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }

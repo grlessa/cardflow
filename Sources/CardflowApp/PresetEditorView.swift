@@ -22,11 +22,11 @@ struct PresetEditorView: View {
             footer
         }
         .frame(width: 600, height: 620)
-        .alert("Não foi possível salvar", isPresented: Binding(
+        .alert("preset.alert.saveTitle", isPresented: Binding(
             get: { model.saveError != nil },
             set: { if !$0 { model.saveError = nil } }
         )) {
-            Button("OK", role: .cancel) { model.saveError = nil }
+            Button("preset.alert.ok", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")
         }
@@ -35,8 +35,8 @@ struct PresetEditorView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.isNew ? "Novo preset" : "Editar preset").font(.title2.weight(.semibold))
-                Text("Como os arquivos vão ser organizados e renomeados").font(.caption).foregroundStyle(.secondary)
+                Text(model.isNew ? "preset.title.new" : "preset.title.edit").font(.title2.weight(.semibold))
+                Text("preset.subtitle").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -63,22 +63,22 @@ struct PresetEditorView: View {
     // 1. Básico (identidade + mídia)
     private var basico: some View {
         VStack(alignment: .leading, spacing: 16) {
-            secao("Identidade") {
-                campo("Nome do preset") { TextField("Ex.: Culto de domingo", text: $model.draft.name) }
-                campo("Pasta-mãe padrão (evento)") { TextField("Ex.: Culto", text: $model.draft.evento) }
+            secao("preset.section.identity") {
+                campo("preset.field.name") { TextField("preset.placeholder.name", text: $model.draft.name) }
+                campo("preset.field.parentFolder") { TextField("preset.placeholder.parentFolder", text: $model.draft.evento) }
             }
-            secao("O que copiar") {
+            secao("preset.section.whatToCopy") {
                 Picker("", selection: $model.draft.media.mode) {
-                    Text("Quem copia escolhe na hora").tag(Preset.Media.Mode.open)
-                    Text("Travado neste preset").tag(Preset.Media.Mode.locked)
+                    Text("preset.media.askEveryTime").tag(Preset.Media.Mode.open)
+                    Text("preset.media.lockedToPreset").tag(Preset.Media.Mode.locked)
                 }.labelsHidden().pickerStyle(.radioGroup)
                 if model.draft.media.mode == .locked {
-                    campo("Copiar") {
+                    campo("preset.field.copy") {
                         Picker("", selection: $model.draft.media.lockedTo) {
-                            Text("Fotos").tag(Preset.Media.Kind.photo)
-                            Text("Vídeos").tag(Preset.Media.Kind.video)
-                            Text("Áudio").tag(Preset.Media.Kind.audio)
-                            Text("Tudo").tag(Preset.Media.Kind.both)
+                            Text("preset.media.photos").tag(Preset.Media.Kind.photo)
+                            Text("preset.media.videos").tag(Preset.Media.Kind.video)
+                            Text("preset.media.audio").tag(Preset.Media.Kind.audio)
+                            Text("preset.media.all").tag(Preset.Media.Kind.both)
                         }.labelsHidden().pickerStyle(.segmented)
                     }
                 }
@@ -89,19 +89,19 @@ struct PresetEditorView: View {
     // 2. Nomeação (o coração)
     private var nomeacao: some View {
         VStack(alignment: .leading, spacing: 16) {
-            secao("Pastas") {
-                Text("Cada linha é uma pasta, e a de baixo fica dentro da de cima. Use “+ Texto…” pra digitar um nome fixo (ex.: Culto).")
+            secao("preset.section.folders") {
+                Text("preset.folders.hint")
                     .font(.caption).foregroundStyle(.secondary)
                 FolderLevelsBuilder(model: model, sessionFields: model.draft.sessionFields)
             }
-            secao("Nome do arquivo") {
-                Toggle("Renomear os arquivos ao copiar", isOn: $model.draft.rename.enabled)
+            secao("preset.section.fileName") {
+                Toggle("preset.rename.toggle", isOn: $model.draft.rename.enabled)
                 if model.draft.rename.enabled {
-                    Text("Os juntadores cinza (· - _) entre as peças definem como elas se unem. Toque num pra trocar.")
+                    Text("preset.rename.joinersHint")
                         .font(.caption).foregroundStyle(.secondary)
                     PillBuilderView(model: model, lane: .name, sessionFields: model.draft.sessionFields)
                 } else {
-                    Text("Os arquivos mantêm o nome original da câmera.").font(.callout).foregroundStyle(.secondary)
+                    Text("preset.rename.keepOriginal").font(.callout).foregroundStyle(.secondary)
                 }
             }
         }
@@ -110,32 +110,27 @@ struct PresetEditorView: View {
     // 3. Avançado
     private var avancado: some View {
         VStack(alignment: .leading, spacing: 16) {
-            secao("Campos personalizados") {
-                Text("Viram peças que você pode usar na nomeação (ex.: Fotógrafo).").font(.caption).foregroundStyle(.secondary)
+            secao("preset.section.customFields") {
+                Text("preset.customFields.hint").font(.caption).foregroundStyle(.secondary)
                 sessionFieldsEditor
             }
-            secao("Opções") {
-                Toggle("Copiar arquivos-irmãos (sidecars) junto", isOn: Binding(
+            secao("preset.section.options") {
+                Toggle("preset.options.copySidecars", isOn: Binding(
                     get: { model.draft.copySidecars == .aside },
                     set: { model.draft.copySidecars = $0 ? .aside : .skip }
                 ))
-                campo("Idioma das datas") {
-                    Picker("", selection: $model.draft.locale) {
-                        Text("Português (BR)").tag("pt_BR"); Text("Inglês (US)").tag("en_US"); Text("Espanhol (ES)").tag("es_ES")
-                    }.labelsHidden()
-                }
             }
-            secao("Extensões reconhecidas") {
-                Text("Quais tipos de arquivo o Cardflow identifica (padrão do sistema).").font(.caption).foregroundStyle(.secondary)
-                extLinha("Fotos", model.draft.photoExtensions)
-                extLinha("Vídeos", model.draft.videoExtensions)
-                extLinha("Áudio", model.draft.audioExtensions)
-                extLinha("Sidecars (XMP, THM…)", model.draft.sidecarExtensions)
+            secao("preset.section.recognizedExtensions") {
+                Text("preset.extensions.hint").font(.caption).foregroundStyle(.secondary)
+                extLinha("preset.extensions.photos", model.draft.photoExtensions)
+                extLinha("preset.extensions.videos", model.draft.videoExtensions)
+                extLinha("preset.extensions.audio", model.draft.audioExtensions)
+                extLinha("preset.extensions.sidecars", model.draft.sidecarExtensions)
             }
         }
     }
 
-    private func extLinha(_ titulo: String, _ tags: [String]) -> some View {
+    private func extLinha(_ titulo: LocalizedStringKey, _ tags: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titulo).font(.caption).foregroundStyle(.secondary)
             TagListView(tags: tags)
@@ -146,16 +141,16 @@ struct PresetEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(model.draft.sessionFields.enumerated()), id: \.offset) { index, _ in
                 HStack(spacing: 8) {
-                    TextField("Rótulo", text: $model.draft.sessionFields[index].label)
-                    TextField("chave", text: $model.draft.sessionFields[index].key).font(.body.monospaced()).foregroundStyle(.secondary)
+                    TextField("preset.sessionField.labelPlaceholder", text: $model.draft.sessionFields[index].label)
+                    TextField("preset.sessionField.keyPlaceholder", text: $model.draft.sessionFields[index].key).font(.body.monospaced()).foregroundStyle(.secondary)
                     Button(role: .destructive) { model.removeSessionField(at: index) } label: { Image(systemName: "minus.circle.fill") }.buttonStyle(.borderless)
                 }
             }
-            Button { model.addSessionField() } label: { Label("Adicionar campo", systemImage: "plus.circle") }
+            Button { model.addSessionField() } label: { Label("preset.sessionField.add", systemImage: "plus.circle") }
         }
     }
 
-    private func campo<C: View>(_ titulo: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func campo<C: View>(_ titulo: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titulo).font(.caption).foregroundStyle(.secondary)
             content().textFieldStyle(.roundedBorder)
@@ -163,9 +158,9 @@ struct PresetEditorView: View {
     }
 
     /// Seção com moldura sutil + título — dá hierarquia visual clara entre os blocos.
-    private func secao<C: View>(_ titulo: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func secao<C: View>(_ titulo: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(titulo.uppercased()).font(.caption2.weight(.bold)).foregroundStyle(.secondary).tracking(0.6)
+            Text(titulo).textCase(.uppercase).font(.caption2.weight(.bold)).foregroundStyle(.secondary).tracking(0.6)
             content()
         }
         .padding(14)
@@ -175,7 +170,7 @@ struct PresetEditorView: View {
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("PRÉVIA — onde um arquivo vai parar")
+            Text("preset.preview.title")
                 .font(.caption2.weight(.bold)).foregroundStyle(.tertiary)
             if let err = model.previewError {
                 Label(err, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
@@ -206,10 +201,10 @@ struct PresetEditorView: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if model.canDelete {
-                Button(role: .destructive) { confirmingDelete = true } label: { Label("Excluir", systemImage: "trash") }
-                    .confirmationDialog("Excluir este preset?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                        Button("Excluir preset", role: .destructive, action: onDelete)
-                        Button("Cancelar", role: .cancel) {}
+                Button(role: .destructive) { confirmingDelete = true } label: { Label("preset.button.delete", systemImage: "trash") }
+                    .confirmationDialog("preset.delete.confirmTitle", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                        Button("preset.delete.confirmAction", role: .destructive, action: onDelete)
+                        Button("preset.button.cancel", role: .cancel) {}
                     }
             }
             if let reason = model.saveDisabledReason {
@@ -218,23 +213,23 @@ struct PresetEditorView: View {
                 Label(aviso, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).lineLimit(1)
             }
             Spacer()
-            Button("Cancelar", role: .cancel) {
+            Button("preset.button.cancel", role: .cancel) {
                 // #23: não descarta uma edição trabalhosa sem confirmar (igual à exclusão).
                 if model.hasUnsavedChanges { confirmingDiscard = true } else { onCancel() }
             }
             .keyboardShortcut(.cancelAction)
-            .confirmationDialog("Descartar as alterações deste preset?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-                Button("Descartar", role: .destructive, action: onCancel)
-                Button("Continuar editando", role: .cancel) {}
+            .confirmationDialog("preset.discard.confirmTitle", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                Button("preset.discard.confirmAction", role: .destructive, action: onCancel)
+                Button("preset.discard.keepEditing", role: .cancel) {}
             }
             if model.step != .basico {
-                Button("Voltar") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue - 1)! }
+                Button("preset.button.back") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue - 1)! }
             }
             if model.step != .avancado {
-                Button("Próximo") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue + 1)! }
+                Button("preset.button.next") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue + 1)! }
                     .keyboardShortcut(.defaultAction)
             } else {
-                Button("Salvar", action: onSave).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(!model.canSave)
+                Button("preset.button.save", action: onSave).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(!model.canSave)
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 14)

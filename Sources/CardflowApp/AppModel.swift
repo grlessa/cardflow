@@ -157,35 +157,36 @@ final class AppModel {
         return pv.selectedCount > 0 && pv.alreadyPresent >= pv.selectedCount
     }
     var alreadyCopiedTitle: String? {
-        isAlreadyCopied ? "Já está copiado" : nil
+        isAlreadyCopied ? String(localized: "main.alreadyCopied.title") : nil
     }
     var alreadyCopiedDetail: String? {
         guard isAlreadyCopied, let pv = cardPreview else { return nil }
-        return "\(pv.selectedCount) arquivo(s) já estão no destino. Nada novo para copiar."
+        return String(localized: "main.alreadyCopied.detail \(pv.selectedCount)")
     }
     /// Opção avançada: só aparece quando há uma retomada parcial. Em cópia nova, não há nada para
     /// reconferir; em cópia já completa, o botão principal nem deveria iniciar outro offload.
     var showsVerifiedResumeOption: Bool { isResume }
     var resumeCardTitle: String? {
-        if isComplementalCopy { return "Complemento detectado" }
-        return isResume ? "Retomada detectada" : nil
+        if isComplementalCopy { return String(localized: "main.resume.complementTitle") }
+        return isResume ? String(localized: "main.resume.title") : nil
     }
     var resumeCardDetail: String? {
         guard (isResume || isComplementalCopy), let pv = cardPreview else { return nil }
         let novos = max(0, pv.selectedCount - pv.alreadyPresent)
+        let remaining = Format.humanBytes(pv.remainingBytes)
         if isComplementalCopy, let phrase = alreadyPresentMediaPhrase(pv) {
-            return "\(pv.alreadyPresent) \(phrase.lower) já \(phrase.copied) · \(novos) novos · faltam \(Format.humanBytes(pv.remainingBytes))"
+            return String(localized: "main.resume.complementDetail \(String(pv.alreadyPresent)) \(phrase.lower) \(phrase.copied) \(String(novos)) \(remaining)")
         }
-        return "\(pv.alreadyPresent) já copiados · \(novos) novos · faltam \(Format.humanBytes(pv.remainingBytes))"
+        return String(localized: "main.resume.detail \(String(pv.alreadyPresent)) \(String(novos)) \(remaining)")
     }
     var resumeActionHint: String? {
         if isComplementalCopy, let phrase = alreadyPresentMediaPhrase(cardPreview) {
-            return "\(phrase.sentenceStart) já \(phrase.copied) serão \(phrase.ignored). Copia só o que falta."
+            return String(localized: "main.resume.complementHint \(phrase.sentenceStart) \(phrase.copied) \(phrase.ignored)")
         }
-        return isResume ? "Continua de onde parou. Copia só o que falta." : nil
+        return isResume ? String(localized: "main.resume.hint") : nil
     }
     var verifiedResumeHelpText: String {
-        "Mais lento. Confere os arquivos já copiados antes de continuar."
+        String(localized: "main.resume.verifiedHelp")
     }
     /// Está copiando? (pra travar os controles durante o processo)
     var isBusy: Bool { if case .running = state { return true }; return false }
@@ -193,9 +194,18 @@ final class AppModel {
     private func alreadyPresentMediaPhrase(_ preview: OffloadPreview?) -> (lower: String, sentenceStart: String, copied: String, ignored: String)? {
         guard let pv = preview else { return nil }
         var labels: [(lower: String, sentenceStart: String, copied: String, ignored: String, count: Int)] = []
-        if pv.photos > 0 { labels.append(("fotos", "Fotos", "copiadas", "ignoradas", pv.photos)) }
-        if pv.videos > 0 { labels.append(("vídeos", "Vídeos", "copiados", "ignorados", pv.videos)) }
-        if pv.audios > 0 { labels.append(("áudios", "Áudios", "copiados", "ignorados", pv.audios)) }
+        if pv.photos > 0 {
+            labels.append((String(localized: "media.photos.lower"), String(localized: "media.photos.sentenceStart"),
+                           String(localized: "media.photos.copied"), String(localized: "media.photos.ignored"), pv.photos))
+        }
+        if pv.videos > 0 {
+            labels.append((String(localized: "media.videos.lower"), String(localized: "media.videos.sentenceStart"),
+                           String(localized: "media.videos.copied"), String(localized: "media.videos.ignored"), pv.videos))
+        }
+        if pv.audios > 0 {
+            labels.append((String(localized: "media.audios.lower"), String(localized: "media.audios.sentenceStart"),
+                           String(localized: "media.audios.copied"), String(localized: "media.audios.ignored"), pv.audios))
+        }
         let matches = labels.filter { $0.count == pv.alreadyPresent }.map { ($0.lower, $0.sentenceStart, $0.copied, $0.ignored) }
         return matches.first
     }
@@ -319,7 +329,7 @@ final class AppModel {
     }
 
     func duplicateActivePreset() {
-        let d = activePreset.duplicated(newName: "\(activePreset.name) (cópia)")
+        let d = activePreset.duplicated(newName: String(localized: "main.preset.copySuffix \(activePreset.name)"))
         _ = try? presetStore.save(d)
         reloadPresets(selecting: d.id)   // muda selectedPresetId → presetSelectionChanged lembra o preset
     }
@@ -448,7 +458,7 @@ final class AppModel {
         let since = capturedSince
         let internalDests = Set(dests.filter { isInternalDestination($0) })
         Task.detached { [weak self] in
-            let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
+            let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace(), locale: AppLocale.effective)
             let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests,
                                           capturedSince: since,
                                           internalDestinations: internalDests)
@@ -480,7 +490,7 @@ final class AppModel {
         state = .running(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0))
 
         offloadTask = Task.detached { [weak self] in
-            let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace())
+            let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace(), locale: AppLocale.effective)
             do {
                 let outcome = try service.run(
                     cardRoot: card, chosenMedia: media, destinations: destinations, camera: camera,
@@ -500,14 +510,14 @@ final class AppModel {
                 // avisamos por garantia (lado seguro).
                 let isPermission: Bool = { if case .permissionDenied = error { return true } else { return false } }()
                 let cardSafe: Bool = isPermission || { if case .notEnoughSpace = error { return true } else { return false } }()
-                let msg = error.errorDescription ?? "\(error)"
+                let msg = AppModel.localizedMessage(for: error)
                 let isCancel: Bool = { if case .cancelled = error { return true } else { return false } }()
                 await self?.failOffload(message: msg, cardUncertain: !cardSafe,
                                         notify: !isCancel, cardName: cardName,
                                         permissionDenied: isPermission)
             } catch let error as NamingError {
                 // erro de template (mesmo p/ todo arquivo) lança ANTES de copiar → cartão intocado.
-                let msg = error.errorDescription ?? "\(error)"
+                let msg = AppModel.localizedMessage(for: error)
                 await self?.failOffload(message: msg, cardUncertain: false, notify: true, cardName: cardName)
             } catch {
                 // falha durante a cópia (disco removido, I/O, etc.) → estado do destino incerto.
@@ -536,6 +546,36 @@ final class AppModel {
         notifyFinished(outcome, cardName: cardName)
     }
 
+    // Os erros do OffloadKit cravam a mensagem em pt-BR no errorDescription (fallback de dev / CLI).
+    // Na UI do app remapeamos cada caso pro catálogo localizado, pra a mensagem seguir o idioma
+    // escolhido. O pt-BR do catálogo espelha o errorDescription; EN/ES são idiomáticos.
+    nonisolated static func localizedMessage(for error: OffloadError) -> String {
+        switch error {
+        case .notEnoughSpace(let shortfalls):
+            let names = shortfalls.map { $0.destination.lastPathComponent }.joined(separator: ", ")
+            return String(localized: "error.offload.notEnoughSpace \(names)")
+        case .unsafeDestination:
+            return String(localized: "error.offload.unsafeDestination")
+        case .cancelled:
+            return String(localized: "error.offload.cancelled")
+        case .diskFullDuringCopy:
+            return String(localized: "error.offload.diskFullDuringCopy")
+        case .permissionDenied:
+            return String(localized: "error.offload.permissionDenied")
+        }
+    }
+
+    nonisolated static func localizedMessage(for error: NamingError) -> String {
+        switch error {
+        case .unknownToken(let token):
+            return String(localized: "error.naming.unknownToken \(token)")
+        case .unknownModifier(let modifier):
+            return String(localized: "error.naming.unknownModifier \(modifier)")
+        case .pathTraversal:
+            return String(localized: "error.naming.pathTraversal")
+        }
+    }
+
     private func failOffload(message: String, cardUncertain: Bool, notify: Bool,
                              cardName: String, permissionDenied: Bool = false) {
         if permissionDenied { internalPermissionDenied = true }   // reacende o aviso pra liberar acesso
@@ -547,22 +587,22 @@ final class AppModel {
     /// Aviso do sistema ao terminar — pra quem saiu de perto durante a cópia (vários minutos).
     func notifyFinished(_ outcome: OffloadOutcome, cardName: String) {
         if !outcome.failures.isEmpty {
-            Notifier.notify(title: "Atenção: falha no backup",
-                            body: "NÃO formate o cartão \(cardName). \(outcome.failures.count) arquivo(s) não passaram na conferência.")
+            Notifier.notify(title: String(localized: "notif.failTitle"),
+                            body: String(localized: "notif.failBody \(cardName) \(outcome.failures.count)"))
         } else if outcome.canSafelyFormatCard {
-            Notifier.notify(title: "Backup concluído",
-                            body: "Cartão \(cardName) verificado. Pode formatar com segurança.")
+            Notifier.notify(title: String(localized: "notif.doneTitle"),
+                            body: String(localized: "notif.doneBody \(cardName)"))
         }
         // nada salvo (cartão vazio / filtro errado) → sem notificação
     }
 
     func notifyFailed(uncertain: Bool, cardName: String) {
         if uncertain {
-            Notifier.notify(title: "Backup interrompido",
-                            body: "NÃO formate o cartão \(cardName). A mídia não foi totalmente verificada — tente de novo.")
+            Notifier.notify(title: String(localized: "notif.interruptedTitle"),
+                            body: String(localized: "notif.interruptedBody \(cardName)"))
         } else {
-            Notifier.notify(title: "Backup não realizado",
-                            body: "O cartão \(cardName) está intacto. Veja o aviso no Cardflow.")
+            Notifier.notify(title: String(localized: "notif.notDoneTitle"),
+                            body: String(localized: "notif.notDoneBody \(cardName)"))
         }
     }
 

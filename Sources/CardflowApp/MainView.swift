@@ -41,38 +41,54 @@ struct MainView: View {
     @ViewBuilder private var presetBar: some View {
         @Bindable var model = model
         HStack(spacing: 8) {
-            Text("Preset").font(.callout).foregroundStyle(.secondary)
+            Text("main.preset.label").font(.callout).foregroundStyle(.secondary)
             Picker("", selection: $model.selectedPresetId) {
-                ForEach(model.presets, id: \.id) { p in Text(p.name).tag(p.id) }
+                ForEach(model.presets, id: \.id) { p in presetLabel(p).tag(p.id) }
             }
             .labelsHidden().fixedSize().disabled(model.isBusy)
             Button { openEditor(.editing(model.activePreset)) } label: { Image(systemName: "pencil") }
-                .help("Editar este preset").disabled(model.isBusy)
+                .help("main.preset.edit.help").disabled(model.isBusy)
             Button { openEditor(.creating()) } label: { Image(systemName: "plus") }
-                .help("Novo preset").disabled(model.isBusy)
+                .help("main.preset.new.help").disabled(model.isBusy)
             Menu {
-                Button("Importar preset…") { importPresetPanel() }
-                Button("Exportar este preset…") { exportPresetPanel() }
-                Button("Duplicar") { model.duplicateActivePreset() }
+                Button("main.preset.import") { importPresetPanel() }
+                Button("main.preset.export") { exportPresetPanel() }
+                Button("main.preset.duplicate") { model.duplicateActivePreset() }
                 Divider()
-                Button("Excluir", role: .destructive) { confirmDelete = true }
+                Button("main.preset.delete", role: .destructive) { confirmDelete = true }
                     .disabled(model.selectedPresetId == "factory-default")
             } label: { Image(systemName: "ellipsis") }
-            .menuIndicator(.hidden).help("Gerenciar presets").disabled(model.isBusy)
-            .confirmationDialog("Excluir o preset “\(model.activePreset.name)”?",
+            .menuIndicator(.hidden).help("main.preset.manage.help").disabled(model.isBusy)
+            .confirmationDialog(Text("main.preset.deleteConfirm \(displayName(model.activePreset))"),
                                 isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Excluir", role: .destructive) { model.deleteActivePreset() }
-                Button("Cancelar", role: .cancel) {}
+                Button("main.preset.delete", role: .destructive) { model.deleteActivePreset() }
+                Button("main.cancel", role: .cancel) {}
             }
-            .alert("Não consegui importar esse preset.", isPresented: $importError) {
-                Button("OK", role: .cancel) {}
+            .alert("main.importError", isPresented: $importError) {
+                Button("main.ok", role: .cancel) {}
             }
             Spacer()
-            Button { showingHistory = true } label: { Label("Histórico", systemImage: "clock.arrow.circlepath") }
-                .help("Cópias já feitas neste disco").disabled(model.destinationURL == nil)
+            Button { showingHistory = true } label: { Label("main.history.button", systemImage: "clock.arrow.circlepath") }
+                .help("main.history.help").disabled(model.destinationURL == nil)
             Button { showingOnboarding = true } label: { Image(systemName: "questionmark.circle") }
-                .help("Como usar o Cardflow")
+                .help("main.onboarding.help")
         }
+    }
+
+    // Rótulo do preset no seletor: o de FÁBRICA é exibido localizado (PT "Padrão", EN "Default",
+    // ES "Predeterminado"); presets do usuário ficam verbatim. Só a EXIBIÇÃO muda — o dado salvo
+    // (name="Padrão", id="factory-default") não é tocado, pra não quebrar persistência/round-trip.
+    @ViewBuilder private func presetLabel(_ p: Preset) -> some View {
+        if p.id == Preset.factoryDefault.id {
+            Text("preset.factory.name")
+        } else {
+            Text(verbatim: p.name)
+        }
+    }
+
+    // Nome do preset para mensagens (ex.: confirmar exclusão): localiza só o de fábrica.
+    private func displayName(_ p: Preset) -> String {
+        p.id == Preset.factoryDefault.id ? String(localized: "preset.factory.name") : p.name
     }
 
     // abre o editor já sabendo os nomes dos OUTROS presets (pra avisar nome duplicado, #23).
@@ -160,12 +176,14 @@ struct MainView: View {
                 model: ed,
                 onSave: {
                     if ed.save(into: model.presetStore) {
-                        model.reloadPresets(selecting: ed.draft.id, preserveContext: true)
+                        // preset NOVO: trata como seleção (reseta a Pasta/campos pro evento do novo preset, e
+                        // o preview/Iniciar passam a refletir ele na hora). Edição: preserva o que foi digitado.
+                        model.reloadPresets(selecting: ed.draft.id, preserveContext: !ed.isNew)
                         model.savePresetSelection()   // lembra o preset salvo/criado na sessão
                         editor = nil                  // só fecha quando REALMENTE salvou
                     } else {
                         // #9: não fecha a sheet — senão a configuração inteira do voluntário sumiria sem aviso.
-                        ed.saveError = "Não foi possível salvar o preset. Revise a estrutura de pastas e o nome e tente de novo."
+                        ed.saveError = String(localized: "preset.saveError")
                     }
                 },
                 onCancel: { editor = nil },
@@ -185,7 +203,7 @@ struct MainView: View {
         @Bindable var model = model
         let card = model.detectedCard
         return VStack(spacing: 0) {
-            panelHeader("CARTÃO")
+            panelHeader("main.panel.card")
             if model.sources.count > 1 {   // várias fontes conectadas → escolher qual
                 Picker("", selection: Binding(get: { model.detectedCard?.url }, set: { model.selectedCardURL = $0 })) {
                     ForEach(model.sources) { s in Text(s.name).tag(URL?.some(s.url)) }
@@ -204,7 +222,7 @@ struct MainView: View {
                 }
             Spacer(minLength: 10)
             VStack(spacing: 10) {
-                Text(card?.name ?? "Aguardando cartão")
+                Text(card?.name ?? String(localized: "main.card.waiting"))
                     .font(.system(size: m.name, weight: .semibold)).multilineTextAlignment(.center).lineLimit(1)
                 cardStats(model, hasCard: card != nil, gb: m.gb)
             }
@@ -223,10 +241,10 @@ struct MainView: View {
             if model.activePreset.media.mode == .open {
                 Picker("", selection: Binding(get: { model.mediaChoice },
                                               set: { model.mediaChoice = $0; model.savePresetSelection() })) {
-                    Text("Foto").tag(Preset.Media.Kind.photo)
-                    Text("Vídeo").tag(Preset.Media.Kind.video)
-                    Text("Áudio").tag(Preset.Media.Kind.audio)
-                    Text("Tudo").tag(Preset.Media.Kind.both)
+                    Text("main.media.photo").tag(Preset.Media.Kind.photo)
+                    Text("main.media.video").tag(Preset.Media.Kind.video)
+                    Text("main.media.audio").tag(Preset.Media.Kind.audio)
+                    Text("main.media.all").tag(Preset.Media.Kind.both)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -256,7 +274,7 @@ struct MainView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(model.filterTodayOnly ? Color.accentColor : Color.secondary)
                     .frame(width: 14)
-                Text("Copiar apenas arquivos de hoje")
+                Text("main.todayOnly.label")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(model.filterTodayOnly ? Color.accentColor : Color.secondary)
                     .lineLimit(1)
@@ -279,21 +297,21 @@ struct MainView: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .disabled(model.isBusy)
-            .accessibilityLabel("Copiar só os arquivos de hoje")
-            .accessibilityValue(model.filterTodayOnly ? "Ativado" : "Desativado")
-            .help("Copia só os arquivos capturados hoje — útil quando o cartão acumula vários dias")
+            .accessibilityLabel(Text("main.todayOnly.a11yLabel"))
+            .accessibilityValue(Text(model.filterTodayOnly ? "main.todayOnly.on" : "main.todayOnly.off"))
+            .help("main.todayOnly.help")
     }
 
     private func sourceCorrectionButton(_ model: AppModel, card: ExternalVolume) -> some View {
         Button { model.useAsDestination(card) } label: {
-            Label("Mover para destino", systemImage: "arrow.right.circle")
+            Label("main.moveToDestination", systemImage: "arrow.right.circle")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .font(.caption.weight(.semibold))
         .disabled(model.isBusy)
-        .help("Este disco não é a fonte? Use como destino")
+        .help("main.moveToDestination.help")
         .frame(maxWidth: .infinity)
     }
 
@@ -303,16 +321,16 @@ struct MainView: View {
         if let pv = model.cardPreview {
             VStack(spacing: 9) {
                 HStack(spacing: 0) {
-                    statColumn(icon: "photo.fill", value: "\(pv.photos)", label: "fotos")
+                    statColumn(icon: "photo.fill", value: "\(pv.photos)", label: String(localized: "main.stat.photos"))
                     Divider().frame(height: 28)
-                    statColumn(icon: "video.fill", value: "\(pv.videos)", label: "vídeos")
+                    statColumn(icon: "video.fill", value: "\(pv.videos)", label: String(localized: "main.stat.videos"))
                     if pv.audios > 0 {
                         Divider().frame(height: 28)
-                        statColumn(icon: "waveform", value: "\(pv.audios)", label: "áudios")
+                        statColumn(icon: "waveform", value: "\(pv.audios)", label: String(localized: "main.stat.audios"))
                     }
                     if pv.cinema > 0 {
                         Divider().frame(height: 28)
-                        statColumn(icon: "film.fill", value: "\(pv.cinema)", label: pv.cinema == 1 ? "clipe" : "clipes")
+                        statColumn(icon: "film.fill", value: "\(pv.cinema)", label: String(localized: pv.cinema == 1 ? "main.stat.clip" : "main.stat.clips"))
                     }
                 }
                 Divider()
@@ -338,7 +356,8 @@ struct MainView: View {
                     .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 if let lote = pv.lote {
-                    Label("Lote \(String(format: "%02d", lote.numero)) · \(lote.isNovo ? "novo" : "continua")",
+                    let loteState = String(localized: lote.isNovo ? "main.lote.new" : "main.lote.continues")
+                    Label(String(localized: "main.lote.label \(String(format: "%02d", lote.numero)) \(loteState)"),
                           systemImage: "rectangle.stack")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -346,7 +365,7 @@ struct MainView: View {
                     Button {
                         ignoredFilesSheet = IgnoredFilesSheet(paths: pv.junkPaths)
                     } label: {
-                        Label("\(pv.junk) ignorado(s) · thumbnail/lixo", systemImage: "list.bullet.rectangle")
+                        Label(String(localized: "main.junk.label \(pv.junk)"), systemImage: "list.bullet.rectangle")
                             .labelStyle(.titleAndIcon)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -355,7 +374,7 @@ struct MainView: View {
                     .buttonStyle(.plain)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .help("Ver arquivos ignorados")
+                    .help("main.junk.help")
                 }
             }
             .padding(.vertical, 12).padding(.horizontal, 16)
@@ -364,10 +383,10 @@ struct MainView: View {
         } else if hasCard {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("calculando tamanho…").font(.callout).foregroundStyle(.secondary)
+                Text("main.card.calculating").font(.callout).foregroundStyle(.secondary)
             }.frame(height: 96)
         } else {
-            Text("conecte o cartão da câmera")
+            Text("main.card.connectPrompt")
                 .font(.callout).foregroundStyle(.secondary).frame(height: 96)
         }
     }
@@ -389,32 +408,32 @@ struct MainView: View {
         @Bindable var model = model
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                panelHeader("DESTINO")
+                panelHeader("main.panel.destination")
 
                 // PRINCIPAL
                 VStack(alignment: .leading, spacing: 8) {
-                    sectionLabel("PRINCIPAL")
+                    sectionLabel("main.dest.main")
                     diskPicker(selection: Binding(get: { model.destinationURL }, set: { model.setUserDestination($0) }),
-                               disks: model.destinations, placeholder: "— escolha o disco —",
+                               disks: model.destinations, placeholder: String(localized: "main.dest.pickDisk"),
                                allowNone: false, disabled: model.isBusy)
                     if model.principalTooSmall {
-                        Label("sem espaço pro cartão", systemImage: "exclamationmark.triangle.fill")
+                        Label("main.dest.noSpace", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.orange)
                     } else if let free = model.destinationFreeBytes, let total = model.destinationTotalBytes, total > 0 {
                         CapacityBar(free: free, total: total)
                     }
                     if model.internalPermissionDenied {
-                        Label("o macOS bloqueou o acesso — libere em Ajustes › Privacidade › Arquivos e Pastas",
+                        Label("main.dest.permissionDenied",
                               systemImage: "lock.fill")
                             .font(.caption).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let inc = model.cardPreview?.lote?.anteriorIncompleto {
                         VStack(alignment: .leading, spacing: 4) {
-                            Label("O Lote \(String(format: "%02d", inc)) ficou incompleto e o cartão foi formatado — aqueles arquivos não estão mais no cartão.",
+                            Label(String(localized: "main.lote.incomplete \(String(format: "%02d", inc))"),
                                   systemImage: "exclamationmark.octagon.fill")
                                 .font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-                            Toggle("Entendi, criar um lote novo mesmo assim",
+                            Toggle("main.lote.acknowledgeNew",
                                    isOn: Binding(get: { model.acknowledgedIncompleteLote == inc },
                                                  set: { model.acknowledgedIncompleteLote = $0 ? inc : nil }))
                                 .font(.caption).toggleStyle(.checkbox)
@@ -422,32 +441,32 @@ struct MainView: View {
                     }
                     if let dest = model.destinations.first(where: { $0.url == model.destinationURL }) {
                         Button { model.useAsSource(dest) } label: {
-                            Label("Usar como fonte", systemImage: "arrow.left.circle")
+                            Label("main.useAsSource", systemImage: "arrow.left.circle")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .font(.caption.weight(.semibold))
                         .disabled(model.isBusy)
-                        .help("Este disco foi detectado errado? Use como fonte")
+                        .help("main.useAsSource.help")
                     }
                 }
 
                 // BACKUP (opcional)
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
-                    sectionLabel("BACKUP (OPCIONAL)")
+                    sectionLabel("main.dest.backup")
                     diskPicker(selection: Binding(get: { model.backupURL }, set: { model.backupURL = $0; model.saveDiskSelection() }),
                                disks: model.destinations.filter { $0.url != model.destinationURL && !model.samePhysicalDisk($0.url, model.destinationURL) },
-                               placeholder: "— nenhum —", allowNone: true, disabled: model.isBusy)
+                               placeholder: String(localized: "main.dest.noneOption"), allowNone: true, disabled: model.isBusy)
                     if model.backupURL != nil {
                         if model.backupTooSmall {
-                            Label("sem espaço pro cartão", systemImage: "exclamationmark.triangle.fill")
+                            Label("main.dest.noSpace", systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption).foregroundStyle(.orange)
                         } else if let free = model.backupFreeBytes, let total = model.backupTotalBytes, total > 0 {
                             CapacityBar(free: free, total: total)
                         }
                         if model.backupNotConfirmed {
-                            Label("não confirmei que é outro disco físico", systemImage: "exclamationmark.triangle")
+                            Label("main.dest.backupNotConfirmed", systemImage: "exclamationmark.triangle")
                                 .font(.caption2).foregroundStyle(.orange)
                         }
                     }
@@ -455,20 +474,20 @@ struct MainView: View {
 
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
-                    sectionLabel("VAI CRIAR")
+                    sectionLabel("main.dest.willCreate")
                     Text(pathPreview(model)).font(.callout)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     if let backup = model.backupURL {
-                        Text("+ backup em \(diskName(backup, model))")
+                        Text("main.dest.backupAt \(diskName(backup, model))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Divider().padding(.vertical, 2)
 
-                    LabeledContent("Pasta") {
-                        TextField("nome da pasta", text: $model.eventName).textFieldStyle(.roundedBorder).frame(maxWidth: .infinity).disabled(model.isBusy)
+                    LabeledContent("main.dest.folder") {
+                        TextField("main.dest.folderPlaceholder", text: $model.eventName).textFieldStyle(.roundedBorder).frame(maxWidth: .infinity).disabled(model.isBusy)
                     }
                     if model.usesCameraToken {
-                        LabeledContent("Câmera") {
+                        LabeledContent("main.dest.camera") {
                             TextField("Cam01", text: $model.camera).textFieldStyle(.roundedBorder).frame(maxWidth: .infinity).disabled(model.isBusy)
                         }
                     }
@@ -506,7 +525,7 @@ struct MainView: View {
                 }
                 let internos = disks.filter { $0.isInternalShortcut }
                 if !internos.isEmpty {
-                    Section("No computador") {
+                    Section("main.dest.inComputer") {
                         ForEach(internos) { d in Button(d.name) { selection.wrappedValue = d.url } }
                     }
                 }
@@ -522,12 +541,12 @@ struct MainView: View {
         }
     }
 
-    private func sectionLabel(_ s: String) -> some View {
+    private func sectionLabel(_ s: LocalizedStringKey) -> some View {
         Text(s).font(.caption2.weight(.bold)).foregroundStyle(.secondary).tracking(0.4)
     }
 
     private func diskName(_ url: URL?, _ model: AppModel) -> String {
-        model.destinations.first { $0.url == url }?.name ?? "disco"
+        model.destinations.first { $0.url == url }?.name ?? String(localized: "main.diskName.fallback")
     }
 
     // MARK: - Blocos do resultado (concluído)
@@ -552,7 +571,7 @@ struct MainView: View {
 
     private func skippedLine(_ o: OffloadOutcome) -> String {
         var parts: [String] = []
-        if !o.skipped.isEmpty { parts.append("\(o.skipped.count) já estava(m) no destino") }
+        if !o.skipped.isEmpty { parts.append(String(localized: "result.skipped \(o.skipped.count)")) }
         return parts.joined(separator: " · ")
     }
 
@@ -592,14 +611,14 @@ struct MainView: View {
 
     private func ejectInline(ejected: Bool) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            resultInfoLine(ejected ? "Cartão ejetado" : "Ejete manualmente",
-                           detail: ejected ? "pode devolver e formatar"
-                           : (model.ejectError != nil ? "disco em uso — feche janelas do Finder" : "antes de remover do Mac"),
+            resultInfoLine(String(localized: ejected ? "result.eject.done" : "result.eject.manual"),
+                           detail: ejected ? String(localized: "result.eject.doneDetail")
+                           : (model.ejectError != nil ? String(localized: "result.eject.inUse") : String(localized: "result.eject.beforeRemove")),
                            icon: ejected ? "eject.fill" : "eject",
                            color: ejected ? .green : .orange)
             if !ejected {
                 Spacer(minLength: 0)
-                Button("Tentar de novo") { model.retryEject() }
+                Button("result.eject.retry") { model.retryEject() }
                     .controlSize(.small)
             }
         }
@@ -607,11 +626,11 @@ struct MainView: View {
 
     private func proofCompact(_ o: OffloadOutcome) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            resultTitle("Prova da cópia", icon: "checkmark.shield.fill", color: .green)
+            resultTitle(String(localized: "result.proof.title"), icon: "checkmark.shield.fill", color: .green)
             resultInfoLine(proofLine(o), icon: "doc.text.magnifyingglass")
             if !o.manifestPaths.isEmpty {
                 Button { model.openReport(o) } label: {
-                    Label("Ver relatório da cópia", systemImage: "doc.text")
+                    Label("result.proof.openReport", systemImage: "doc.text")
                 }
                 .buttonStyle(.link)
                 .controlSize(.small)
@@ -620,9 +639,9 @@ struct MainView: View {
     }
 
     private func proofLine(_ o: OffloadOutcome) -> String {
-        var parts = ["\(o.verifiedCount) verificado(s) agora"]
-        if !o.skipped.isEmpty { parts.append("\(o.skipped.count) já presente(s)") }
-        if !o.manifestPaths.isEmpty { parts.append("manifesto salvo em \(o.manifestPaths.count) destino(s)") }
+        var parts = [String(localized: "result.proof.verifiedNow \(o.verifiedCount)")]
+        if !o.skipped.isEmpty { parts.append(String(localized: "result.proof.alreadyPresent \(o.skipped.count)")) }
+        if !o.manifestPaths.isEmpty { parts.append(String(localized: "result.proof.manifestSaved \(o.manifestPaths.count)")) }
         return parts.joined(separator: " · ")
     }
 
@@ -631,23 +650,23 @@ struct MainView: View {
         return HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 11) {
                 if hasFailures {
-                    resultTitle("NÃO formate o cartão", icon: "exclamationmark.octagon.fill", color: .red)
+                    resultTitle(String(localized: "result.doNotFormat"), icon: "exclamationmark.octagon.fill", color: .red)
                 } else if canFormat {
-                    resultTitle("Pode formatar o cartão", icon: "checkmark.seal.fill", color: .green)
+                    resultTitle(String(localized: "result.canFormat"), icon: "checkmark.seal.fill", color: .green)
                 } else {
-                    resultTitle("Nada para copiar", icon: "questionmark.circle.fill", color: .orange)
+                    resultTitle(String(localized: "result.nothingToCopy"), icon: "questionmark.circle.fill", color: .orange)
                 }
 
                 if canFormat && (model.cardEjected || model.ejectError != nil) {
                     ejectInline(ejected: model.cardEjected)
                 } else {
-                    Text(canFormat ? "cópia verificada com segurança" : "revise o resultado antes de agir")
+                    Text(canFormat ? "result.verifiedSafe" : "result.reviewBeforeAct")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                resultInfoLine("\(readyCount) arquivo(s) pronto(s)",
-                               detail: "no destino",
+                resultInfoLine(String(localized: "result.filesReady \(readyCount)"),
+                               detail: String(localized: "result.atDestination"),
                                icon: "externaldrive.fill")
                     .monospacedDigit()
             }
@@ -656,24 +675,24 @@ struct MainView: View {
             Divider().frame(height: 112)
 
             VStack(alignment: .center, spacing: 11) {
-                Text("Próximo passo")
+                Text("result.nextStep")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
                     if canFormat {
                         Button { model.revealOffloadInFinder(o) } label: {
-                            Label("Abrir no Finder", systemImage: "folder")
+                            Label("result.openInFinder", systemImage: "folder")
                         }
                     }
-                    Button("Novo cartão") { model.reset() }
+                    Button("result.newCard") { model.reset() }
                 }
                 .controlSize(.regular)
 
                 HStack(spacing: 8) {
-                    if let e = model.lastElapsed { statTile(formatElapsed(e), "tempo") }
-                    statTile("\(o.verifiedCount)", "novos", color: saved && o.verifiedCount > 0 ? .green : .secondary)
-                    statTile("\(o.failures.count)", "falhas", color: hasFailures ? .red : .secondary)
+                    if let e = model.lastElapsed { statTile(formatElapsed(e), String(localized: "result.stat.time")) }
+                    statTile("\(o.verifiedCount)", String(localized: "result.stat.new"), color: saved && o.verifiedCount > 0 ? .green : .secondary)
+                    statTile("\(o.failures.count)", String(localized: "result.stat.failures"), color: hasFailures ? .red : .secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -682,13 +701,13 @@ struct MainView: View {
 
             VStack(alignment: .leading, spacing: 9) {
                 if !o.unrecognized.isEmpty {
-                    warningRow("questionmark.folder", "\(o.unrecognized.count) arquivo(s) não reconhecido(s) copiado(s) para .cardflow/desconhecidos — confira depois, mas nada foi deixado no cartão sem cópia")
+                    warningRow("questionmark.folder", String(localized: "result.warn.unrecognized \(o.unrecognized.count)"))
                 }
                 if !o.relocatedCinema.isEmpty {
-                    warningRow("film.stack", "\(o.relocatedCinema.count) clipe(s) de cinema movido(s) pra não sobrescrever filmagem diferente — confira o relink")
+                    warningRow("film.stack", String(localized: "result.warn.relocatedCinema \(o.relocatedCinema.count)"))
                 }
                 if !o.manifestFailures.isEmpty {
-                    warningRow("doc.badge.ellipsis", "manifesto não salvo em \(o.manifestFailures.joined(separator: ", ")) — mídia ok, mas sem o registro")
+                    warningRow("doc.badge.ellipsis", String(localized: "result.warn.manifestFailures \(o.manifestFailures.joined(separator: ", "))"))
                 }
 
                 if canFormat {
@@ -716,12 +735,12 @@ struct MainView: View {
     private func updateBanner(_ version: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.down.circle.fill").foregroundStyle(.tint)
-            Text("Versão \(version) disponível").font(.callout.weight(.medium))
+            Text("main.update.available \(version)").font(.callout.weight(.medium))
             Spacer()
-            Button("Instalar") { updates.install() }
+            Button("main.update.install") { updates.install() }
                 .buttonStyle(.borderedProminent).controlSize(.small)
             Button { updates.availableVersion = nil } label: { Image(systemName: "xmark") }
-                .buttonStyle(.plain).foregroundStyle(.secondary).help("Dispensar")
+                .buttonStyle(.plain).foregroundStyle(.secondary).help("main.update.dismiss")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
@@ -748,7 +767,7 @@ struct MainView: View {
         }
     }
 
-    private func panelHeader(_ title: String) -> some View {
+    private func panelHeader(_ title: LocalizedStringKey) -> some View {
         VStack(spacing: 8) {
             HStack {
                 Text(title).font(.caption.weight(.bold)).foregroundStyle(.primary.opacity(0.72)).tracking(0.5)
@@ -769,7 +788,7 @@ struct MainView: View {
                 } else {
                     VStack(spacing: 10) {
                         Button(action: { model.startOffload() }) {
-                            Label(model.isResume ? "RETOMAR" : "INICIAR",
+                            Label(model.isResume ? "main.action.resume" : "main.action.start",
                                   systemImage: model.isResume ? "arrow.clockwise" : "play.fill")
                                 .font(.title3.bold()).frame(maxWidth: 360).padding(.vertical, 10)
                         }
@@ -782,7 +801,7 @@ struct MainView: View {
                         }
                         if model.showsVerifiedResumeOption {
                             Button { model.startOffload(fastResume: false) } label: {
-                                Label("Retomar conferindo tudo", systemImage: "checkmark.shield")
+                                Label("main.resume.verifyAll", systemImage: "checkmark.shield")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
@@ -798,27 +817,27 @@ struct MainView: View {
                         if model.detectedCard != nil && model.destinationURL == nil {
                             // sem NENHUM destino conectado → mandar "escolher" um disco que não existe confunde.
                             Text(model.destinations.isEmpty
-                                 ? "Conecte um SSD ou HD para receber a cópia"
-                                 : "Escolha um disco de destino")
+                                 ? "main.dest.noneConnected"
+                                 : "main.dest.pickOne")
                                 .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
                         }
                     }
                 }
             case .running(let p):
                 VStack(spacing: 8) {
-                    Label(model.isCancelling ? "Parando com segurança… terminando o bloco atual"
-                          : (p.phase == .verifying ? "Conferindo… não desconecte o cartão nem o disco"
-                                                   : "Copiando… não desconecte o cartão nem o disco"),
+                    Label(model.isCancelling ? "main.running.stopping"
+                          : (p.phase == .verifying ? "main.running.verifying"
+                                                   : "main.copying"),
                           systemImage: model.isCancelling ? "stop.circle" : "lock.fill")
                         .font(.callout).foregroundStyle(.secondary)
                     if model.isCancelling {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
-                            Text("Parando…").font(.callout).foregroundStyle(.secondary)
+                            Text("main.running.stoppingShort").font(.callout).foregroundStyle(.secondary)
                         }
                     } else {
                         Button(role: .destructive) { model.cancelOffload() } label: {
-                            Label("Parar", systemImage: "stop.fill")
+                            Label("main.running.stop", systemImage: "stop.fill")
                         }.controlSize(.regular)
                     }
                 }
@@ -830,14 +849,14 @@ struct MainView: View {
             case .failed(let msg, let cardUncertain):
                 VStack(spacing: 8) {
                     if cardUncertain {
-                        Label("NÃO formate o cartão", systemImage: "exclamationmark.octagon.fill")
+                        Label("result.doNotFormat", systemImage: "exclamationmark.octagon.fill")
                             .font(.headline).foregroundStyle(.red)
-                        Text("A cópia foi interrompida e a mídia não foi totalmente verificada. Mantenha o cartão como está e tente de novo.")
+                        Text("main.failed.cardUncertain")
                             .font(.caption).foregroundStyle(.secondary)
                             .multilineTextAlignment(.center).frame(maxWidth: 440)
                     }
-                    Text(msg).font(.caption).foregroundStyle(.secondary).lineLimit(3).frame(maxWidth: 440)
-                    Button("Voltar") { model.reset() }.controlSize(.large)
+                    Text(verbatim: msg).font(.caption).foregroundStyle(.secondary).lineLimit(3).frame(maxWidth: 440)
+                    Button("main.failed.back") { model.reset() }.controlSize(.large)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -846,11 +865,11 @@ struct MainView: View {
     }
 
     private func pathPreview(_ model: AppModel) -> String {
-        let dest = model.destinations.first(where: { $0.url == model.destinationURL })?.name ?? "disco"
+        let dest = model.destinations.first(where: { $0.url == model.destinationURL })?.name ?? String(localized: "main.diskName.fallback")
         var p = model.activePreset
         p.evento = model.effectiveEvento
         // renderiza a estrutura com o motor REAL (datas viram "28 Mai 2026", caixa certa), não o template cru.
-        guard case .success(let full) = NameBuilder(preset: p).preview(for: .previewSample, context: .previewContext) else {
+        guard case .success(let full) = NameBuilder(preset: p, locale: AppLocale.effective).preview(for: .previewSample, context: .previewContext) else {
             return dest
         }
         var folders = full.split(separator: "/").map(String.init)
@@ -864,27 +883,27 @@ struct MainView: View {
 
     private func tipoPreview(_ kind: Preset.Media.Kind) -> String {
         switch kind {
-        case .photo: return "Foto"
-        case .video: return "Video"
-        case .audio: return "Audio"
-        case .both: return "Foto/Video"
+        case .photo: return String(localized: "main.preview.tipo.photo")
+        case .video: return String(localized: "main.preview.tipo.video")
+        case .audio: return String(localized: "main.preview.tipo.audio")
+        case .both: return String(localized: "main.preview.tipo.photoVideo")
         }
     }
 
     private func alreadyCopiedReadyState(_ model: AppModel) -> some View {
         VStack(spacing: 8) {
-            Label(model.alreadyCopiedTitle ?? "Já está copiado", systemImage: "checkmark.seal.fill")
+            Label(model.alreadyCopiedTitle ?? String(localized: "main.alreadyCopied.title"), systemImage: "checkmark.seal.fill")
                 .font(.title3.bold())
                 .foregroundStyle(.green)
             if let detail = model.alreadyCopiedDetail {
-                Text(detail)
+                Text(verbatim: detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
             }
             Button { model.revealCurrentDestinationInFinder() } label: {
-                Label("Abrir destino", systemImage: "folder")
+                Label("main.alreadyCopied.openDest", systemImage: "folder")
             }
             .controlSize(.regular)
         }
@@ -917,11 +936,11 @@ private struct CapacityBar: View {
             }
             .frame(height: 6)
             .accessibilityElement()
-            .accessibilityLabel("Espaço no disco")
-            .accessibilityValue("\(humanBytes(free)) livres de \(humanBytes(total)), \(Int((usedFrac * 100).rounded())) por cento usado")
-            (Text("livre: ").foregroundStyle(.secondary)
-                + Text(humanBytes(free)).fontWeight(.bold)
-                + Text("  de \(humanBytes(total))").foregroundStyle(.secondary))
+            .accessibilityLabel(Text("main.capacity.a11yLabel"))
+            .accessibilityValue(Text("main.capacity.a11yValue \(humanBytes(free)) \(humanBytes(total)) \(String(Int((usedFrac * 100).rounded())))"))
+            (Text("main.capacity.free").foregroundStyle(.secondary)
+                + Text(verbatim: humanBytes(free)).fontWeight(.bold)
+                + Text("main.capacity.of \(humanBytes(total))").foregroundStyle(.secondary))
                 .font(.subheadline).monospacedDigit()
                 .accessibilityHidden(true)   // a barra acima já anuncia o mesmo valor pro VoiceOver
         }
@@ -951,9 +970,15 @@ private struct TransferFlow: View {
                 ProgressView(value: Double(p.bytesDone), total: Double(max(p.bytesTotal, 1)))
                     .frame(width: 130).tint(.accentColor)
                 // hierarquia: contagem grande (primário) > cronômetro + ETA (destaque) > bytes (detalhe)
-                Text(p.phase == .scanning ? "Escaneando…"
-                     : p.phase == .verifying ? "Conferindo…"
-                     : "\(p.filesDone)/\(p.filesTotal)")
+                Group {
+                    if p.phase == .scanning {
+                        Text("main.flow.scanning")
+                    } else if p.phase == .verifying {
+                        Text("main.flow.verifyingShort")
+                    } else {
+                        Text(verbatim: "\(p.filesDone)/\(p.filesTotal)")
+                    }
+                }
                     .font(.title3.bold()).monospacedDigit().foregroundStyle(.primary)
                 if let start = startedAt {
                     TimelineView(.periodic(from: start, by: 1)) { ctx in
@@ -966,13 +991,13 @@ private struct TransferFlow: View {
                             }
                             if p.phase == .copying, p.bytesDone > 0, p.bytesTotal > p.bytesDone, elapsed > 1 {
                                 let restante = Double(p.bytesTotal - p.bytesDone) / (Double(p.bytesDone) / elapsed)
-                                Text("~\(formatElapsed(restante)) restante")
+                                Text("main.flow.remaining \(formatElapsed(restante))")
                                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                             }
                         }
                     }
                 }
-                Text("\(humanBytes(p.bytesDone)) / \(humanBytes(p.bytesTotal))")
+                Text(verbatim: "\(humanBytes(p.bytesDone)) / \(humanBytes(p.bytesTotal))")
                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             case .finished(let o):
                 ResultBadge(ok: o.canSafelyFormatCard)
@@ -1016,7 +1041,7 @@ private struct ResultBadge: View {
     var body: some View {
         VStack(spacing: 6) {
             badgeIcon
-            Text(ok ? "Verificado" : "Falhou").font(.headline).foregroundStyle(ok ? .green : .red)
+            Text(ok ? "main.badge.verified" : "main.badge.failed").font(.headline).foregroundStyle(ok ? .green : .red)
         }
         .onAppear { show = true }
     }
@@ -1061,21 +1086,21 @@ private struct IgnoredFilesView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("Arquivos ignorados", systemImage: "list.bullet.rectangle")
+                    Label("main.ignored.title", systemImage: "list.bullet.rectangle")
                         .font(.title3.weight(.semibold))
-                    Text("Thumbnail/lixo detectado no cartão. Nada desta lista será copiado.")
+                    Text("main.ignored.detail")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Fechar") { onClose() }
+                Button("main.ignored.close") { onClose() }
                     .keyboardShortcut(.cancelAction)
             }
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 7) {
                     ForEach(paths, id: \.self) { path in
-                        Text(path)
+                        Text(verbatim: path)
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
                             .foregroundStyle(.primary)

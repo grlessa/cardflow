@@ -7,41 +7,41 @@ public enum Report {
 
     public static func summary(preview p: OffloadPreview, destinations: [URL]) -> String {
         var lines: [String] = []
-        var media = "\(p.photos) foto(s) + \(p.videos) vídeo(s)"
-        if p.audios > 0 { media += " + \(p.audios) áudio(s)" }
-        if p.cinema > 0 { media += " + \(p.cinema) clipe(s) de cinema" }
-        lines.append("Vai copiar: \(media) = \(p.selectedCount) arquivo(s), \(humanBytes(p.totalBytes)) por destino.")
-        lines.append("Destinos: " + destinations.map(\.path).joined(separator: ", "))
+        var media = CLIStrings.string("report.summary.media %1$lld %2$lld", p.photos, p.videos)
+        if p.audios > 0 { media += CLIStrings.string("report.summary.mediaAudio %lld", p.audios) }
+        if p.cinema > 0 { media += CLIStrings.string("report.summary.cinema %lld", p.cinema) }
+        lines.append(CLIStrings.string("report.summary.totals %1$@ %2$lld %3$@", media, p.selectedCount, humanBytes(p.totalBytes)))
+        lines.append(CLIStrings.string("report.summary.destinations %@", destinations.map(\.path).joined(separator: ", ")))
         if !p.unrecognized.isEmpty {
-            lines.append("⚠️ Arquivos não reconhecidos (copiados para .cardflow/desconhecidos): " + p.unrecognized.joined(separator: ", "))
+            lines.append(CLIStrings.string("report.summary.unrecognized %@", p.unrecognized.joined(separator: ", ")))
         }
         for s in p.shortfalls {
-            lines.append("❌ Sem espaço em \(s.destination.path): precisa \(humanBytes(s.required)), tem \(humanBytes(s.available)).")
+            lines.append(CLIStrings.string("report.summary.shortfall %1$@ %2$@ %3$@", s.destination.path, humanBytes(s.required), humanBytes(s.available)))
         }
         return lines.joined(separator: "\n")
     }
 
     public static func outcome(_ o: OffloadOutcome) -> String {
         var lines: [String] = []
-        lines.append("Verificados: \(o.verifiedCount) · Pulados (já existiam): \(o.skipped.count) · Falhas: \(o.failures.count) · Sidecars: \(o.sidecarsCopied)")
-        if o.cardAlreadyCopied { lines.append("Este cartão já tinha sido copiado (nada novo).") }
-        if !o.failures.isEmpty { lines.append("Falharam: " + o.failures.joined(separator: ", ")) }
-        if !o.unrecognized.isEmpty { lines.append("Não reconhecidos: " + o.unrecognized.joined(separator: ", ")) }
+        lines.append(CLIStrings.string("report.outcome.header %1$lld %2$lld %3$lld %4$lld", o.verifiedCount, o.skipped.count, o.failures.count, o.sidecarsCopied))
+        if o.cardAlreadyCopied { lines.append(CLIStrings.string("report.outcome.cardAlreadyCopied")) }
+        if !o.failures.isEmpty { lines.append(CLIStrings.string("report.outcome.failures %@", o.failures.joined(separator: ", "))) }
+        if !o.unrecognized.isEmpty { lines.append(CLIStrings.string("report.outcome.unrecognized %@", o.unrecognized.joined(separator: ", "))) }
         if !o.relocatedCinema.isEmpty {
-            lines.append("⚠️ \(o.relocatedCinema.count) clipe(s) de cinema movido(s) pra evitar sobrescrever filmagem diferente (confira o relink no editor): " + o.relocatedCinema.joined(separator: ", "))
+            lines.append(CLIStrings.string("report.outcome.relocatedCinema %1$lld %2$@", o.relocatedCinema.count, o.relocatedCinema.joined(separator: ", ")))
         }
         if !o.manifestFailures.isEmpty {
-            lines.append("⚠️ Manifesto NÃO salvo em: " + o.manifestFailures.joined(separator: ", ") + " (a mídia foi verificada; só o registro falhou — disco cheio/somente-leitura?)")
+            lines.append(CLIStrings.string("report.outcome.manifestFailures %@", o.manifestFailures.joined(separator: ", ")))
         }
-        for p in o.manifestPaths { lines.append("Manifesto: \(p)") }
+        for p in o.manifestPaths { lines.append(CLIStrings.string("report.outcome.manifestPath %@", p)) }
         return lines.joined(separator: "\n")
     }
 
     public static func verdict(_ o: OffloadOutcome) -> (ok: Bool, line: String) {
         if o.canSafelyFormatCard {
-            return (true, "✅ Tudo verificado em todos os destinos. Pode formatar o cartão com segurança.")
+            return (true, CLIStrings.string("report.verdict.ok"))
         } else {
-            return (false, "❌ \(o.failures.count) falha(s) na verificação. NÃO formate o cartão.")
+            return (false, CLIStrings.string("report.verdict.notOk %lld", o.failures.count))
         }
     }
 }

@@ -66,4 +66,28 @@ import Foundation
         let limpo = OffloadOutcome(verifiedCount: 1, failures: [], unrecognized: [], skipped: [])
         #expect(!Report.outcome(limpo).contains("movido"))
     }
+
+    // O catálogo resolve os 3 idiomas. O ambiente de teste roda em pt-BR (idioma-base), então
+    // estas asserções confirmam que a chave RESOLVE pra string traduzida — não o literal da chave
+    // — e que os placeholders (%lld, %@) viram os valores. (Inglês/espanhol foram validados à mão
+    // via `cardflow --help -AppleLanguages`; aqui travamos o pt-BR pra pegar regressão de chave.)
+    @Test func verdictResolvesCatalogKeyNotRawKey() {
+        let ok = Report.verdict(OffloadOutcome(verifiedCount: 6, failures: [], unrecognized: [], skipped: []))
+        #expect(!ok.line.contains("report.verdict"))   // não vazou o nome da chave
+        #expect(ok.line.contains("✅"))
+        let bad = Report.verdict(OffloadOutcome(verifiedCount: 0, failures: ["x", "y"], unrecognized: [], skipped: []))
+        #expect(!bad.line.contains("report.verdict"))
+        #expect(bad.line.contains("2"))                // o count entrou no %lld
+    }
+
+    @Test func summaryResolvesKeysAndInterpolates() {
+        let pv = OffloadPreview(photos: 3, videos: 2, audios: 1, cinema: 0, junk: 0, selectedCount: 6,
+                                totalBytes: 1024, unrecognized: [], shortfalls: [])
+        let s = Report.summary(preview: pv, destinations: [URL(fileURLWithPath: "/Volumes/SSD")])
+        #expect(!s.contains("report.summary"))   // nenhuma chave crua vazou
+        #expect(s.contains("3 foto"))
+        #expect(s.contains("2 vídeo"))
+        #expect(s.contains("1 áudio"))
+        #expect(s.contains("/Volumes/SSD"))
+    }
 }

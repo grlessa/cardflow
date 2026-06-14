@@ -11,9 +11,9 @@ final class PresetEditorModel: Identifiable {
         public var id: Int { rawValue }
         var titulo: String {
             switch self {
-            case .basico: return "Básico"
-            case .nomeacao: return "Nomeação"
-            case .avancado: return "Avançado"
+            case .basico: return String(localized: "preset.step.basic")
+            case .nomeacao: return String(localized: "preset.step.naming")
+            case .avancado: return String(localized: "preset.step.advanced")
             }
         }
     }
@@ -41,7 +41,7 @@ final class PresetEditorModel: Identifiable {
     var hasUnsavedChanges: Bool { draft != original }
     /// Nome igual ao de outro preset → aviso não-bloqueante (dois indistinguíveis no Picker).
     var duplicateNameWarning: String? {
-        otherNames.contains(trimmedName) ? "Já existe um preset com esse nome." : nil
+        otherNames.contains(trimmedName) ? String(localized: "preset.warning.duplicateName") : nil
     }
 
     /// "Novo": começa do preset de fábrica com id fresco e nome em branco.
@@ -58,7 +58,7 @@ final class PresetEditorModel: Identifiable {
         if preset.id == Preset.factoryDefault.id {
             var p = preset
             p.id = UUID().uuidString
-            p.name = preset.name + " (cópia)"
+            p.name = String(localized: "preset.copyNameSuffix \(preset.name)")
             return .init(draft: p, isNew: true, canDelete: false)
         }
         return .init(draft: preset, isNew: false, canDelete: true)
@@ -154,9 +154,10 @@ final class PresetEditorModel: Identifiable {
         ("28-05", "dd-MM"),                 // sem ano
         ("28.05.2026", "dd.MM.yyyy"),       // separador "."
         ("20260528", "yyyyMMdd"),           // sem separador
-        ("28 de maio de 2026", "dd 'de' MMMM 'de' yyyy"),
-        ("28 de maio", "dd 'de' MMMM"),     // por extenso, sem ano
-        ("maio de 2026", "MMMM 'de' yyyy"),
+        // prévias por extenso: o rótulo segue o idioma; o formato é técnico (NameBuilder).
+        (String(localized: "pill.dateFormat.longFull"), "dd 'de' MMMM 'de' yyyy"),
+        (String(localized: "pill.dateFormat.longNoYear"), "dd 'de' MMMM"),
+        (String(localized: "pill.dateFormat.longMonthYear"), "MMMM 'de' yyyy"),
     ]
     func setDateFormat(_ format: String) { draft.dateFormat = format }
 
@@ -173,7 +174,7 @@ final class PresetEditorModel: Identifiable {
     func addSessionField() {
         var n = draft.sessionFields.count + 1
         while draft.sessionFields.contains(where: { $0.key == "campo\(n)" }) { n += 1 }
-        draft.sessionFields.append(.init(key: "campo\(n)", label: "Campo \(n)"))
+        draft.sessionFields.append(.init(key: "campo\(n)", label: String(localized: "preset.sessionField.defaultLabel \(n)")))
     }
 
     func removeSessionField(at index: Int) {
@@ -196,9 +197,9 @@ final class PresetEditorModel: Identifiable {
         var seen = Set<String>()
         for f in draft.sessionFields {
             let k = f.key.trimmingCharacters(in: .whitespaces)
-            if k.isEmpty { return "Todo campo personalizado precisa de uma chave." }
-            if NameBuilder.knownTokens.contains(k) { return "A chave \u{201C}\(k)\u{201D} já é um token do sistema — escolha outra." }
-            if !seen.insert(k).inserted { return "Chave de campo repetida: \u{201C}\(k)\u{201D}." }
+            if k.isEmpty { return String(localized: "preset.validation.sessionFieldKeyEmpty") }
+            if NameBuilder.knownTokens.contains(k) { return String(localized: "preset.validation.sessionFieldKeyReserved \(k)") }
+            if !seen.insert(k).inserted { return String(localized: "preset.validation.sessionFieldKeyDuplicate \(k)") }
         }
         return nil
     }
@@ -212,7 +213,7 @@ final class PresetEditorModel: Identifiable {
         p.sessionFields = p.sessionFields.map {
             .init(key: $0.key.trimmingCharacters(in: .whitespaces), label: $0.label)
         }
-        return NameBuilder(preset: p).preview()
+        return NameBuilder(preset: p, locale: AppLocale.effective).preview()
     }
 
     /// Pasta/nome renderizados pelo motor real, ou "" se o template estiver inválido.
@@ -235,9 +236,9 @@ final class PresetEditorModel: Identifiable {
     private static func message(for result: Result<String, NamingError>) -> String? {
         guard case .failure(let e) = result else { return nil }
         switch e {
-        case .unknownToken(let t): return "Token desconhecido: {\(t)}"
-        case .unknownModifier(let m): return "Modificador desconhecido: :\(m)"
-        case .pathTraversal: return "A estrutura não pode sair da pasta de destino (sem “..”, “/” ou “~” no início)."
+        case .unknownToken(let t): return String(localized: "preset.error.unknownToken \(t)")
+        case .unknownModifier(let m): return String(localized: "preset.error.unknownModifier \(m)")
+        case .pathTraversal: return String(localized: "preset.error.pathTraversal")
         }
     }
 
@@ -263,12 +264,12 @@ final class PresetEditorModel: Identifiable {
 
     /// Por que o botão Salvar está desabilitado (nil = pode salvar). Mostrado na UI.
     var saveDisabledReason: String? {
-        if trimmedName.isEmpty { return "Dê um nome ao preset." }
+        if trimmedName.isEmpty { return String(localized: "preset.validation.nameRequired") }
         // #9: estrutura de pastas vazia passa em validateTokensExist (nada pra validar) mas o
         // PresetStore.validate rejeita ao salvar — então a sheet fecharia descartando tudo em silêncio.
         // Pega aqui pra o botão já avisar antes.
         if draft.folderStructure.split(separator: "/", omittingEmptySubsequences: true).isEmpty {
-            return "Defina ao menos uma pasta de destino."
+            return String(localized: "preset.validation.folderRequired")
         }
         if let e = sessionFieldsError { return e }
         if let e = templateError { return e }

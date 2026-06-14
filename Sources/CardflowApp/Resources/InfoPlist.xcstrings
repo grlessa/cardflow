@@ -1,0 +1,34 @@
+{
+  "sourceLanguage" : "pt-BR",
+  "strings" : {
+    "NSRemovableVolumesUsageDescription" : {
+      "localizations" : {
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Cardflow precisa ler os cartões de câmera para fazer a cópia." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow needs to read your camera cards to copy from them." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow necesita leer las tarjetas de cámara para copiarlas." } }
+      }
+    },
+    "NSNetworkVolumesUsageDescription" : {
+      "localizations" : {
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Cardflow precisa acessar discos de rede quando você usa um NAS como destino de backup." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow needs access to network drives when you back up to a NAS." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow necesita acceder a discos de red cuando usas un NAS como destino del backup." } }
+      }
+    },
+    "NSDesktopFolderUsageDescription" : {
+      "localizations" : {
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Cardflow precisa de acesso à Mesa quando você a escolhe como destino da cópia." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow needs access to your Desktop when you pick it as the copy destination." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow necesita acceso al Escritorio cuando lo eliges como destino de la copia." } }
+      }
+    },
+    "NSDocumentsFolderUsageDescription" : {
+      "localizations" : {
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Cardflow precisa de acesso aos Documentos quando você os escolhe como destino da cópia." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow needs access to your Documents when you pick them as the copy destination." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cardflow necesita acceso a Documentos cuando los eliges como destino de la copia." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
