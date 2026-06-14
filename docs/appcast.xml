@@ -3,20 +3,18 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>0.2.1</title>
-      <sparkle:version>236</sparkle:version>
-      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <title>0.2.2</title>
+      <sparkle:version>270</sparkle:version>
+      <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Fri, 12 Jun 2026 14:53:29 +0000</pubDate>
-      <description><![CDATA[<h2>Mais confiança no que foi salvo</h2>
-<ul>
-  <li><b>Reconferir tudo:</b> uma opção nova pra reler o cartão e o destino do zero, ignorando o que já tinha sido conferido. Útil quando você desconfia que mexeram no SSD.</li>
-  <li><b>Resultado mais claro no fim:</b> quantos arquivos foram conferidos, quantos já estavam lá e onde ficou o manifesto da cópia.</li>
-  <li><b>Arquivos desconhecidos</b> agora aparecem como copiados pra revisão, não como erro.</li>
-  <li>A tela principal respeita a opção de reduzir movimento do sistema.</li>
-</ul>
+      <pubDate>Sun, 14 Jun 2026 13:27:26 +0000</pubDate>
+      <description><![CDATA[<h2>Agora em três idiomas</h2>
+<p>O Cardflow passa a falar português, inglês e espanhol, seguindo o idioma do seu Mac automaticamente. Se quiser forçar um idioma só pro Cardflow, dá pra escolher em Ajustes do Sistema, em Geral › Idioma e Região › Aplicativos.</p>
+<p>As pastas que o app cria acompanham o idioma: turno, dia da semana, mês, tipo de mídia e lote saem no idioma certo (Morning/Mañana, Monday/Lunes).</p>
+<h2>Correção</h2>
+<p>Ao criar um preset novo, ele já vira o preset ativo na hora. Antes, a prévia continuava mostrando o preset anterior até você trocar e voltar; agora a prévia e a cópia já usam o preset novo direto.</p>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.1/Cardflow.dmg" sparkle:edSignature="K5mpl1M/dVlJbzmBh5Hh1eYKDP0NHt1G2XaQTQ/1MzXLSxAS4iMj9bSyRhpMXdait8uwMb523FDMvW9QHclPBw==" length="5813720" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.2/Cardflow.dmg" sparkle:edSignature="trjtTmY7JGJQNOOsW0tX1eF3+jR4+8kTDQSGtE7EZ/3BWL3qWj4Q0pJZXjn5auXWNly7TFIvUQWpMUUyXuzyCg==" length="5867431" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
