@@ -141,6 +141,36 @@
 
     .sub-nav .meta { color: var(--gray); font-size: 14px; }
 
+    /* seletor de idioma */
+    .lang {
+      display: inline-flex;
+      align-items: center;
+      font-size: 13px;
+      letter-spacing: 0;
+      color: var(--gray);
+    }
+
+    .lang-opt {
+      appearance: none;
+      background: none;
+      border: 0;
+      padding: 4px 7px;
+      margin: 0;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0;
+      color: var(--gray);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: color 150ms ease, background 150ms ease;
+    }
+
+    .lang-opt + .lang-opt { margin-left: 1px; }
+    .lang-opt:hover { color: var(--ink); }
+    .lang-opt[aria-current="true"] { color: var(--ink); font-weight: 600; }
+    .lang-opt:focus-visible { outline: 2px solid #0071e3; outline-offset: 2px; }
+
     /* ============ pílulas ============ */
     .pill {
       display: inline-flex;
@@ -408,12 +438,12 @@
   <div class="nav-stack">
     <div class="global-nav">
       <div class="wrap-wide row">
-        <a class="home" href="#topo" aria-label="Cardflow, início">
+        <a class="home" href="#topo" data-i18n-attr="aria-label:nav.homeAria" aria-label="Cardflow, início">
           <img src="assets/cardflow-icon.png" width="22" height="22" alt="">
         </a>
-        <nav aria-label="Navegação">
-          <a class="hide-sm" href="#faz">Como funciona</a>
-          <a class="hide-sm" href="#uso">Como usar</a>
+        <nav data-i18n-attr="aria-label:nav.navAria" aria-label="Navegação">
+          <a class="hide-sm" href="#faz" data-i18n="nav.how">Como funciona</a>
+          <a class="hide-sm" href="#uso" data-i18n="nav.use">Como usar</a>
           <a href="https://github.com/grlessa/cardflow">GitHub</a>
         </nav>
       </div>
@@ -422,8 +452,13 @@
       <div class="wrap-wide row">
         <span class="name">Cardflow</span>
         <span class="right">
-          <span class="meta">macOS 14 ou mais novo</span>
-          <a class="pill pill-solid pill-sm" href="https://github.com/grlessa/cardflow/releases/latest/download/Cardflow.dmg">Baixar</a>
+          <span class="meta" data-i18n="subnav.req">macOS 14 ou mais novo</span>
+          <span class="lang" role="group" data-i18n-attr="aria-label:lang.groupAria" aria-label="Idioma">
+            <button type="button" class="lang-opt" data-lang="pt" lang="pt-BR">PT</button>
+            <button type="button" class="lang-opt" data-lang="en" lang="en">EN</button>
+            <button type="button" class="lang-opt" data-lang="es" lang="es">ES</button>
+          </span>
+          <a class="pill pill-solid pill-sm" href="https://github.com/grlessa/cardflow/releases/latest/download/Cardflow.dmg" data-i18n="subnav.download">Baixar</a>
         </span>
       </div>
     </div>
@@ -433,21 +468,21 @@
     <!-- tile 1 — hero -->
     <section class="tile tile-light">
       <div class="wrap">
-        <h1>Copie o cartão. Confira. Só então formate.</h1>
-        <p class="lead">Descarrega o cartão, confere cada arquivo e só dá o sinal verde quando a cópia bateu.</p>
+        <h1 data-i18n="hero.title">Copie o cartão. Confira. Só então formate.</h1>
+        <p class="lead" data-i18n="hero.lead">Descarrega o cartão, confere cada arquivo e só dá o sinal verde quando a cópia bateu.</p>
         <div class="cta-row">
           <a class="pill pill-solid" href="https://github.com/grlessa/cardflow/releases/latest/download/Cardflow.dmg">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>
             </svg>
-            Baixar o Cardflow
+            <span data-i18n="hero.ctaDownload">Baixar o Cardflow</span>
           </a>
-          <a class="pill pill-ghost" href="https://github.com/grlessa/cardflow">Ver no GitHub</a>
+          <a class="pill pill-ghost" href="https://github.com/grlessa/cardflow" data-i18n="hero.ctaGithub">Ver no GitHub</a>
         </div>
-        <p class="note">Baixa o DMG mais recente direto do GitHub, sem pedir cadastro.</p>
+        <p class="note" data-i18n="hero.note">Baixa o DMG mais recente direto do GitHub, sem pedir cadastro.</p>
 
         <figure class="product">
-          <img src="assets/cardflow-app-screenshot.png" width="1814" height="1504" alt="Tela do Cardflow: um cartão Sony A7IV detectado à esquerda, o disco de destino e o backup opcional à direita, e o botão Iniciar embaixo.">
+          <img src="assets/cardflow-app-screenshot.png" width="1814" height="1504" data-i18n-attr="alt:hero.shotAlt" alt="Tela do Cardflow: um cartão Sony A7IV detectado à esquerda, o disco de destino e o backup opcional à direita, e o botão Iniciar embaixo.">
         </figure>
       </div>
     </section>
@@ -455,12 +490,12 @@
     <!-- tile 2 — promessa de verificação (escuro) -->
     <section id="faz" class="tile tile-dark">
       <div class="wrap">
-        <p class="eyebrow">Verificação</p>
-        <h2 class="h-tile">Não é copiar e torcer. É copiar e conferir.</h2>
-        <p class="lead">Ele confere o hash da origem e do destino. Se um arquivo não bateu, você fica sabendo antes de formatar.</p>
+        <p class="eyebrow" data-i18n="verify.eyebrow">Verificação</p>
+        <h2 class="h-tile" data-i18n="verify.title">Não é copiar e torcer. É copiar e conferir.</h2>
+        <p class="lead" data-i18n="verify.lead">Ele confere o hash da origem e do destino. Se um arquivo não bateu, você fica sabendo antes de formatar.</p>
         <span class="status">
           <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"></path></svg></span>
-          Conferido. Seguro para formatar.
+          <span data-i18n="verify.status">Conferido. Seguro para formatar.</span>
         </span>
       </div>
     </section>
@@ -468,22 +503,22 @@
     <!-- tile 3 — o que acontece numa descarga (pergaminho, cartões utilitários) -->
     <section class="tile tile-parchment">
       <div class="wrap-wide">
-        <h2 class="h-tile">Tudo o que acontece numa descarga.</h2>
+        <h2 class="h-tile" data-i18n="offload.title">Tudo o que acontece numa descarga.</h2>
         <div class="util-grid">
           <article class="util-card">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v5c0 4.5 3.2 8 8 10 4.8-2 8-5.5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-            <h3>Confere arquivo por arquivo</h3>
-            <p>Compara o hash da origem com o do destino. Ou bateu certinho, ou ele te avisa.</p>
+            <h3 data-i18n="offload.card1Title">Confere arquivo por arquivo</h3>
+            <p data-i18n="offload.card1Body">Compara o hash da origem com o do destino. Ou bateu certinho, ou ele te avisa.</p>
           </article>
           <article class="util-card">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="13" height="16" rx="2"/><path d="M8 4v16"/><rect x="16" y="8" width="5" height="12" rx="1.5"/></svg></span>
-            <h3>Dois discos e retomada</h3>
-            <p>Destino principal e backup na mesma rodada. Se o disco cair no meio, ele continua de onde parou.</p>
+            <h3 data-i18n="offload.card2Title">Dois discos e retomada</h3>
+            <p data-i18n="offload.card2Body">Destino principal e backup na mesma rodada. Se o disco cair no meio, ele continua de onde parou.</p>
           </article>
           <article class="util-card">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M3 11h18"/></svg></span>
-            <h3>Cinema preservado</h3>
-            <p>RED, Blackmagic, P2 e XAVC ficam com a estrutura que o editor espera. Cada descarga gera um manifesto do que foi salvo.</p>
+            <h3 data-i18n="offload.card3Title">Cinema preservado</h3>
+            <p data-i18n="offload.card3Body">RED, Blackmagic, P2 e XAVC ficam com a estrutura que o editor espera. Cada descarga gera um manifesto do que foi salvo.</p>
           </article>
         </div>
       </div>
@@ -492,12 +527,12 @@
     <!-- tile 4 — como usar (claro) -->
     <section id="uso" class="tile tile-light">
       <div class="wrap-wide">
-        <h2 class="h-tile">Quatro passos, sem comando e sem arrastar pasta.</h2>
+        <h2 class="h-tile" data-i18n="use.title">Quatro passos, sem comando e sem arrastar pasta.</h2>
         <div class="steps">
-          <div class="step"><span class="num">1</span><b>Conecte o cartão.</b><span>O app detecta a mídia de câmera e mostra o tamanho da descarga.</span></div>
-          <div class="step"><span class="num">2</span><b>Escolha o destino.</b><span>SSD, HD ou pasta interna. Backup em outro disco físico, se quiser.</span></div>
-          <div class="step"><span class="num">3</span><b>Clique em iniciar.</b><span>Ele copia, confere e avisa se encontrou algo estranho no caminho.</span></div>
-          <div class="step is-safe"><span class="num"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"></path></svg></span><b>Espere o sinal verde.</b><span>Só formate o cartão quando aparecer que está seguro.</span></div>
+          <div class="step"><span class="num">1</span><b data-i18n="use.step1Title">Conecte o cartão.</b><span data-i18n="use.step1Body">O app detecta a mídia de câmera e mostra o tamanho da descarga.</span></div>
+          <div class="step"><span class="num">2</span><b data-i18n="use.step2Title">Escolha o destino.</b><span data-i18n="use.step2Body">SSD, HD ou pasta interna. Backup em outro disco físico, se quiser.</span></div>
+          <div class="step"><span class="num">3</span><b data-i18n="use.step3Title">Clique em iniciar.</b><span data-i18n="use.step3Body">Ele copia, confere e avisa se encontrou algo estranho no caminho.</span></div>
+          <div class="step is-safe"><span class="num"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"></path></svg></span><b data-i18n="use.step4Title">Espere o sinal verde.</b><span data-i18n="use.step4Body">Só formate o cartão quando aparecer que está seguro.</span></div>
         </div>
       </div>
     </section>
@@ -505,14 +540,14 @@
     <!-- tile 5 — fecho (pergaminho) -->
     <section class="tile tile-parchment tile-fecho">
       <div class="wrap">
-        <h2 class="h-tile">Baixe e deixe no Mac.</h2>
-        <p class="lead">App nativo e assinado, que roda offline. Seus arquivos ficam no seu Mac. A&nbsp;internet entra só para buscar atualização.</p>
+        <h2 class="h-tile" data-i18n="close.title">Baixe e deixe no Mac.</h2>
+        <p class="lead" data-i18n-html="close.lead">App nativo e assinado, que roda offline. Seus arquivos ficam no seu Mac. A&nbsp;internet entra só para buscar atualização.</p>
         <div class="cta-row">
           <a class="pill pill-solid" href="https://github.com/grlessa/cardflow/releases/latest/download/Cardflow.dmg">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>
             </svg>
-            Baixar o Cardflow
+            <span data-i18n="close.cta">Baixar o Cardflow</span>
           </a>
         </div>
       </div>
@@ -522,12 +557,302 @@
   <footer>
     <div class="wrap-wide">
       <div class="footer-row">
-        <a class="tlink" href="https://github.com/grlessa/cardflow/releases/latest">Última release</a>
+        <a class="tlink" href="https://github.com/grlessa/cardflow/releases/latest" data-i18n="footer.latest">Última release</a>
         <a class="tlink" href="https://github.com/grlessa/cardflow">GitHub</a>
-        <a class="tlink" href="https://github.com/grlessa/cardflow/releases">Histórico de versões</a>
+        <a class="tlink" href="https://github.com/grlessa/cardflow/releases" data-i18n="footer.history">Histórico de versões</a>
       </div>
-      <p class="footer-legal">Cardflow · App nativo para macOS 14 ou mais novo · Feito para descarregar cartão de câmera com segurança.</p>
+      <p class="footer-legal" data-i18n="footer.legal">Cardflow · App nativo para macOS 14 ou mais novo · Feito para descarregar cartão de câmera com segurança.</p>
     </div>
   </footer>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // Dicionário de traduções. pt-BR é a fonte (mesmo texto do HTML base).
+    var I18N = {
+      pt: {
+        // <head>
+        "meta.title": "Cardflow — descarregue cartão de câmera com segurança no macOS",
+        "meta.description": "Cardflow copia seu cartão de câmera, confere arquivo por arquivo e só libera para formatar quando a cópia bateu. App nativo para macOS, sem cadastro.",
+        "meta.ogTitle": "Cardflow",
+        "meta.ogDescription": "Descarregue cartões de câmera sem ficar torcendo para a cópia ter dado certo. Copia, confere e só então libera para formatar.",
+        "meta.ogImageAlt": "Tela do Cardflow com um cartão Sony detectado e o destino pronto para copiar.",
+        // navegação
+        "nav.homeAria": "Cardflow, início",
+        "nav.navAria": "Navegação",
+        "nav.how": "Como funciona",
+        "nav.use": "Como usar",
+        "lang.groupAria": "Idioma",
+        "subnav.req": "macOS 14 ou mais novo",
+        "subnav.download": "Baixar",
+        // hero
+        "hero.title": "Copie o cartão. Confira. Só então formate.",
+        "hero.lead": "Descarrega o cartão, confere cada arquivo e só dá o sinal verde quando a cópia bateu.",
+        "hero.ctaDownload": "Baixar o Cardflow",
+        "hero.ctaGithub": "Ver no GitHub",
+        "hero.note": "Baixa o DMG mais recente direto do GitHub, sem pedir cadastro.",
+        "hero.shotAlt": "Tela do Cardflow: um cartão Sony A7IV detectado à esquerda, o disco de destino e o backup opcional à direita, e o botão Iniciar embaixo.",
+        // verificação
+        "verify.eyebrow": "Verificação",
+        "verify.title": "Não é copiar e torcer. É copiar e conferir.",
+        "verify.lead": "Ele confere o hash da origem e do destino. Se um arquivo não bateu, você fica sabendo antes de formatar.",
+        "verify.status": "Conferido. Seguro para formatar.",
+        // descarga
+        "offload.title": "Tudo o que acontece numa descarga.",
+        "offload.card1Title": "Confere arquivo por arquivo",
+        "offload.card1Body": "Compara o hash da origem com o do destino. Ou bateu certinho, ou ele te avisa.",
+        "offload.card2Title": "Dois discos e retomada",
+        "offload.card2Body": "Destino principal e backup na mesma rodada. Se o disco cair no meio, ele continua de onde parou.",
+        "offload.card3Title": "Cinema preservado",
+        "offload.card3Body": "RED, Blackmagic, P2 e XAVC ficam com a estrutura que o editor espera. Cada descarga gera um manifesto do que foi salvo.",
+        // como usar
+        "use.title": "Quatro passos, sem comando e sem arrastar pasta.",
+        "use.step1Title": "Conecte o cartão.",
+        "use.step1Body": "O app detecta a mídia de câmera e mostra o tamanho da descarga.",
+        "use.step2Title": "Escolha o destino.",
+        "use.step2Body": "SSD, HD ou pasta interna. Backup em outro disco físico, se quiser.",
+        "use.step3Title": "Clique em iniciar.",
+        "use.step3Body": "Ele copia, confere e avisa se encontrou algo estranho no caminho.",
+        "use.step4Title": "Espere o sinal verde.",
+        "use.step4Body": "Só formate o cartão quando aparecer que está seguro.",
+        // fecho
+        "close.title": "Baixe e deixe no Mac.",
+        "close.lead": "App nativo e assinado, que roda offline. Seus arquivos ficam no seu Mac. A&nbsp;internet entra só para buscar atualização.",
+        "close.cta": "Baixar o Cardflow",
+        // rodapé
+        "footer.latest": "Última release",
+        "footer.history": "Histórico de versões",
+        "footer.legal": "Cardflow · App nativo para macOS 14 ou mais novo · Feito para descarregar cartão de câmera com segurança."
+      },
+      en: {
+        // <head>
+        "meta.title": "Cardflow — offload camera cards safely on macOS",
+        "meta.description": "Cardflow copies your camera card, verifies it file by file, and only clears it for formatting once the copy checks out. Native macOS app, no sign-up.",
+        "meta.ogTitle": "Cardflow",
+        "meta.ogDescription": "Offload camera cards without crossing your fingers that the copy worked. It copies, verifies, and only then clears the card for formatting.",
+        "meta.ogImageAlt": "The Cardflow window with a Sony card detected and the destination ready to copy.",
+        // navegação
+        "nav.homeAria": "Cardflow, home",
+        "nav.navAria": "Navigation",
+        "nav.how": "How it works",
+        "nav.use": "How to use",
+        "lang.groupAria": "Language",
+        "subnav.req": "macOS 14 or later",
+        "subnav.download": "Download",
+        // hero
+        "hero.title": "Copy the card. Verify. Only then format.",
+        "hero.lead": "It offloads the card, verifies every file, and only gives the green light once the copy checks out.",
+        "hero.ctaDownload": "Download Cardflow",
+        "hero.ctaGithub": "View on GitHub",
+        "hero.note": "Grabs the latest DMG straight from GitHub. No sign-up.",
+        "hero.shotAlt": "The Cardflow window: a Sony A7IV card detected on the left, the destination drive and optional backup on the right, and the Start button below.",
+        // verificação
+        "verify.eyebrow": "Verification",
+        "verify.title": "Not copy and hope. Copy and verify.",
+        "verify.lead": "It checks the hash on the source and the destination. If a file doesn't match, you find out before you format.",
+        "verify.status": "Verified. Safe to format.",
+        // descarga
+        "offload.title": "Everything that happens in one offload.",
+        "offload.card1Title": "Verifies every file",
+        "offload.card1Body": "It compares the source hash against the destination. Either it matches exactly, or it lets you know.",
+        "offload.card2Title": "Two drives, with resume",
+        "offload.card2Body": "Main destination and backup in the same run. If a drive drops mid-copy, it picks up where it left off.",
+        "offload.card3Title": "Cinema, preserved",
+        "offload.card3Body": "RED, Blackmagic, P2, and XAVC keep the structure your editor expects. Every offload writes a manifest of what was saved.",
+        // como usar
+        "use.title": "Four steps. No commands, no dragging folders.",
+        "use.step1Title": "Connect the card.",
+        "use.step1Body": "The app detects camera media and shows you the size of the offload.",
+        "use.step2Title": "Pick the destination.",
+        "use.step2Body": "SSD, hard drive, or an internal folder. Back up to a second physical drive if you want.",
+        "use.step3Title": "Hit start.",
+        "use.step3Body": "It copies, verifies, and flags anything that looks off along the way.",
+        "use.step4Title": "Wait for the green light.",
+        "use.step4Body": "Only format the card once it tells you it's safe.",
+        // fecho
+        "close.title": "Download it and leave it on your Mac.",
+        "close.lead": "A native, signed app that runs offline. Your files stay on your Mac. It only reaches the internet to check for updates.",
+        "close.cta": "Download Cardflow",
+        // rodapé
+        "footer.latest": "Latest release",
+        "footer.history": "Version history",
+        "footer.legal": "Cardflow · Native app for macOS 14 or later · Built to offload camera cards safely."
+      },
+      es: {
+        // <head>
+        "meta.title": "Cardflow — descarga tarjetas de cámara con seguridad en macOS",
+        "meta.description": "Cardflow copia tu tarjeta de cámara, la verifica archivo por archivo y solo la libera para formatear cuando la copia coincide. App nativa para macOS, sin registro.",
+        "meta.ogTitle": "Cardflow",
+        "meta.ogDescription": "Descarga tarjetas de cámara sin cruzar los dedos para que la copia haya salido bien. Copia, verifica y solo entonces libera la tarjeta para formatear.",
+        "meta.ogImageAlt": "La ventana de Cardflow con una tarjeta Sony detectada y el destino listo para copiar.",
+        // navegação
+        "nav.homeAria": "Cardflow, inicio",
+        "nav.navAria": "Navegación",
+        "nav.how": "Cómo funciona",
+        "nav.use": "Cómo usar",
+        "lang.groupAria": "Idioma",
+        "subnav.req": "macOS 14 o posterior",
+        "subnav.download": "Descargar",
+        // hero
+        "hero.title": "Copia la tarjeta. Verifica. Solo entonces formatea.",
+        "hero.lead": "Descarga la tarjeta, verifica cada archivo y solo da luz verde cuando la copia coincide.",
+        "hero.ctaDownload": "Descargar Cardflow",
+        "hero.ctaGithub": "Ver en GitHub",
+        "hero.note": "Baja el DMG más reciente directo de GitHub, sin pedir registro.",
+        "hero.shotAlt": "La ventana de Cardflow: una tarjeta Sony A7IV detectada a la izquierda, el disco de destino y el backup opcional a la derecha, y el botón Iniciar abajo.",
+        // verificação
+        "verify.eyebrow": "Verificación",
+        "verify.title": "No es copiar y rezar. Es copiar y verificar.",
+        "verify.lead": "Verifica el hash del origen y del destino. Si un archivo no coincide, te enteras antes de formatear.",
+        "verify.status": "Verificado. Seguro para formatear.",
+        // descarga
+        "offload.title": "Todo lo que pasa en una descarga.",
+        "offload.card1Title": "Verifica archivo por archivo",
+        "offload.card1Body": "Compara el hash del origen con el del destino. O coincide exacto, o te avisa.",
+        "offload.card2Title": "Dos discos y reanudación",
+        "offload.card2Body": "Destino principal y backup en la misma pasada. Si un disco se cae a mitad de camino, sigue donde quedó.",
+        "offload.card3Title": "Cine preservado",
+        "offload.card3Body": "RED, Blackmagic, P2 y XAVC conservan la estructura que el editor espera. Cada descarga genera un manifiesto de lo que se guardó.",
+        // como usar
+        "use.title": "Cuatro pasos, sin comandos y sin arrastrar carpetas.",
+        "use.step1Title": "Conecta la tarjeta.",
+        "use.step1Body": "La app detecta el medio de cámara y te muestra el tamaño de la descarga.",
+        "use.step2Title": "Elige el destino.",
+        "use.step2Body": "SSD, disco duro o una carpeta interna. Backup en otro disco físico, si quieres.",
+        "use.step3Title": "Pulsa iniciar.",
+        "use.step3Body": "Copia, verifica y te avisa si encuentra algo raro por el camino.",
+        "use.step4Title": "Espera la luz verde.",
+        "use.step4Body": "Formatea la tarjeta solo cuando te diga que es seguro.",
+        // fecho
+        "close.title": "Descárgalo y déjalo en tu Mac.",
+        "close.lead": "Una app nativa y firmada que funciona sin conexión. Tus archivos se quedan en tu Mac. Internet entra solo para buscar actualizaciones.",
+        "close.cta": "Descargar Cardflow",
+        // rodapé
+        "footer.latest": "Última versión",
+        "footer.history": "Historial de versiones",
+        "footer.legal": "Cardflow · App nativa para macOS 14 o posterior · Hecha para descargar tarjetas de cámara con seguridad."
+      }
+    };
+
+    var STORAGE_KEY = "cardflow-lang";
+    var DEFAULT_LANG = "pt";
+    var HTML_LANG = { pt: "pt-BR", en: "en", es: "es" };
+
+    function safeGet(key) {
+      try { return window.localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function safeSet(key, value) {
+      try { window.localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+    }
+
+    function normalize(code) {
+      if (!code) return null;
+      var base = String(code).toLowerCase().slice(0, 2);
+      if (base === "pt" || base === "en" || base === "es") return base;
+      return null;
+    }
+
+    function detectLang() {
+      var saved = normalize(safeGet(STORAGE_KEY));
+      if (saved) return saved;
+      var langs = navigator.languages && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language];
+      for (var i = 0; i < langs.length; i++) {
+        var n = normalize(langs[i]);
+        if (n) return n;
+      }
+      return DEFAULT_LANG; // qualquer outro idioma cai em pt-BR
+    }
+
+    function t(lang, key) {
+      var dict = I18N[lang] || I18N[DEFAULT_LANG];
+      if (Object.prototype.hasOwnProperty.call(dict, key)) return dict[key];
+      // fallback para pt se faltar tradução
+      var base = I18N[DEFAULT_LANG];
+      return Object.prototype.hasOwnProperty.call(base, key) ? base[key] : null;
+    }
+
+    function setMeta(selector, value) {
+      if (value == null) return;
+      var el = document.querySelector(selector);
+      if (el) el.setAttribute("content", value);
+    }
+
+    function apply(lang) {
+      // texto de elementos
+      var nodes = document.querySelectorAll("[data-i18n]");
+      for (var i = 0; i < nodes.length; i++) {
+        var key = nodes[i].getAttribute("data-i18n");
+        var val = t(lang, key);
+        if (val != null) nodes[i].textContent = val;
+      }
+
+      // texto com HTML inline (ex.: &nbsp;)
+      var htmlNodes = document.querySelectorAll("[data-i18n-html]");
+      for (var h = 0; h < htmlNodes.length; h++) {
+        var hkey = htmlNodes[h].getAttribute("data-i18n-html");
+        var hval = t(lang, hkey);
+        if (hval != null) htmlNodes[h].innerHTML = hval;
+      }
+
+      // atributos de elementos (formato "attr:chave; attr2:chave2")
+      var attrNodes = document.querySelectorAll("[data-i18n-attr]");
+      for (var a = 0; a < attrNodes.length; a++) {
+        var spec = attrNodes[a].getAttribute("data-i18n-attr");
+        var pairs = spec.split(";");
+        for (var p = 0; p < pairs.length; p++) {
+          var pair = pairs[p].trim();
+          if (!pair) continue;
+          var idx = pair.indexOf(":");
+          if (idx === -1) continue;
+          var attr = pair.slice(0, idx).trim();
+          var akey = pair.slice(idx + 1).trim();
+          var aval = t(lang, akey);
+          if (aval != null) attrNodes[a].setAttribute(attr, aval);
+        }
+      }
+
+      // <title> e meta tags
+      var title = t(lang, "meta.title");
+      if (title != null) document.title = title;
+      setMeta('meta[name="description"]', t(lang, "meta.description"));
+      setMeta('meta[property="og:title"]', t(lang, "meta.ogTitle"));
+      setMeta('meta[property="og:description"]', t(lang, "meta.ogDescription"));
+      setMeta('meta[property="og:image:alt"]', t(lang, "meta.ogImageAlt"));
+
+      // idioma do documento
+      document.documentElement.setAttribute("lang", HTML_LANG[lang] || lang);
+
+      // estado visual do seletor
+      var opts = document.querySelectorAll(".lang-opt");
+      for (var o = 0; o < opts.length; o++) {
+        var isActive = opts[o].getAttribute("data-lang") === lang;
+        opts[o].setAttribute("aria-current", isActive ? "true" : "false");
+      }
+    }
+
+    function init() {
+      var current = detectLang();
+      apply(current);
+
+      var opts = document.querySelectorAll(".lang-opt");
+      for (var i = 0; i < opts.length; i++) {
+        opts[i].addEventListener("click", function () {
+          var chosen = this.getAttribute("data-lang");
+          safeSet(STORAGE_KEY, chosen);
+          apply(chosen);
+        });
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
+  })();
+  </script>
 </body>
 </html>
