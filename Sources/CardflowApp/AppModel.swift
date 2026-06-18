@@ -23,9 +23,77 @@ final class AppModel {
     private var destWasAutoSelected = false   // destino atual veio de auto-seleção, não da escolha do usuário
     var camera: String = "Cam01"
     var mediaChoice: Preset.Media.Kind = .both
-    var filterTodayOnly = false        // "só hoje": copia só o que foi capturado hoje (vários domingos no mesmo disco)
-    /// Início de hoje (fuso local) quando o filtro está ligado; senão sem filtro.
-    var capturedSince: Date? { filterTodayOnly ? Calendar.current.startOfDay(for: Date()) : nil }
+    enum CaptureDateFilter: Equatable {
+        case all
+        case today(anchor: Date)
+        case singleDay(Date)
+        case range(start: Date, end: Date)
+    }
+
+    var captureDateFilter: CaptureDateFilter = .all
+
+    var capturedIn: DateInterval? {
+        captureDateInterval(for: captureDateFilter)
+    }
+
+    var captureDateFilterTitle: String {
+        switch captureDateFilter {
+        case .all:
+            return String(localized: "main.captureFilter.all")
+        case .today(let anchor):
+            if Calendar.current.isDateInToday(anchor) {
+                return String(localized: "main.captureFilter.today")
+            }
+            return shortCaptureDate(anchor)
+        case .singleDay(let date):
+            return shortCaptureDate(date)
+        case .range(let start, let end):
+            let bounds = normalizedRange(start, end)
+            return "\(shortCaptureDate(bounds.start)) \(String(localized: "main.captureFilter.rangeSeparator")) \(shortCaptureDate(bounds.end))"
+        }
+    }
+
+    var isCaptureDateFilterActive: Bool {
+        captureDateFilter != .all
+    }
+
+    func setCaptureDateFilter(_ filter: CaptureDateFilter) {
+        captureDateFilter = filter
+        refreshCardPreview()
+    }
+
+    func captureDateInterval(for filter: CaptureDateFilter,
+                             calendar: Calendar = .current) -> DateInterval? {
+        func wholeDay(_ date: Date) -> DateInterval {
+            let start = calendar.startOfDay(for: date)
+            let end = calendar.date(byAdding: .day, value: 1, to: start)
+                ?? start.addingTimeInterval(86_400)
+            return DateInterval(start: start, end: end)
+        }
+
+        switch filter {
+        case .all:
+            return nil
+        case .today(let anchor), .singleDay(let anchor):
+            return wholeDay(anchor)
+        case .range(let a, let b):
+            let bounds = normalizedRange(a, b)
+            let start = calendar.startOfDay(for: bounds.start)
+            let endStart = calendar.startOfDay(for: bounds.end)
+            let end = calendar.date(byAdding: .day, value: 1, to: endStart)
+                ?? endStart.addingTimeInterval(86_400)
+            return DateInterval(start: start, end: end)
+        }
+    }
+
+    private func normalizedRange(_ a: Date, _ b: Date) -> (start: Date, end: Date) {
+        a <= b ? (a, b) : (b, a)
+    }
+
+    private func shortCaptureDate(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month().year())
+    }
+
     var state: OffloadState = .idle
     var cardPreview: OffloadPreview?   // prévia do cartão detectado (contagem/tamanho)
     var internalPermissionDenied = false   // macOS bloqueou acesso à pasta interna escolhida (Mesa/Documentos)
@@ -438,7 +506,10 @@ final class AppModel {
         let dests = offloadDestinations
         let cardURL = detectedCard?.url
         // trocou de fonte → limpa os stats da fonte anterior (mostra "calculando…").
-        if cardURL != previewedCardURL { cardPreview = nil }
+        if cardURL != previewedCardURL {
+            cardPreview = nil
+            captureDateFilter = .all
+        }
         previewedCardURL = cardURL
         // trocou destino/backup → recalcula o ESPAÇO na hora (rápido) com o total já conhecido, pra
         // canStart/avisos não usarem shortfall obsoleto enquanto a nova prévia não chega.
@@ -455,12 +526,12 @@ final class AppModel {
         guard let card = cardURL, !dests.isEmpty else { cardPreview = nil; return }
         let preset = activePreset
         let media = preset.media.mode == .locked ? preset.media.lockedTo : mediaChoice
-        let since = capturedSince
+        let interval = capturedIn
         let internalDests = Set(dests.filter { isInternalDestination($0) })
         Task.detached { [weak self] in
             let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace(), locale: AppLocale.effective)
             let pv = try? service.preview(cardRoot: card, chosenMedia: media, destinations: dests,
-                                          capturedSince: since,
+                                          capturedIn: interval,
                                           internalDestinations: internalDests)
             // a trava compara o NÚMERO confirmado, então não precisa resetar aqui.
             await self?.applyPreview(pv, generation: gen)
@@ -484,7 +555,7 @@ final class AppModel {
         cardEjected = false; ejectError = nil
         offloadStartedAt = Date(); lastElapsed = nil
         let cardName = detectedCard?.name ?? card.lastPathComponent   // capturado agora (some ao ejetar)
-        let since = capturedSince                                     // filtro "só hoje", se ligado
+        let interval = capturedIn                                     // filtro temporário, já congelado
         let internalDests = Set(destinations.filter { isInternalDestination($0) })   // reserva de 5GB no interno
         isCancelling = false                                         // run novo: limpa feedback de Parar anterior
         state = .running(OffloadProgress(phase: .scanning, filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0))
@@ -495,7 +566,7 @@ final class AppModel {
                 let outcome = try service.run(
                     cardRoot: card, chosenMedia: media, destinations: destinations, camera: camera,
                     sessionValues: session,
-                    capturedSince: since,
+                    capturedIn: interval,
                     fastResume: fastResume,
                     internalDestinations: internalDests,
                     isCancelled: { Task.isCancelled },   // botão Parar cancela este Task → checado entre arquivos

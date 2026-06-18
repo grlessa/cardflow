@@ -12,6 +12,11 @@ struct MainView: View {
     @State private var showingHistory = false
     @State private var showingOnboarding = false
     @State private var ignoredFilesSheet: IgnoredFilesSheet?
+    @State private var showingCaptureFilter = false
+    @State private var filterDraftMode: CaptureDateFilterDraftMode = .all
+    @State private var filterSingleDay = Date()
+    @State private var filterRangeStart = Date()
+    @State private var filterRangeEnd = Date()
 
     /// Tamanhos derivados da janela: cards crescem na largura e ícone/números/seta escalam.
     private struct Metrics {
@@ -34,6 +39,13 @@ struct MainView: View {
             arrow = 30 * s
             gap = 24 * s
         }
+    }
+
+    private enum CaptureDateFilterDraftMode: Hashable {
+        case all
+        case today
+        case singleDay
+        case range
     }
 
     // TOPO — seletor de preset, gerenciamento, histórico e ajuda. Extraído do body pra o
@@ -252,7 +264,7 @@ struct MainView: View {
             }
 
             VStack(spacing: 7) {
-                todayOnlyFilter(model)
+                captureDateFilterControl(model)
                 if let card {
                     sourceCorrectionButton(model, card: card)
                 }
@@ -262,44 +274,197 @@ struct MainView: View {
         .padding(.horizontal, 4)
     }
 
-    private func todayOnlyFilter(_ model: AppModel) -> some View {
+    private func captureDateFilterControl(_ model: AppModel) -> some View {
         @Bindable var model = model
+        let active = model.isCaptureDateFilterActive
         return Button {
             guard !model.isBusy else { return }
-            model.filterTodayOnly.toggle()
-            model.refreshCardPreview()
+            syncCaptureFilterDrafts(from: model.captureDateFilter)
+            showingCaptureFilter = true
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: model.filterTodayOnly ? "checkmark.square.fill" : "square")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(model.filterTodayOnly ? Color.accentColor : Color.secondary)
-                    .frame(width: 14)
-                Text("main.todayOnly.label")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(model.filterTodayOnly ? Color.accentColor : Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.9)
+            HStack(spacing: 10) {
+                Image(systemName: active ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(active ? Color.accentColor : Color.secondary)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("main.captureFilter.controlTitle")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(active ? Color.primary.opacity(0.62) : Color.secondary)
+                    Text(verbatim: model.captureDateFilterTitle)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(active ? Color.accentColor : Color.primary.opacity(0.86))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
                 Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(active ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(0.72))
             }
-            .padding(.horizontal, 9)
-            .frame(height: 28)
+            .padding(.horizontal, 11)
+            .frame(height: 42)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-            .buttonStyle(.plain)
-            .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(model.filterTodayOnly ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.06))
+        .buttonStyle(.plain)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(active ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.06))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(active ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.07), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .disabled(model.isBusy)
+        .accessibilityLabel(Text("main.captureFilter.a11yLabel"))
+        .accessibilityValue(Text(verbatim: model.captureDateFilterTitle))
+        .help("main.captureFilter.help")
+        .popover(isPresented: $showingCaptureFilter, arrowEdge: .bottom) {
+            captureDateFilterPopover(model)
+        }
+    }
+
+    private func captureDateFilterPopover(_ model: AppModel) -> some View {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("main.captureFilter.popoverTitle")
+                    .font(.headline)
+                Text("main.captureFilter.popoverSubtitle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(model.filterTodayOnly ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.07), lineWidth: 1)
+
+            Picker("main.captureFilter.modeLabel",
+                   selection: Binding(get: { filterDraftMode },
+                                      set: {
+                                          filterDraftMode = $0
+                                          applyCaptureFilterDraftMode($0, to: model)
+                                      })) {
+                Text("main.captureFilter.modeAll").tag(CaptureDateFilterDraftMode.all)
+                Text("main.captureFilter.modeToday").tag(CaptureDateFilterDraftMode.today)
+                Text("main.captureFilter.modeOneDay").tag(CaptureDateFilterDraftMode.singleDay)
+                Text("main.captureFilter.modeRange").tag(CaptureDateFilterDraftMode.range)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .disabled(model.isBusy)
-            .accessibilityLabel(Text("main.todayOnly.a11yLabel"))
-            .accessibilityValue(Text(model.filterTodayOnly ? "main.todayOnly.on" : "main.todayOnly.off"))
-            .help("main.todayOnly.help")
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Group {
+                switch filterDraftMode {
+                case .all:
+                    captureFilterSummary("main.captureFilter.summaryAll", systemImage: "tray.full")
+                case .today:
+                    captureFilterSummary("main.captureFilter.summaryToday", systemImage: "calendar.badge.clock")
+                case .singleDay:
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("main.captureFilter.chooseDay")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        CaptureDateStepper(
+                            title: "main.captureFilter.day",
+                            selection: Binding(get: { filterSingleDay },
+                                               set: {
+                                                   filterSingleDay = $0
+                                                   model.setCaptureDateFilter(.singleDay($0))
+                                               })
+                        )
+                    }
+                case .range:
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("main.captureFilter.chooseRange")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        CaptureDateStepper(
+                            title: "main.captureFilter.startDate",
+                            selection: Binding(get: { filterRangeStart },
+                                               set: { setFilterRangeStart($0, model: model) }),
+                            role: .start,
+                            upperBound: filterRangeEnd
+                        )
+                        CaptureDateStepper(
+                            title: "main.captureFilter.endDate",
+                            selection: Binding(get: { filterRangeEnd },
+                                               set: { setFilterRangeEnd($0, model: model) }),
+                            lowerBound: filterRangeStart,
+                            role: .end
+                        )
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .padding(16)
+        .frame(width: 420)
+    }
+
+    private func captureFilterSummary(_ key: LocalizedStringKey, systemImage: String) -> some View {
+        Label(key, systemImage: systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func syncCaptureFilterDrafts(from filter: AppModel.CaptureDateFilter) {
+        let now = Date()
+        switch filter {
+        case .all:
+            filterDraftMode = .all
+            filterSingleDay = now
+            filterRangeStart = now
+            filterRangeEnd = now
+        case .today(let anchor):
+            filterDraftMode = .today
+            filterSingleDay = anchor
+            filterRangeStart = anchor
+            filterRangeEnd = anchor
+        case .singleDay(let anchor):
+            filterDraftMode = .singleDay
+            filterSingleDay = anchor
+            filterRangeStart = anchor
+            filterRangeEnd = anchor
+        case .range(let start, let end):
+            filterDraftMode = .range
+            filterSingleDay = start
+            filterRangeStart = start
+            filterRangeEnd = end
+        }
+    }
+
+    private func applyCaptureFilterDraftMode(_ mode: CaptureDateFilterDraftMode, to model: AppModel) {
+        switch mode {
+        case .all:
+            model.setCaptureDateFilter(.all)
+        case .today:
+            let anchor = Date()
+            filterSingleDay = anchor
+            filterRangeStart = anchor
+            filterRangeEnd = anchor
+            model.setCaptureDateFilter(.today(anchor: anchor))
+        case .singleDay:
+            model.setCaptureDateFilter(.singleDay(filterSingleDay))
+        case .range:
+            model.setCaptureDateFilter(.range(start: filterRangeStart, end: filterRangeEnd))
+        }
+    }
+
+    private func setFilterRangeStart(_ date: Date, model: AppModel) {
+        filterRangeStart = date
+        if Calendar.current.startOfDay(for: filterRangeEnd) < Calendar.current.startOfDay(for: date) {
+            filterRangeEnd = date
+        }
+        model.setCaptureDateFilter(.range(start: filterRangeStart, end: filterRangeEnd))
+    }
+
+    private func setFilterRangeEnd(_ date: Date, model: AppModel) {
+        let startDay = Calendar.current.startOfDay(for: filterRangeStart)
+        let endDay = Calendar.current.startOfDay(for: date)
+        filterRangeEnd = endDay < startDay ? filterRangeStart : date
+        model.setCaptureDateFilter(.range(start: filterRangeStart, end: filterRangeEnd))
     }
 
     private func sourceCorrectionButton(_ model: AppModel, card: ExternalVolume) -> some View {
@@ -944,6 +1109,145 @@ private struct CapacityBar: View {
                 .font(.subheadline).monospacedDigit()
                 .accessibilityHidden(true)   // a barra acima já anuncia o mesmo valor pro VoiceOver
         }
+    }
+}
+
+private enum CaptureDateStepperRole {
+    case start
+    case end
+
+    var marker: String {
+        switch self {
+        case .start: "1"
+        case .end: "2"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .start: Color.accentColor
+        case .end: Color.green
+        }
+    }
+}
+
+private struct CaptureDateStepper: View {
+    let title: LocalizedStringKey
+    @Binding private var selection: Date
+    private let lowerBound: Date?
+    private let upperBound: Date?
+    private let role: CaptureDateStepperRole?
+
+    init(title: LocalizedStringKey,
+         selection: Binding<Date>,
+         lowerBound: Date? = nil,
+         role: CaptureDateStepperRole? = nil,
+         upperBound: Date? = nil) {
+        self.title = title
+        _selection = selection
+        self.lowerBound = lowerBound
+        self.upperBound = upperBound
+        self.role = role
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                if let role {
+                    Text(verbatim: role.marker)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(role.color, in: Circle())
+                }
+                Text(title)
+                    .font(.caption.weight(role == nil ? .semibold : .bold))
+                    .foregroundStyle(role?.color ?? Color.secondary)
+            }
+
+            HStack(spacing: 6) {
+                stepButton("chevron.left.2", delta: .month(-1))
+                stepButton("chevron.left", delta: .day(-1))
+
+                Text(verbatim: selection.formatted(.dateTime.day().month().year()))
+                    .font(.title3.weight(.semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                stepButton("chevron.right", delta: .day(1))
+                stepButton("chevron.right.2", delta: .month(1))
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(stepperBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            if let role {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(role.color.opacity(0.32), lineWidth: 1)
+            }
+        }
+    }
+
+    private enum StepDelta {
+        case day(Int)
+        case month(Int)
+    }
+
+    private func stepButton(_ systemImage: String, delta: StepDelta) -> some View {
+        Button {
+            move(delta)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .frame(width: 44, height: 40)
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .disabled(!canMove(delta))
+    }
+
+    private var stepperBackground: Color {
+        if let role {
+            return role.color.opacity(0.09)
+        }
+        return Color.primary.opacity(0.055)
+    }
+
+    private func move(_ delta: StepDelta) {
+        guard let next = date(after: delta), isWithinBounds(next) else { return }
+        selection = next
+    }
+
+    private func canMove(_ delta: StepDelta) -> Bool {
+        guard let next = date(after: delta) else { return false }
+        return isWithinBounds(next)
+    }
+
+    private func date(after delta: StepDelta) -> Date? {
+        switch delta {
+        case .day(let value):
+            return Calendar.current.date(byAdding: .day, value: value, to: selection)
+        case .month(let value):
+            return Calendar.current.date(byAdding: .month, value: value, to: selection)
+        }
+    }
+
+    private func isWithinBounds(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        if let lowerBound, day < calendar.startOfDay(for: lowerBound) {
+            return false
+        }
+        if let upperBound, day > calendar.startOfDay(for: upperBound) {
+            return false
+        }
+        return true
     }
 }
 

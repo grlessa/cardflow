@@ -530,112 +530,442 @@
         }
       }
     },
-    "main.todayOnly.label": {
+    "main.captureFilter.controlTitle": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copiar apenas arquivos de hoje"
+            "value": "Data de captura"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copy only today’s files"
+            "value": "Capture date"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copiar solo los archivos de hoy"
+            "value": "Fecha de captura"
           }
         }
       }
     },
-    "main.todayOnly.a11yLabel": {
+    "main.captureFilter.popoverTitle": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copiar só os arquivos de hoje"
+            "value": "Data de captura"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copy only today’s files"
+            "value": "Capture date"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copiar solo los archivos de hoy"
+            "value": "Fecha de captura"
           }
         }
       }
     },
-    "main.todayOnly.on": {
+    "main.captureFilter.popoverSubtitle": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ativado"
+            "value": "Escolha quais datas entram na cópia deste cartão."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "On"
+            "value": "Choose which capture dates are included from this card."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Activado"
+            "value": "Elige qué fechas entran en la copia de esta tarjeta."
           }
         }
       }
     },
-    "main.todayOnly.off": {
+    "main.captureFilter.modeLabel": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desativado"
+            "value": "Filtro"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Off"
+            "value": "Filter"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desactivado"
+            "value": "Filtro"
           }
         }
       }
     },
-    "main.todayOnly.help": {
+    "main.captureFilter.modeAll": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copia só os arquivos capturados hoje — útil quando o cartão acumula vários dias"
+            "value": "Todos"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copies only files captured today, handy when a card piles up several days"
+            "value": "All"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copia solo los archivos capturados hoy, útil cuando la tarjeta acumula varios días"
+            "value": "Todos"
+          }
+        }
+      }
+    },
+    "main.captureFilter.modeToday": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy"
+          }
+        }
+      }
+    },
+    "main.captureFilter.modeOneDay": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um dia"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One day"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un día"
+          }
+        }
+      }
+    },
+    "main.captureFilter.modeRange": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervalo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Range"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervalo"
+          }
+        }
+      }
+    },
+    "main.captureFilter.summaryAll": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos os arquivos do cartão entram na cópia."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All files on the card are included in the copy."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos los archivos de la tarjeta entran en la copia."
+          }
+        }
+      }
+    },
+    "main.captureFilter.summaryToday": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só arquivos capturados hoje entram na cópia."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only files captured today are included in the copy."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo los archivos capturados hoy entran en la copia."
+          }
+        }
+      }
+    },
+    "main.captureFilter.all": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos os arquivos"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All files"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos los archivos"
+          }
+        }
+      }
+    },
+    "main.captureFilter.today": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy"
+          }
+        }
+      }
+    },
+    "main.captureFilter.chooseDay": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher dia"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose day"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir día"
+          }
+        }
+      }
+    },
+    "main.captureFilter.day": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dia"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Day"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Día"
+          }
+        }
+      }
+    },
+    "main.captureFilter.chooseRange": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher intervalo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose range"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir intervalo"
+          }
+        }
+      }
+    },
+    "main.captureFilter.startDate": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Início"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inicio"
+          }
+        }
+      }
+    },
+    "main.captureFilter.endDate": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fim"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fin"
+          }
+        }
+      }
+    },
+    "main.captureFilter.rangeSeparator": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "to"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a"
+          }
+        }
+      }
+    },
+    "main.captureFilter.a11yLabel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtro de data de captura"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture date filter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtro de fecha de captura"
+          }
+        }
+      }
+    },
+    "main.captureFilter.help": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolhe quais dias do cartão serão copiados"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose which days from the card will be copied"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige qué días de la tarjeta se copiarán"
           }
         }
       }

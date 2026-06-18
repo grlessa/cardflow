@@ -573,27 +573,68 @@ import Foundation
         #expect(manifests.first?.interrupted == true)
     }
 
-    // #28: filtro "só hoje" (capturedSince) copia só os arquivos planos a partir da data; antigos ficam.
-    @Test func capturedSinceFiltersOlderFlatFiles() throws {
+    @Test func dateFilterUsesHalfOpenIntervalAndKeepsPreservedBundles() throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = Date(timeIntervalSince1970: 2_000)
+        let filter = CopyService.dateFilter(DateInterval(start: start, end: end))
+        let url = URL(fileURLWithPath: "/tmp/source")
+
+        let before = MediaFile(sourceURL: url, relPath: "before.mov", size: 1, type: .video,
+                               captureDate: start.addingTimeInterval(-1))
+        let atStart = MediaFile(sourceURL: url, relPath: "start.mov", size: 1, type: .video,
+                                captureDate: start)
+        let beforeEnd = MediaFile(sourceURL: url, relPath: "inside.mov", size: 1, type: .video,
+                                  captureDate: end.addingTimeInterval(-1))
+        let atEnd = MediaFile(sourceURL: url, relPath: "end.mov", size: 1, type: .video,
+                              captureDate: end)
+        let preservedBefore = MediaFile(sourceURL: url, relPath: "A001.RDC/clip.r3d", size: 1,
+                                        type: .cinema, captureDate: start.addingTimeInterval(-1),
+                                        preserve: true)
+
+        #expect(filter(before) == false)
+        #expect(filter(atStart))
+        #expect(filter(beforeEnd))
+        #expect(filter(atEnd) == false)
+        #expect(filter(preservedBefore))
+    }
+
+    @Test func capturedInFiltersPreviewAndRunTheSameWay() throws {
         let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
         let fm = FileManager.default
         let card = work.appendingPathComponent("CARD")
         try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
-        let oldFile = card.appendingPathComponent("DCIM/100/OLD.MP4")
-        let newFile = card.appendingPathComponent("DCIM/100/NEW.MP4")
-        fm.createFile(atPath: oldFile.path, contents: Data("antigo".utf8))
-        fm.createFile(atPath: newFile.path, contents: Data("recente".utf8))
-        let oldDate = Date(timeIntervalSince1970: 1_000_000)
-        let newDate = Date(timeIntervalSince1970: 1_780_000_000)
-        try fm.setAttributes([.creationDate: oldDate, .modificationDate: oldDate], ofItemAtPath: oldFile.path)
-        try fm.setAttributes([.creationDate: newDate, .modificationDate: newDate], ofItemAtPath: newFile.path)
+
+        let beforeFile = card.appendingPathComponent("DCIM/100/BEFORE.MP4")
+        let insideFile = card.appendingPathComponent("DCIM/100/INSIDE.MP4")
+        let afterFile = card.appendingPathComponent("DCIM/100/AFTER.MP4")
+        fm.createFile(atPath: beforeFile.path, contents: Data("antes".utf8))
+        fm.createFile(atPath: insideFile.path, contents: Data("dentro".utf8))
+        fm.createFile(atPath: afterFile.path, contents: Data("depois".utf8))
+
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(86_400)
+        let beforeDate = start.addingTimeInterval(-60)
+        let insideDate = start.addingTimeInterval(3_600)
+        let afterDate = end
+        try fm.setAttributes([.creationDate: beforeDate, .modificationDate: beforeDate], ofItemAtPath: beforeFile.path)
+        try fm.setAttributes([.creationDate: insideDate, .modificationDate: insideDate], ofItemAtPath: insideFile.path)
+        try fm.setAttributes([.creationDate: afterDate, .modificationDate: afterDate], ofItemAtPath: afterFile.path)
+
+        let capturedIn = DateInterval(start: start, end: end)
         let dest = work.appendingPathComponent("SSD")
         let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
-        let o = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam",
-                            capturedSince: Date(timeIntervalSince1970: 1_500_000_000))
-        #expect(o.verifiedCount == 1)   // só o recente
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/NEW.MP4").path))
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/OLD.MP4").path))
+
+        let preview = try svc.preview(cardRoot: card, chosenMedia: .video, destinations: [dest],
+                                      capturedIn: capturedIn)
+        #expect(preview.videos == 1)
+        #expect(preview.selectedCount == 1)
+
+        let outcome = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest],
+                                  camera: "Cam", capturedIn: capturedIn)
+        #expect(outcome.verifiedCount == 1)
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/INSIDE.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/BEFORE.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/AFTER.MP4").path))
     }
 
     // Retomada RÁPIDA: a 2ª rodada pula os arquivos que o manifesto anterior já conferiu, sem reler —

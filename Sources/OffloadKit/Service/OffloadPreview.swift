@@ -52,14 +52,14 @@ public struct OffloadPreview: Equatable {
 
 extension CopyService {
     /// Escaneia e calcula o que SERIA copiado, sem copiar nada. Inclui checagem de espaço por destino.
-    /// `capturedSince`: se dado, só inclui arquivos PLANOS capturados a partir dessa data (filtro "só
-    /// hoje"). Bundles de cinema ficam de fora do filtro pra não quebrar um clipe pela metade.
+    /// `capturedIn`: se dado, só inclui arquivos planos capturados dentro do intervalo. Bundles de
+    /// cinema ficam fora do filtro para não quebrar um clipe pela metade.
     public func preview(cardRoot: URL, chosenMedia: Preset.Media.Kind, destinations: [URL],
-                        capturedSince: Date? = nil, fastResume: Bool = true,
+                        capturedIn: DateInterval? = nil, fastResume: Bool = true,
                         internalDestinations: Set<URL> = []) throws -> OffloadPreview {
         let destinations = destinations.reduce(into: [URL]()) { acc, u in if !acc.contains(u) { acc.append(u) } }   // dedup (igual ao run)
         let all = try scanner.scan(cardRoot: cardRoot)
-        let dateOK = Self.dateFilter(capturedSince)
+        let dateOK = Self.dateFilter(capturedIn)
         let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
         let photos = selected.filter { $0.type == .photo }.count
         let videos = selected.filter { $0.type == .video }.count

@@ -108,11 +108,13 @@ public struct CopyService {
         self.appVersion = appVersion
     }
 
-    /// Filtro de data do "só hoje": passa arquivos PLANOS capturados a partir de `since`. Bundles de
-    /// cinema (preserve) passam sempre — filtrar por arquivo quebraria um clipe pela metade.
-    static func dateFilter(_ since: Date?) -> (MediaFile) -> Bool {
-        guard let since else { return { _ in true } }
-        return { $0.preserve || $0.captureDate >= since }
+    /// Filtro de data: passa arquivos planos capturados dentro de `interval`. Bundles de cinema
+    /// (`preserve`) passam sempre para não quebrar um clipe pela metade.
+    static func dateFilter(_ interval: DateInterval?) -> (MediaFile) -> Bool {
+        guard let interval else { return { _ in true } }
+        return { file in
+            file.preserve || (file.captureDate >= interval.start && file.captureDate < interval.end)
+        }
     }
 
     func wants(_ type: FileType, _ chosen: Preset.Media.Kind) -> Bool {
@@ -419,7 +421,7 @@ public struct CopyService {
     public func run(cardRoot: URL, chosenMedia: Preset.Media.Kind,
                     destinations: [URL], camera: String,
                     sessionValues: [String: String] = [:],
-                    capturedSince: Date? = nil,
+                    capturedIn: DateInterval? = nil,
                     fastResume: Bool = true,
                     internalDestinations: Set<URL> = [],
                     isCancelled: () -> Bool = { false },
@@ -436,7 +438,7 @@ public struct CopyService {
         let eventoRoot = NameBuilder.sanitizePathComponent(preset.evento)
         let cardName = NameBuilder.sanitizePathComponent(cardRoot.lastPathComponent)
         let all = try scanner.scan(cardRoot: cardRoot)
-        let dateOK = Self.dateFilter(capturedSince)   // filtro "só hoje" (planos); cinema passa sempre
+        let dateOK = Self.dateFilter(capturedIn)
         let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
         let sidecars = all.filter { $0.type == .sidecar && !$0.preserve && dateOK($0) }
         // não-reconhecidos: copiados verbatim como REDE DE SEGURANÇA (#3) — podem ser footage de um
