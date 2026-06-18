@@ -14,6 +14,8 @@ struct OnboardingView: View {
               texto: "onboarding.step1.text"),
         .init(icon: "externaldrive.fill.badge.checkmark", cor: .accentColor, titulo: "onboarding.step2.title",
               texto: "onboarding.step2.text"),
+        .init(icon: "folder.fill", cor: .accentColor, titulo: "onboarding.organize.title",
+              texto: "onboarding.organize.text"),
         .init(icon: "checkmark.shield.fill", cor: .green, titulo: "onboarding.step3.title",
               texto: "onboarding.step3.text"),
         .init(icon: "checkmark.seal.fill", cor: .green, titulo: "onboarding.step4.title",

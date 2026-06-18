@@ -88,6 +88,43 @@ import Foundation
         #expect(!s.contains("Verificados"))
     }
 
+    @Test func htmlReportIsCredibleProof() {
+        let html = ManifestStore().htmlReport(sampleManifest())
+        #expect(html.hasPrefix("<!DOCTYPE html>"))
+        #expect(html.contains("Cardflow"))
+        #expect(html.contains("2 arquivos copiados e verificados byte a byte"))  // veredito (totals.verified)
+        #expect(html.contains("Conf/FOTO/1.JPG"))   // o caminho do arquivo na tabela
+        #expect(html.contains("aabb"))               // o hash de verificação (a prova)
+        #expect(html.contains("byte a byte"))        // nota de rodapé
+        #expect(html.contains("SONY_64G"))           // o cartão
+    }
+
+    @Test func htmlReportFollowsEnglishLocale() {
+        let html = ManifestStore().htmlReport(sampleManifest(), locale: Locale(identifier: "en"))
+        #expect(html.contains("Copy receipt"))
+        #expect(html.contains("copied and verified byte for byte"))
+        #expect(html.contains("lang=\"en\""))
+        #expect(!html.contains("Comprovante"))       // não vaza pt
+    }
+
+    @Test func htmlReportEscapesFileNames() {
+        var m = sampleManifest()
+        m.files = [.init(sourceRelPath: "a", destRelPath: "Foto/<script>x</script>.jpg",
+                         type: .photo, bytes: 10, xxhash64: "ff", status: "verified")]
+        let html = ManifestStore().htmlReport(m)
+        #expect(html.contains("&lt;script&gt;"))     // nome de arquivo escapado
+        #expect(!html.contains("<script>"))          // nenhuma tag <script> crua (injeção)
+    }
+
+    @Test func writeAlsoWritesHtmlReceipt() throws {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let url = try ManifestStore().write(sampleManifest(), eventRootIn: dest, eventName: "Conf")
+        let html = url.deletingPathExtension().appendingPathExtension("html")
+        #expect(FileManager.default.fileExists(atPath: html.path))
+    }
+
     @Test func fingerprintIsStableAndOrderIndependent() {
         let a = MediaFile(sourceURL: URL(fileURLWithPath: "/a"), relPath: "B.JPG", size: 10, type: .photo, captureDate: .init(timeIntervalSince1970: 0))
         let b = MediaFile(sourceURL: URL(fileURLWithPath: "/b"), relPath: "A.JPG", size: 20, type: .photo, captureDate: .init(timeIntervalSince1970: 0))

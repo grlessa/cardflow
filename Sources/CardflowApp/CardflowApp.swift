@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum AppWindowSize {
-    static let minimum = CGSize(width: 960, height: 780)
-    static let preferred = CGSize(width: 1120, height: 860)
+    static let minimum = CGSize(width: 960, height: 820)
+    static let preferred = CGSize(width: 1120, height: 900)
 }
 
 @main

@@ -7,13 +7,12 @@ import OffloadKit
 final class PresetEditorModel: Identifiable {
 
     enum Step: Int, CaseIterable, Identifiable {
-        case basico, nomeacao, avancado
+        case basico, nomeacao
         public var id: Int { rawValue }
         var titulo: String {
             switch self {
             case .basico: return String(localized: "preset.step.basic")
             case .nomeacao: return String(localized: "preset.step.naming")
-            case .avancado: return String(localized: "preset.step.advanced")
             }
         }
     }

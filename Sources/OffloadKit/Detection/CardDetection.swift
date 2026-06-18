@@ -35,11 +35,27 @@ public enum CardDetection {
         "braw", "r3d", "mxf", "mts", "m2ts",          // cinema / camcorder
     ]
 
-    /// É fonte de mídia se for removível E (pasta-marcador OU CONTENTS-com-clipe OU RED OU extensão
-    /// de fonte solta na raiz). (Leitor de SD embutido reporta interno → não filtra por isso.)
+    /// Clipes de cinema-original que indicam FONTE mesmo em subpasta (SSD organizado em pastas). Só os
+    /// formatos de câmera (não áudio nem mov/mp4) pra não pegar disco de trabalho/backup.
+    private static let recursiveCinemaExtensions: Set<String> = ["braw", "r3d", "mxf"]
+
+    /// É fonte de mídia se for removível OU externo (SSD/HD que monta fixo) E tiver estrutura de fonte
+    /// (pasta-marcador, CONTENTS-com-clipe, RED, extensão solta na raiz, ou clipe de cinema em subpasta).
+    /// O leitor de SD embutido reporta interno mas removível → coberto pelo "removível". Disco de
+    /// sistema (interno E não-removível) é barrado. Time Machine nunca é fonte.
     public static func isCard(_ vol: ExternalVolume) -> Bool {
-        guard vol.isRemovable else { return false }
+        guard vol.isRemovable || !vol.isInternal else { return false }
         let fm = FileManager.default
+        // Volume de rede (NAS): é destino/arquivo, não fonte de offload — e varrer pela rede é lento.
+        if let vals = try? vol.url.resourceValues(forKeys: [.volumeIsLocalKey]), vals.volumeIsLocal == false {
+            return false
+        }
+        let rootEntries = (try? fm.contentsOfDirectory(atPath: vol.url.path)) ?? []
+        // Time Machine / imagens de backup nunca são fonte (não varrer footage de um backup). HFS+ TM
+        // usa Backups.backupdb; APFS TM (Ventura+) e Carbon Copy Cloner usam .sparsebundle/.backupbundle.
+        if rootEntries.contains(where: {
+            $0 == "Backups.backupdb" || $0.hasSuffix(".sparsebundle") || $0.hasSuffix(".backupbundle")
+        }) { return false }
         // 1) pasta-marcador de câmera de nome exato na raiz
         if cameraMarkers.contains(where: { fm.fileExists(atPath: vol.url.appendingPathComponent($0).path) }) {
             return true
@@ -56,14 +72,42 @@ public enum CardDetection {
             return true
         }
         // 3) marker-less: RED (pastas .RDM/.RDC) ou extensão de FONTE solta na raiz (gravador/cinema).
-        guard let root = try? fm.contentsOfDirectory(atPath: vol.url.path) else { return false }
-        for name in root {
+        for name in rootEntries {
             if name.hasPrefix(".") { continue }   // ignora lixo do macOS (.Spotlight-V100, .fseventsd, .Trashes)
             let upper = name.uppercased()
             if upper.hasSuffix(".RDM") || upper.hasSuffix(".RDC") { return true }
             if looseSourceExtensions.contains((name as NSString).pathExtension.lowercased()) { return true }
         }
-        return false
+        // 4) subpastas (até 2 níveis): clipe de cinema-original ou pasta RED — pega SSD organizado em
+        //    pastas (SSD/Reel01/A001.braw). Teto de pastas + parada no 1º acerto limitam o I/O.
+        return hasNestedCinemaSource(vol.url, fm: fm)
+    }
+
+    /// Procura clipe de cinema (.braw/.r3d/.mxf) ou pasta RED (.RDM/.RDC) até 2 níveis de subpasta.
+    private static func hasNestedCinemaSource(_ root: URL, fm: FileManager) -> Bool {
+        var budget = 400   // teto de pastas visitadas — não varre um disco de trabalho gigante
+        func scan(_ dir: URL, _ depth: Int) -> Bool {
+            guard depth >= 0, budget > 0, let items = try? fm.contentsOfDirectory(atPath: dir.path) else { return false }
+            budget -= 1
+            var subdirs: [URL] = []
+            for name in items {
+                if name.hasPrefix(".") || name == "Backups.backupdb" { continue }
+                let url = dir.appendingPathComponent(name)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
+                if isDir.boolValue {
+                    let upper = name.uppercased()
+                    if upper.hasSuffix(".RDM") || upper.hasSuffix(".RDC") { return true }
+                    subdirs.append(url)
+                } else if recursiveCinemaExtensions.contains((name as NSString).pathExtension.lowercased()) {
+                    return true
+                }
+            }
+            if depth == 0 { return false }
+            for sub in subdirs where scan(sub, depth - 1) { return true }
+            return false
+        }
+        return scan(root, 2)
     }
     public static func cards(from volumes: [ExternalVolume]) -> [ExternalVolume] {
         volumes.filter { isCard($0) }

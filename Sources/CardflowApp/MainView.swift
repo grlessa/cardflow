@@ -32,8 +32,8 @@ struct MainView: View {
             let s = min(max(min(size.width / 1180, size.height / 760), 1.0), 1.35)
             // largura proporcional (piso 250 / teto 540): nunca encosta na borda nem estica demais.
             cardW = min(max(size.width * 0.31, 250), 540)
-            cardH = min(max(size.height - 240, 430), 500)   // mais respiro vertical para status + filtros do cartão
-            icon = 66 * s                                    // vira respiro (gap pro botão) em vez de esticar o card
+            cardH = min(max(size.height - 240, 430), 560)   // teto maior pra o card cheio respirar (status + complemento + filtros)
+            icon = cardH * 0.16                              // proporcional à ALTURA do card — cresce junto quando o card é maior
             name = 22 * s
             gb = 25 * s
             arrow = 30 * s
@@ -53,14 +53,18 @@ struct MainView: View {
     @ViewBuilder private var presetBar: some View {
         @Bindable var model = model
         HStack(spacing: 8) {
-            Text("main.preset.label").font(.callout).foregroundStyle(.secondary)
+            Text("main.preset.label").font(.callout).foregroundStyle(.secondary).fixedSize()
             Picker("", selection: $model.selectedPresetId) {
                 ForEach(model.presets, id: \.id) { p in presetLabel(p).tag(p.id) }
             }
             .labelsHidden().fixedSize().disabled(model.isBusy)
-            Button { openEditor(.editing(model.activePreset)) } label: { Image(systemName: "pencil") }
+            Button { openEditor(.editing(model.activePreset)) } label: {
+                Label("main.preset.editButton", systemImage: "pencil").labelStyle(.titleAndIcon)
+            }
                 .help("main.preset.edit.help").disabled(model.isBusy)
-            Button { openEditor(.creating()) } label: { Image(systemName: "plus") }
+            Button { openEditor(.creating()) } label: {
+                Label("main.preset.newButton", systemImage: "plus").labelStyle(.titleAndIcon)
+            }
                 .help("main.preset.new.help").disabled(model.isBusy)
             Menu {
                 Button("main.preset.import") { importPresetPanel() }
@@ -81,7 +85,7 @@ struct MainView: View {
             }
             Spacer()
             Button { showingHistory = true } label: { Label("main.history.button", systemImage: "clock.arrow.circlepath") }
-                .help("main.history.help").disabled(model.destinationURL == nil)
+                .help("main.history.help").disabled(model.destinationURL == nil).fixedSize()
             Button { showingOnboarding = true } label: { Image(systemName: "questionmark.circle") }
                 .help("main.onboarding.help")
         }
@@ -215,14 +219,20 @@ struct MainView: View {
         @Bindable var model = model
         let card = model.detectedCard
         return VStack(spacing: 0) {
-            panelHeader("main.panel.card")
+            panelHeader(sourcePanelTitle(card))
             if model.sources.count > 1 {   // várias fontes conectadas → escolher qual
                 Picker("", selection: Binding(get: { model.detectedCard?.url }, set: { model.selectedCardURL = $0 })) {
                     ForEach(model.sources) { s in Text(s.name).tag(URL?.some(s.url)) }
                 }.labelsHidden().padding(.top, 6).disabled(model.isBusy)
             }
-            Spacer(minLength: 6)
-            SDCardIcon(size: m.icon, present: card != nil)
+            Spacer(minLength: 3)
+            Group {
+                if let card, !card.isRemovable {
+                    DriveIcon(size: m.icon)   // SSD/HD externo como fonte
+                } else {
+                    SDCardIcon(size: m.icon, present: card != nil)
+                }
+            }
                 .background {
                     if card == nil {   // halo suave atrás do ícone pra a tela de espera não ficar seca
                         Circle()
@@ -232,13 +242,16 @@ struct MainView: View {
                             .blur(radius: 6)
                     }
                 }
-            Spacer(minLength: 10)
+            Spacer(minLength: 5)
             VStack(spacing: 10) {
                 Text(card?.name ?? String(localized: "main.card.waiting"))
                     .font(.system(size: m.name, weight: .semibold)).multilineTextAlignment(.center).lineLimit(1)
                 cardStats(model, hasCard: card != nil, gb: m.gb)
+                if card == nil {
+                    sourceDoor(model)
+                }
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: 6)
             cardControls(model, card: card)
         }
         .padding(18)
@@ -272,6 +285,37 @@ struct MainView: View {
         }
         .padding(.top, 2)
         .padding(.horizontal, 4)
+    }
+
+    /// Título do painel da fonte, adaptável ao que está conectado: vazio → FONTE, cartão → CARTÃO,
+    /// disco externo (SSD/HD) → SSD.
+    private func sourcePanelTitle(_ card: ExternalVolume?) -> LocalizedStringKey {
+        guard let card else { return "main.panel.source" }
+        return card.isRemovable ? "main.panel.card" : "main.panel.drive"
+    }
+
+    /// Porta de SSD: no estado de espera, deixa marcar um disco conectado como fonte (caso a câmera
+    /// grave em SSD/HD e a detecção automática não pegue). Some quando não há disco pra escolher.
+    @ViewBuilder
+    private func sourceDoor(_ model: AppModel) -> some View {
+        let disks = model.destinations.filter { !$0.isInternalShortcut }
+        if !disks.isEmpty {
+            VStack(spacing: 5) {
+                Text("main.source.recordedElsewhere")
+                    .font(.caption2).foregroundStyle(.secondary)
+                Menu {
+                    ForEach(disks) { disk in
+                        Button(disk.name) { model.useAsSource(disk) }
+                    }
+                } label: {
+                    Label("main.source.chooseAsSource", systemImage: "arrow.left.arrow.right")
+                }
+                .controlSize(.small)
+                .fixedSize()
+                .disabled(model.isBusy)
+            }
+            .padding(.top, 4)
+        }
     }
 
     private func captureDateFilterControl(_ model: AppModel) -> some View {
@@ -485,24 +529,31 @@ struct MainView: View {
     private func cardStats(_ model: AppModel, hasCard: Bool, gb: CGFloat) -> some View {
         if let pv = model.cardPreview {
             VStack(spacing: 9) {
-                HStack(spacing: 0) {
-                    statColumn(icon: "photo.fill", value: "\(pv.photos)", label: String(localized: "main.stat.photos"))
-                    Divider().frame(height: 28)
-                    statColumn(icon: "video.fill", value: "\(pv.videos)", label: String(localized: "main.stat.videos"))
-                    if pv.audios > 0 {
-                        Divider().frame(height: 28)
-                        statColumn(icon: "waveform", value: "\(pv.audios)", label: String(localized: "main.stat.audios"))
+                let cols = statColumns(pv)
+                if !cols.isEmpty {
+                    HStack(spacing: 0) {
+                        // só os tipos com contagem > 0 — selecionar Áudio não mostra mais "0 fotos / 0 vídeos".
+                        ForEach(Array(cols.enumerated()), id: \.offset) { item in
+                            if item.offset > 0 { Divider().frame(height: 28) }
+                            statColumn(icon: item.element.icon, value: item.element.value, label: item.element.label)
+                        }
                     }
-                    if pv.cinema > 0 {
-                        Divider().frame(height: 28)
-                        statColumn(icon: "film.fill", value: "\(pv.cinema)", label: String(localized: pv.cinema == 1 ? "main.stat.clip" : "main.stat.clips"))
-                    }
+                    Divider()
                 }
-                Divider()
-                Text(humanBytes(pv.totalBytes))
+                if model.showsRemainingHeadline {
+                    Text("main.stat.remainingLabel")
+                        .font(.caption2.weight(.semibold)).textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                }
+                Text(humanBytes(model.headlineBytes))
                     .font(.system(size: gb, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(Color.accentColor)
-                // numa retomada, deixa claro: o número grande é o TOTAL do cartão; aqui o que falta copiar.
+                if model.showsRemainingHeadline {
+                    // numa retomada o número grande é o que FALTA; aqui o total do cartão pra dar contexto.
+                    Text(String(localized: "main.stat.ofTotal \(humanBytes(pv.totalBytes))"))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                // a caixa de retomada (abaixo) detalha já copiados · novos · faltam.
                 if let title = model.resumeCardTitle, let detail = model.resumeCardDetail {
                     VStack(spacing: 3) {
                         Label(title, systemImage: model.isComplementalCopy ? "plus.circle" : "arrow.clockwise")
@@ -551,9 +602,43 @@ struct MainView: View {
                 Text("main.card.calculating").font(.callout).foregroundStyle(.secondary)
             }.frame(height: 96)
         } else {
-            Text("main.card.connectPrompt")
-                .font(.callout).foregroundStyle(.secondary).frame(height: 96)
+            // Estado de espera: enriquece com os tipos de fonte aceitos — preenche o card (que de outro
+            // jeito fica vazio) e reforça que cartão, SSD/HD e gravador funcionam. Some quando há disco
+            // conectado (aí a porta "Escolher disco como fonte" já preenche e é o caminho de ação).
+            let semDiscoConectado = model.destinations.filter { !$0.isInternalShortcut }.isEmpty
+            VStack(spacing: 14) {
+                Text("main.card.connectPrompt")
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                if semDiscoConectado {
+                    VStack(alignment: .leading, spacing: 11) {
+                        sourceTypeRow("sdcard.fill", "main.source.type.card")
+                        sourceTypeRow("externaldrive.fill", "main.source.type.drive")
+                        sourceTypeRow("waveform", "main.source.type.recorder")
+                    }
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
+                }
+            }
         }
+    }
+
+    private func sourceTypeRow(_ icon: String, _ label: LocalizedStringKey) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon).font(.callout)
+                .foregroundStyle(Color.accentColor.opacity(0.85)).frame(width: 22)
+            Text(label).font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Colunas de tipo na prévia: só os tipos com contagem > 0 (ordem foto, vídeo, áudio, cinema).
+    /// Selecionar só Áudio deixa de mostrar "0 fotos / 0 vídeos".
+    private func statColumns(_ pv: OffloadPreview) -> [(icon: String, value: String, label: String)] {
+        var cols: [(icon: String, value: String, label: String)] = []
+        if pv.photos > 0 { cols.append((icon: "photo.fill", value: "\(pv.photos)", label: String(localized: "main.stat.photos"))) }
+        if pv.videos > 0 { cols.append((icon: "video.fill", value: "\(pv.videos)", label: String(localized: "main.stat.videos"))) }
+        if pv.audios > 0 { cols.append((icon: "waveform", value: "\(pv.audios)", label: String(localized: "main.stat.audios"))) }
+        if pv.cinema > 0 { cols.append((icon: "film.fill", value: "\(pv.cinema)", label: String(localized: pv.cinema == 1 ? "main.stat.clip" : "main.stat.clips"))) }
+        return cols
     }
 
     private func statColumn(icon: String, value: String, label: String) -> some View {
@@ -640,8 +725,18 @@ struct MainView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     sectionLabel("main.dest.willCreate")
-                    Text(pathPreview(model)).font(.callout)
-                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    organizationChips(model)
+                    Text("main.dest.previewExample")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button { openEditor(.editing(model.activePreset)) } label: {
+                        Label("main.dest.customize", systemImage: "slider.horizontal.3")
+                            .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                    }
+                    .buttonStyle(.plain).disabled(model.isBusy)
+                    .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
                     if let backup = model.backupURL {
                         Text("main.dest.backupAt \(diskName(backup, model))")
                             .font(.caption).foregroundStyle(.secondary)
@@ -741,7 +836,7 @@ struct MainView: View {
     }
 
     private func resultTitle(_ text: String, icon: String, color: Color) -> some View {
-        HStack(alignment: .center, spacing: 7) {
+        HStack(alignment: .center, spacing: 8) {
             Image(systemName: icon)
                 .font(.caption.weight(.bold))
                 .frame(width: 18, height: 18)
@@ -794,11 +889,17 @@ struct MainView: View {
             resultTitle(String(localized: "result.proof.title"), icon: "checkmark.shield.fill", color: .green)
             resultInfoLine(proofLine(o), icon: "doc.text.magnifyingglass")
             if !o.manifestPaths.isEmpty {
+                // mesma coluna de ícone (18pt) das outras linhas, pra alinhar; cor de link.
                 Button { model.openReport(o) } label: {
-                    Label("result.proof.openReport", systemImage: "doc.text")
+                    HStack(alignment: .center, spacing: 8) {
+                        Image(systemName: "doc.text")
+                            .font(.caption.weight(.semibold)).frame(width: 18, height: 18)
+                        Text("result.proof.openReport").font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.link)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .onHover { $0 ? NSCursor.pointingHand.set() : NSCursor.arrow.set() }
             }
         }
     }
@@ -965,19 +1066,15 @@ struct MainView: View {
                                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 360)
                         }
                         if model.showsVerifiedResumeOption {
+                            // opção avançada (reconferir o que já foi copiado): botão discreto, 1 elemento só
+                            // (o detalhe "mais lento…" fica no tooltip, em vez de uma linha de ajuda separada).
                             Button { model.startOffload(fastResume: false) } label: {
                                 Label("main.resume.verifyAll", systemImage: "checkmark.shield")
+                                    .font(.caption.weight(.semibold))
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
-                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered).controlSize(.small)
                             .disabled(!model.canStart)
                             .help(model.verifiedResumeHelpText)
-                            Text(model.verifiedResumeHelpText)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: 360)
                         }
                         if model.detectedCard != nil && model.destinationURL == nil {
                             // sem NENHUM destino conectado → mandar "escolher" um disco que não existe confunde.
@@ -1029,21 +1126,52 @@ struct MainView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func pathPreview(_ model: AppModel) -> String {
+    /// Segmentos da árvore que será criada no destino: o 1º é o DISCO (fixo); os demais vêm do MODELO
+    /// de pastas (renderizados pelo motor real — datas viram "28 Mai 2026", caixa certa).
+    private func pathSegments(_ model: AppModel) -> [String] {
         let dest = model.destinations.first(where: { $0.url == model.destinationURL })?.name ?? String(localized: "main.diskName.fallback")
         var p = model.activePreset
         p.evento = model.effectiveEvento
-        // renderiza a estrutura com o motor REAL (datas viram "28 Mai 2026", caixa certa), não o template cru.
         guard case .success(let full) = NameBuilder(preset: p, locale: AppLocale.effective).preview(for: .previewSample, context: .previewContext) else {
-            return dest
+            return [dest]
         }
         var folders = full.split(separator: "/").map(String.init)
         if !folders.isEmpty { folders.removeLast() }   // tira o nome do arquivo de exemplo, fica só a pasta
         // se a última pasta é o {tipo}, mostra os tipos que vão ser criados (conforme o filtro de mídia)
         if p.folderStructure.split(separator: "/").last.map(String.init) == "{tipo}", !folders.isEmpty {
-            folders[folders.count - 1] = tipoPreview(model.mediaChoice)
+            // mídia efetiva: preset travado usa lockedTo (igual ao refreshCardPreview); senão a escolha do usuário.
+            let effective = p.media.mode == .locked ? p.media.lockedTo : model.mediaChoice
+            folders[folders.count - 1] = tipoPreview(effective)
         }
-        return ([dest] + folders).joined(separator: " › ")
+        return [dest] + folders
+    }
+
+    /// A árvore do destino como chips: o 1º (o disco) é neutro/fixo; os demais (do modelo de pastas)
+    /// ficam em destaque — comunica que a estrutura é configurável, não fixa do sistema.
+    @ViewBuilder
+    private func organizationChips(_ model: AppModel) -> some View {
+        let segs = pathSegments(model)
+        FlowRow(spacing: 4) {
+            ForEach(Array(segs.enumerated()), id: \.offset) { i, seg in
+                HStack(spacing: 4) {
+                    Text(seg)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(i == 0 ? Color.secondary : Color.accentColor)
+                        // nome de pasta longo não pode estourar a coluna (o destPanel corta sem reticência):
+                        // 1 linha, reticência no meio, teto de largura que cabe na janela mínima.
+                        .lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: 220, alignment: .leading)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(i == 0 ? Color.primary.opacity(0.08) : Color.accentColor.opacity(0.18),
+                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    // chevron TRAILING: linha que quebra termina com "›" (continuação), a próxima começa limpa.
+                    if i < segs.count - 1 {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
     }
 
     private func tipoPreview(_ kind: Preset.Media.Kind) -> String {

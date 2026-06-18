@@ -14,17 +14,53 @@ import Testing
         (".DS_Store", FileType.junk),
         ("Thumbs.db", FileType.junk),
         ("notas.txt", FileType.unknown),
-        ("AUDIO.WAV", FileType.unknown), // áudio desligado por padrão no preset de exemplo
+        ("AUDIO.WAV", FileType.audio), // áudio é nativo: reconhecido independente do preset
     ])
     func classifies(fileName: String, expected: FileType) {
         #expect(classifier.classify(fileName: fileName) == expected)
     }
 
-    @Test func audioActivatesWhenPresetListsIt() {
+    @Test func audioIsNativeMesmoComPresetSemAudio() {
+        // sampleConferencia tem audioExtensions vazio; áudio comum ainda é reconhecido (nativo, como cinema).
+        let c = FileClassifier(preset: .sampleConferencia)
+        for ext in ["wav", "WAV", "w64", "rf64", "caf", "aif", "aiff", "aifc", "flac",
+                    "m4a", "mp3", "aac", "ogg", "opus", "wma", "dsf", "dff", "bwf", "wave"] {
+            #expect(c.classify(fileName: "REC001.\(ext)") == .audio, "esperava .audio para .\(ext)")
+        }
+    }
+
+    @Test func extensoesDoPresetSaoIgnoradas() {
+        // O APP define as extensões nativamente; o que o preset listar NÃO conta. Migração: modelo
+        // antigo com extensões salvas não afeta o reconhecimento novo.
         var preset = Preset.sampleConferencia
-        preset.audioExtensions = ["wav", "mp3"]
+        preset.audioExtensions = ["zzz"]
+        preset.photoExtensions = ["qqq"]
         let c = FileClassifier(preset: preset)
-        #expect(c.classify(fileName: "REC001.WAV") == .audio)
+        #expect(c.classify(fileName: "WEIRD.ZZZ") == .unknown)
+        #expect(c.classify(fileName: "WEIRD.QQQ") == .unknown)
+        // o nativo continua valendo mesmo que o preset não liste
+        #expect(c.classify(fileName: "REC.WAV") == .audio)
+    }
+
+    @Test func sidecarEhNativo() {
+        // sidecar reconhecido nativamente (xml/thm/xmp/cube/aae), independente do preset.
+        var preset = Preset.sampleConferencia
+        preset.sidecarExtensions = []
+        let c = FileClassifier(preset: preset)
+        for ext in ["xml", "thm", "xmp", "cube", "aae"] {
+            #expect(c.classify(fileName: "FILE.\(ext)") == .sidecar, "esperava .sidecar para .\(ext)")
+        }
+    }
+
+    @Test func fotoEVideoTambemSaoNativos() {
+        // sampleConferencia NÃO lista tiff/png/x3f (foto) nem mkv/m4v/mts (vídeo); o nativo reconhece.
+        let c = FileClassifier(preset: .sampleConferencia)
+        for ext in ["tif", "tiff", "png", "x3f", "pef", "webp"] {
+            #expect(c.classify(fileName: "IMG.\(ext)") == .photo, "esperava .photo para .\(ext)")
+        }
+        for ext in ["mkv", "m4v", "webm", "mts", "m2ts"] {
+            #expect(c.classify(fileName: "CLIP.\(ext)") == .video, "esperava .video para .\(ext)")
+        }
     }
 
     /// Cobertura ampliada (preset de fábrica): vídeo flat de camcorder + RAW modernos de foto.

@@ -127,4 +127,77 @@ import Foundation
             try FileManager.default.createDirectory(at: $0.appendingPathComponent(".fseventsd"), withIntermediateDirectories: true)
         } == false)
     }
+
+    // SSD externo fixo (monta como NÃO removível, mas é externo) com clipe de cinema na raiz É fonte.
+    // Destrava o caso do vídeo: câmera que grava em SSD via USB-C/Thunderbolt.
+    @Test func ssdExternoFixoComCinemaEhFonte() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        FileManager.default.createFile(atPath: dir.appendingPathComponent("A001_clip.braw").path, contents: Data())
+        let ssd = ExternalVolume(url: dir, name: "SAMSUNG T7", isRemovable: false, isInternal: false)
+        #expect(CardDetection.isCard(ssd) == true)
+    }
+
+    // Cinema organizado em SUBPASTA (SSD/Reel01/A001.braw) é fonte — recursão por estrutura.
+    @Test func detectaCinemaEmSubpasta() throws {
+        #expect(try cardWith {
+            try FileManager.default.createDirectory(at: $0.appendingPathComponent("Reel01"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: $0.appendingPathComponent("Reel01/A001.braw").path, contents: Data())
+        } == true)
+    }
+
+    @Test func detectaCinemaEmSubpastaDoisNiveis() throws {
+        #expect(try cardWith {
+            try FileManager.default.createDirectory(at: $0.appendingPathComponent("2026/Reel01"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: $0.appendingPathComponent("2026/Reel01/A001.r3d").path, contents: Data())
+        } == true)
+    }
+
+    // Time Machine NUNCA é fonte, mesmo com clipe de cinema raso (não varrer footage de backup).
+    @Test func timeMachineNaoEhFonte() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("Backups.backupdb"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        FileManager.default.createFile(atPath: dir.appendingPathComponent("A001.braw").path, contents: Data())
+        let tm = ExternalVolume(url: dir, name: "Time Machine", isRemovable: false, isInternal: false)
+        #expect(CardDetection.isCard(tm) == false)
+    }
+
+    // Clipe fundo demais (> 2 níveis de subpasta) NÃO dispara a recursão — limita I/O e evita backup.
+    @Test func cinemaFundoDemaisNaoEhFonte() throws {
+        #expect(try cardWith {
+            try FileManager.default.createDirectory(at: $0.appendingPathComponent("a/b/c/d"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: $0.appendingPathComponent("a/b/c/d/A001.braw").path, contents: Data())
+        } == false)
+    }
+
+    // APFS Time Machine (Ventura+) usa .sparsebundle na raiz, não Backups.backupdb — também excluído.
+    @Test func apfsTimeMachineNaoEhFonte() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("MacBook.sparsebundle"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        FileManager.default.createFile(atPath: dir.appendingPathComponent("A001.braw").path, contents: Data())
+        let tm = ExternalVolume(url: dir, name: "Time Machine", isRemovable: false, isInternal: false)
+        #expect(CardDetection.isCard(tm) == false)
+    }
+
+    // TRADEOFF CONHECIDO (não "corrigir" sem rever a decisão): disco com clipe de cinema RASO em
+    // subpasta (Projetos/FilmeX/A001.braw) vira fonte. É o preço da detecção "conservadora por
+    // estrutura" — é assim que se pega o SSD de cinema organizado em pastas.
+    @Test func discoComCinemaRasoEhFonteTradeoffConhecido() throws {
+        #expect(try cardWith {
+            try FileManager.default.createDirectory(at: $0.appendingPathComponent("Projetos/FilmeX"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: $0.appendingPathComponent("Projetos/FilmeX/A001.braw").path, contents: Data())
+        } == true)
+    }
+
+    // O destino de offload REAL tem a footage 3+ níveis fundo (evento/dia/tipo/clip), FORA do alcance da
+    // recursão — então um disco de destino de sessões anteriores NÃO é re-detectado como fonte.
+    @Test func destinoDeOffloadComFootageProfundaNaoEhFonte() throws {
+        #expect(try cardWith {
+            try FileManager.default.createDirectory(at: $0.appendingPathComponent("Sessao/28 Mai 2026/Cinema"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: $0.appendingPathComponent("Sessao/28 Mai 2026/Cinema/A001.braw").path, contents: Data())
+        } == false)
+    }
 }

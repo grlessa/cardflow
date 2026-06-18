@@ -13,8 +13,10 @@ struct FolderLevelsBuilder: View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(model.folderLevels.enumerated()), id: \.offset) { i, _ in
                 HStack(alignment: .center, spacing: 7) {
-                    if i > 0 {   // conector em L (└─), estilo árvore de pastas — desce e entra na de baixo
-                        TreeBranch().padding(.leading, CGFloat(i - 1) * 22 + 4)
+                    if i > 0 {   // conector em L (└─), estilo árvore de pastas — desce e entra na de baixo.
+                        // teto na indentação: distingue os primeiros níveis e depois estabiliza, pra
+                        // estrutura profunda não empurrar os controles pra fora da janela (overflow).
+                        TreeBranch().padding(.leading, min(CGFloat(i - 1) * 22, 110) + 4)
                     }
                     Image(systemName: "folder.fill").foregroundStyle(.secondary).font(.callout)
                     PillBuilderView(model: model, lane: .folder(i), sessionFields: sessionFields)
@@ -219,7 +221,13 @@ private struct TokenPill: View {
 
     private var optionsPopover: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(label).font(.headline)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label).font(.headline)
+                if let desc = TokenCatalog.info(for: name)?.description {
+                    Text(desc).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("pill.case.label").font(.caption).foregroundStyle(.secondary)
                 Picker("pill.case.label", selection: Binding(
@@ -310,22 +318,6 @@ private struct ReorderDrop: DropDelegate {
             Task { @MainActor in model.moveSegment(from: from, to: targetIndex, in: lane) }
         }
         return true
-    }
-}
-
-/// Lista read-only de extensões reconhecidas — só informativo (não dá pra adicionar/remover).
-struct TagListView: View {
-    let tags: [String]
-    var body: some View {
-        FlowRow(spacing: 6) {
-            ForEach(tags, id: \.self) { tag in
-                Text(tag).font(.callout)
-                    .padding(.horizontal, 8).frame(height: 26)
-                    .background(Capsule().fill(.quaternary))
-            }
-            if tags.isEmpty { Text("pill.tags.none").font(.callout).foregroundStyle(.tertiary) }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

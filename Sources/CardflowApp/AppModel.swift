@@ -256,6 +256,13 @@ final class AppModel {
     var verifiedResumeHelpText: String {
         String(localized: "main.resume.verifiedHelp")
     }
+    /// Numa retomada/complemento, o número de destaque é o que AINDA falta copiar — não o total do
+    /// cartão. O total cheio passava a sensação de "foto de 50 GB presa". Cópia nova mostra o total.
+    var showsRemainingHeadline: Bool { isResume || isComplementalCopy }
+    var headlineBytes: Int64 {
+        guard let pv = cardPreview else { return 0 }
+        return showsRemainingHeadline ? pv.remainingBytes : pv.totalBytes
+    }
     /// Está copiando? (pra travar os controles durante o processo)
     var isBusy: Bool { if case .running = state { return true }; return false }
 
@@ -283,6 +290,14 @@ final class AppModel {
     var effectiveEvento: String {
         let e = eventName.trimmingCharacters(in: .whitespaces)
         return NameBuilder.sanitizePathComponent(e.isEmpty ? activePreset.evento : e)
+    }
+    /// O preset como a PRÉVIA e a CÓPIA devem vê-lo: igual ao ativo, mas com a pasta-mãe que o usuário
+    /// definiu (`effectiveEvento`). Crucial pra detecção de retomada: a prévia precisa procurar o
+    /// manifesto parcial na MESMA pasta onde o startOffload o grava (senão o botão fica "Iniciar").
+    var previewPreset: Preset {
+        var p = activePreset
+        p.evento = effectiveEvento
+        return p
     }
     /// O preset ativo usa {camera}? (pra mostrar o campo Câmera só quando faz diferença)
     var usesCameraToken: Bool {
@@ -524,7 +539,7 @@ final class AppModel {
         }
         previewedDestinations = dests
         guard let card = cardURL, !dests.isEmpty else { cardPreview = nil; return }
-        let preset = activePreset
+        let preset = previewPreset   // aplica effectiveEvento (igual ao startOffload) → retomada detectada
         let media = preset.media.mode == .locked ? preset.media.lockedTo : mediaChoice
         let interval = capturedIn
         let internalDests = Set(dests.filter { isInternalDestination($0) })
@@ -546,8 +561,7 @@ final class AppModel {
     func startOffload(fastResume: Bool = true) {
         let destinations = offloadDestinations
         guard let card = detectedCard?.url, !destinations.isEmpty else { return }
-        var preset = activePreset
-        preset.evento = effectiveEvento                 // pasta-mãe do que o usuário definiu
+        let preset = previewPreset                      // pasta-mãe do que o usuário definiu (mesma da prévia)
         let media = preset.media.mode == .locked ? preset.media.lockedTo : mediaChoice
         let camera = self.camera
         var session = sessionValues
@@ -576,16 +590,22 @@ final class AppModel {
                 )
                 await self?.finishOffload(outcome, card: card, cardName: cardName)
             } catch let error as OffloadError {
-                // espaço (pré-voo) e permissão negada (TCC, na criação da pasta) acontecem ANTES de copiar
-                // → cartão intocado. Os demais (ex.: caminho inválido) também lançam antes de escrever, mas
-                // avisamos por garantia (lado seguro).
-                let isPermission: Bool = { if case .permissionDenied = error { return true } else { return false } }()
-                let cardSafe: Bool = isPermission || { if case .notEnoughSpace = error { return true } else { return false } }()
-                let msg = AppModel.localizedMessage(for: error)
                 let isCancel: Bool = { if case .cancelled = error { return true } else { return false } }()
-                await self?.failOffload(message: msg, cardUncertain: !cardSafe,
-                                        notify: !isCancel, cardName: cardName,
-                                        permissionDenied: isPermission)
+                if isCancel {
+                    // o usuário PAROU de propósito: o que já foi copiado está verificado e seguro.
+                    // Volta pro início já oferecendo "Retomar", sem a tela vermelha de falha.
+                    await self?.returnToStartAfterStop()
+                } else {
+                    // espaço (pré-voo) e permissão negada (TCC, na criação da pasta) acontecem ANTES de
+                    // copiar → cartão intocado. Os demais (ex.: caminho inválido) também lançam antes de
+                    // escrever, mas avisamos por garantia (lado seguro).
+                    let isPermission: Bool = { if case .permissionDenied = error { return true } else { return false } }()
+                    let cardSafe: Bool = isPermission || { if case .notEnoughSpace = error { return true } else { return false } }()
+                    let msg = AppModel.localizedMessage(for: error)
+                    await self?.failOffload(message: msg, cardUncertain: !cardSafe,
+                                            notify: true, cardName: cardName,
+                                            permissionDenied: isPermission)
+                }
             } catch let error as NamingError {
                 // erro de template (mesmo p/ todo arquivo) lança ANTES de copiar → cartão intocado.
                 let msg = AppModel.localizedMessage(for: error)
@@ -677,12 +697,16 @@ final class AppModel {
         }
     }
 
-    /// Abre o relatório legível (manifesto .txt) da cópia — lista o que foi salvo e conferido,
-    /// pra dar confiança e servir de prova pra um responsável. Reusa o que o motor já gravou.
+    /// Abre o comprovante de cópia: o relatório HTML (abre no navegador, com veredito + tabela de
+    /// arquivos com hash). Cai pro .txt e depois pro .json em manifesto antigo sem HTML.
     func openReport(_ outcome: OffloadOutcome) {
         guard let jsonPath = outcome.manifestPaths.first else { return }
-        let txt = URL(fileURLWithPath: jsonPath).deletingPathExtension().appendingPathExtension("txt")
-        let target = FileManager.default.fileExists(atPath: txt.path) ? txt : URL(fileURLWithPath: jsonPath)
+        let base = URL(fileURLWithPath: jsonPath).deletingPathExtension()
+        let html = base.appendingPathExtension("html")
+        let txt = base.appendingPathExtension("txt")
+        let fm = FileManager.default
+        let target = fm.fileExists(atPath: html.path) ? html
+                   : (fm.fileExists(atPath: txt.path) ? txt : URL(fileURLWithPath: jsonPath))
         NSWorkspace.shared.open(target)
     }
 
@@ -733,6 +757,19 @@ final class AppModel {
         offloadTask?.cancel()
     }
 
+    /// Volta à tela inicial depois que o usuário PAROU a cópia. Diferente de `reset()`: relê a prévia
+    /// (pra `isResume` virar true e o botão mostrar "Retomar") e PRESERVA o `backupURL` — zerar mudaria
+    /// a contagem de já-copiados numa retomada com 2 discos. Não passa pela tela de falha: o que foi
+    /// copiado está verificado e seguro, cancelar não é falha.
+    func returnToStartAfterStop() {
+        offloadTask?.cancel(); offloadTask = nil
+        isCancelling = false
+        state = .idle
+        cardEjected = false; ejectError = nil
+        offloadStartedAt = nil; lastElapsed = nil
+        refreshCardPreview()
+    }
+
     func reset() {
         offloadTask?.cancel(); offloadTask = nil   // não deixa um offload órfão rodando após reset
         isCancelling = false
@@ -740,5 +777,6 @@ final class AppModel {
         cardEjected = false; ejectError = nil
         offloadStartedAt = nil; lastElapsed = nil
         backupURL = nil; backupFreeBytes = nil; backupTotalBytes = nil
+        refreshCardPreview()   // relê os manifestos: se sobrou parcial, a volta já oferece Retomar
     }
 }

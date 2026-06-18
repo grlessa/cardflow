@@ -278,7 +278,7 @@
     .product img {
       width: 100%;
       height: auto;
-      aspect-ratio: 1814 / 1504;
+      aspect-ratio: 1520 / 1349;
       border-radius: 12px;
       box-shadow: var(--product-shadow);
     }
@@ -310,7 +310,7 @@
     /* ============ cartões utilitários (grid claro) ============ */
     .util-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 20px;
       margin-top: clamp(34px, 4vw, 48px);
       text-align: left;
@@ -412,6 +412,9 @@
     }
 
     /* ============ responsivo ============ */
+    @media (max-width: 1080px) {
+      .util-grid { grid-template-columns: repeat(2, 1fr); }
+    }
     @media (max-width: 833px) {
       .util-grid { grid-template-columns: 1fr; max-width: 440px; margin-inline: auto; }
       .steps { grid-template-columns: repeat(2, 1fr); }
@@ -469,7 +472,7 @@
     <section class="tile tile-light">
       <div class="wrap">
         <h1 data-i18n="hero.title">Copie o cartão. Confira. Só então formate.</h1>
-        <p class="lead" data-i18n="hero.lead">Descarrega o cartão, confere cada arquivo e só dá o sinal verde quando a cópia bateu.</p>
+        <p class="lead" data-i18n="hero.lead">Descarrega o cartão, organiza nas suas pastas, confere cada arquivo e só dá o sinal verde quando a cópia bateu.</p>
         <div class="cta-row">
           <a class="pill pill-solid" href="https://github.com/grlessa/cardflow/releases/latest/download/Cardflow.dmg">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -482,7 +485,7 @@
         <p class="note" data-i18n="hero.note">Baixa o DMG mais recente direto do GitHub, sem pedir cadastro.</p>
 
         <figure class="product">
-          <img src="assets/cardflow-app-screenshot.png" width="1814" height="1504" data-i18n-attr="alt:hero.shotAlt" alt="Tela do Cardflow: um cartão Sony A7IV detectado à esquerda, o disco de destino e o backup opcional à direita, e o botão Iniciar embaixo.">
+          <img src="assets/cardflow-app-screenshot.png" width="1520" height="1349" data-i18n-attr="alt:hero.shotAlt" alt="Tela do Cardflow: à esquerda um cartão Sony A7S III com 47 fotos e 8 vídeos detectados; à direita o disco de destino, o backup opcional e o modelo de pastas que o app vai montar; o botão Iniciar embaixo.">
         </figure>
       </div>
     </section>
@@ -509,6 +512,11 @@
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v5c0 4.5 3.2 8 8 10 4.8-2 8-5.5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
             <h3 data-i18n="offload.card1Title">Confere arquivo por arquivo</h3>
             <p data-i18n="offload.card1Body">Compara o hash da origem com o do destino. Ou bateu certinho, ou ele te avisa.</p>
+          </article>
+          <article class="util-card">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M8 13h8M8 16h5"/></svg></span>
+            <h3 data-i18n="offload.card4Title">Organiza do seu jeito</h3>
+            <p data-i18n="offload.card4Body">Cria as pastas por evento, data e tipo e renomeia os arquivos. Você desenha o modelo de pastas, ou usa o padrão.</p>
           </article>
           <article class="util-card">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="13" height="16" rx="2"/><path d="M8 4v16"/><rect x="16" y="8" width="5" height="12" rx="1.5"/></svg></span>
@@ -588,11 +596,11 @@
         "subnav.download": "Baixar",
         // hero
         "hero.title": "Copie o cartão. Confira. Só então formate.",
-        "hero.lead": "Descarrega o cartão, confere cada arquivo e só dá o sinal verde quando a cópia bateu.",
+        "hero.lead": "Descarrega o cartão, organiza nas suas pastas, confere cada arquivo e só dá o sinal verde quando a cópia bateu.",
         "hero.ctaDownload": "Baixar o Cardflow",
         "hero.ctaGithub": "Ver no GitHub",
         "hero.note": "Baixa o DMG mais recente direto do GitHub, sem pedir cadastro.",
-        "hero.shotAlt": "Tela do Cardflow: um cartão Sony A7IV detectado à esquerda, o disco de destino e o backup opcional à direita, e o botão Iniciar embaixo.",
+        "hero.shotAlt": "Tela do Cardflow: à esquerda um cartão Sony A7S III com 47 fotos e 8 vídeos detectados; à direita o disco de destino, o backup opcional e o modelo de pastas que o app vai montar; o botão Iniciar embaixo.",
         // verificação
         "verify.eyebrow": "Verificação",
         "verify.title": "Não é copiar e torcer. É copiar e conferir.",
@@ -602,6 +610,8 @@
         "offload.title": "Tudo o que acontece numa descarga.",
         "offload.card1Title": "Confere arquivo por arquivo",
         "offload.card1Body": "Compara o hash da origem com o do destino. Ou bateu certinho, ou ele te avisa.",
+        "offload.card4Title": "Organiza do seu jeito",
+        "offload.card4Body": "Cria as pastas por evento, data e tipo e renomeia os arquivos. Você desenha o modelo de pastas, ou usa o padrão.",
         "offload.card2Title": "Dois discos e retomada",
         "offload.card2Body": "Destino principal e backup na mesma rodada. Se o disco cair no meio, ele continua de onde parou.",
         "offload.card3Title": "Cinema preservado",
@@ -642,11 +652,11 @@
         "subnav.download": "Download",
         // hero
         "hero.title": "Copy the card. Verify. Only then format.",
-        "hero.lead": "It offloads the card, verifies every file, and only gives the green light once the copy checks out.",
+        "hero.lead": "It offloads the card, organizes it into your folders, verifies every file, and only gives the green light once the copy checks out.",
         "hero.ctaDownload": "Download Cardflow",
         "hero.ctaGithub": "View on GitHub",
         "hero.note": "Grabs the latest DMG straight from GitHub. No sign-up.",
-        "hero.shotAlt": "The Cardflow window: a Sony A7IV card detected on the left, the destination drive and optional backup on the right, and the Start button below.",
+        "hero.shotAlt": "The Cardflow window: on the left a Sony A7S III card with 47 photos and 8 videos detected; on the right the destination drive, the optional backup and the folder model the app will build; the Start button below.",
         // verificação
         "verify.eyebrow": "Verification",
         "verify.title": "Not copy and hope. Copy and verify.",
@@ -656,6 +666,8 @@
         "offload.title": "Everything that happens in one offload.",
         "offload.card1Title": "Verifies every file",
         "offload.card1Body": "It compares the source hash against the destination. Either it matches exactly, or it lets you know.",
+        "offload.card4Title": "Organizes your way",
+        "offload.card4Body": "It builds folders by event, date, and type and renames files. You design the folder template, or use the default.",
         "offload.card2Title": "Two drives, with resume",
         "offload.card2Body": "Main destination and backup in the same run. If a drive drops mid-copy, it picks up where it left off.",
         "offload.card3Title": "Cinema, preserved",
@@ -696,11 +708,11 @@
         "subnav.download": "Descargar",
         // hero
         "hero.title": "Copia la tarjeta. Verifica. Solo entonces formatea.",
-        "hero.lead": "Descarga la tarjeta, verifica cada archivo y solo da luz verde cuando la copia coincide.",
+        "hero.lead": "Descarga la tarjeta, la organiza en tus carpetas, verifica cada archivo y solo da luz verde cuando la copia coincide.",
         "hero.ctaDownload": "Descargar Cardflow",
         "hero.ctaGithub": "Ver en GitHub",
         "hero.note": "Baja el DMG más reciente directo de GitHub, sin pedir registro.",
-        "hero.shotAlt": "La ventana de Cardflow: una tarjeta Sony A7IV detectada a la izquierda, el disco de destino y el backup opcional a la derecha, y el botón Iniciar abajo.",
+        "hero.shotAlt": "La ventana de Cardflow: a la izquierda una tarjeta Sony A7S III con 47 fotos y 8 vídeos detectados; a la derecha el disco de destino, el backup opcional y el modelo de carpetas que la app creará; el botón Iniciar abajo.",
         // verificação
         "verify.eyebrow": "Verificación",
         "verify.title": "No es copiar y rezar. Es copiar y verificar.",
@@ -710,6 +722,8 @@
         "offload.title": "Todo lo que pasa en una descarga.",
         "offload.card1Title": "Verifica archivo por archivo",
         "offload.card1Body": "Compara el hash del origen con el del destino. O coincide exacto, o te avisa.",
+        "offload.card4Title": "Organiza a tu manera",
+        "offload.card4Body": "Crea las carpetas por evento, fecha y tipo y renombra los archivos. Tú diseñas el modelo de carpetas, o usas el predeterminado.",
         "offload.card2Title": "Dos discos y reanudación",
         "offload.card2Body": "Destino principal y backup en la misma pasada. Si un disco se cae a mitad de camino, sigue donde quedó.",
         "offload.card3Title": "Cine preservado",

@@ -51,19 +51,107 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preset"
+            "value": "Modelo de pastas"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preset"
+            "value": "Folder template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preset"
+            "value": "Modelo de carpetas"
+          }
+        }
+      }
+    },
+    "main.preset.editButton": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar"
+          }
+        }
+      }
+    },
+    "main.preset.newButton": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevo"
+          }
+        }
+      }
+    },
+    "main.dest.customize": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personalizar modelo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Customize template"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personalizar modelo"
+          }
+        }
+      }
+    },
+    "main.dest.previewExample": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A data aqui é só um exemplo."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This date is just an example."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta fecha es solo un ejemplo."
           }
         }
       }
@@ -73,19 +161,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar este preset"
+            "value": "Editar este modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edit this preset"
+            "value": "Edit this template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar este preset"
+            "value": "Editar este modelo"
           }
         }
       }
@@ -95,19 +183,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Novo preset"
+            "value": "Novo modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New preset"
+            "value": "New template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nuevo preset"
+            "value": "Nuevo modelo"
           }
         }
       }
@@ -117,19 +205,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Importar preset…"
+            "value": "Importar modelo…"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Import preset…"
+            "value": "Import template…"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Importar preset…"
+            "value": "Importar modelo…"
           }
         }
       }
@@ -139,19 +227,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportar este preset…"
+            "value": "Exportar este modelo…"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Export this preset…"
+            "value": "Export this template…"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportar este preset…"
+            "value": "Exportar este modelo…"
           }
         }
       }
@@ -205,19 +293,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gerenciar presets"
+            "value": "Gerenciar modelos"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Manage presets"
+            "value": "Manage templates"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gestionar presets"
+            "value": "Gestionar modelos"
           }
         }
       }
@@ -227,19 +315,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Excluir o preset “%@”?"
+            "value": "Excluir o modelo “%@”?"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete the preset “%@”?"
+            "value": "Delete the template “%@”?"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Eliminar el preset “%@”?"
+            "value": "¿Eliminar el modelo “%@”?"
           }
         }
       }
@@ -271,19 +359,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não consegui importar esse preset."
+            "value": "Não consegui importar esse modelo."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn’t import this preset."
+            "value": "Couldn’t import this template."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo importar este preset."
+            "value": "No se pudo importar este modelo."
           }
         }
       }
@@ -398,6 +486,160 @@
         }
       }
     },
+    "main.panel.source": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FONTE"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SOURCE"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FUENTE"
+          }
+        }
+      }
+    },
+    "main.panel.drive": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DISCO"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DRIVE"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DISCO"
+          }
+        }
+      }
+    },
+    "main.source.recordedElsewhere": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravou em SSD ou HD?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded to an SSD or drive?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Grabaste en SSD o disco?"
+          }
+        }
+      }
+    },
+    "main.source.chooseAsSource": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher disco como fonte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a drive as source"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir disco como origen"
+          }
+        }
+      }
+    },
+    "main.source.type.card": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartão de câmera"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera card"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarjeta de cámara"
+          }
+        }
+      }
+    },
+    "main.source.type.drive": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSD ou HD externo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External SSD or drive"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSD o disco externo"
+          }
+        }
+      }
+    },
+    "main.source.type.recorder": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravador de áudio"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio recorder"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabadora de audio"
+          }
+        }
+      }
+    },
     "main.panel.destination": {
       "localizations": {
         "pt-BR": {
@@ -425,19 +667,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aguardando cartão"
+            "value": "Aguardando fonte"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for a card"
+            "value": "Waiting for a source"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esperando tarjeta"
+            "value": "Esperando fuente"
           }
         }
       }
@@ -1080,6 +1322,50 @@
         }
       }
     },
+    "main.stat.remainingLabel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faltam"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remaining"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faltan"
+          }
+        }
+      }
+    },
+    "main.stat.ofTotal %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "de %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "of %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "de %@"
+          }
+        }
+      }
+    },
     "main.stat.clip": {
       "localizations": {
         "pt-BR": {
@@ -1297,19 +1583,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "conecte o cartão da câmera"
+            "value": "Conecte o cartão ou SSD"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "plug in the camera card"
+            "value": "Connect the card or SSD"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "conecta la tarjeta de la cámara"
+            "value": "Conecta la tarjeta o el SSD"
           }
         }
       }
@@ -1561,19 +1847,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "VAI CRIAR"
+            "value": "VAI ORGANIZAR ASSIM"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "WILL CREATE"
+            "value": "WILL ORGANIZE AS"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "VA A CREAR"
+            "value": "VA A ORGANIZAR ASÍ"
           }
         }
       }
@@ -3309,19 +3595,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível salvar o preset. Revise a estrutura de pastas e o nome e tente de novo."
+            "value": "Não foi possível salvar o modelo. Revise a estrutura de pastas e o nome e tente de novo."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn’t save the preset. Check the folder structure and the name, then try again."
+            "value": "Couldn’t save the template. Check the folder structure and the name, then try again."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo guardar el preset. Revisa la estructura de carpetas y el nombre, e inténtalo de nuevo."
+            "value": "No se pudo guardar el modelo. Revisa la estructura de carpetas y el nombre, e inténtalo de nuevo."
           }
         }
       }
@@ -3455,19 +3741,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ %2$@ já %3$@ · %4$@ novos · faltam %5$@"
+            "value": "%1$@ %2$@ já %3$@ · %4$@ novos"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ %2$@ already %3$@ · %4$@ new · %5$@ left"
+            "value": "%1$@ %2$@ already %3$@ · %4$@ new"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ %2$@ ya %3$@ · %4$@ nuevos · faltan %5$@"
+            "value": "%1$@ %2$@ ya %3$@ · %4$@ nuevos"
           }
         }
       }
@@ -3477,19 +3763,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ já copiados · %2$@ novos · faltam %3$@"
+            "value": "%1$@ já copiados · %2$@ novos"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ already copied · %2$@ new · %3$@ left"
+            "value": "%1$@ already copied · %2$@ new"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ ya copiados · %2$@ nuevos · faltan %3$@"
+            "value": "%1$@ ya copiados · %2$@ nuevos"
           }
         }
       }
@@ -3521,19 +3807,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continua de onde parou. Copia só o que falta."
+            "value": "Continua de onde parou. Não formate o cartão ainda."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Picks up where it stopped. Copies only what’s missing."
+            "value": "Picks up where it stopped. Don’t format the card yet."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continúa donde se detuvo. Copia solo lo que falta."
+            "value": "Continúa donde se detuvo. No formatees la tarjeta todavía."
           }
         }
       }
@@ -4269,19 +4555,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Excluir preset"
+            "value": "Excluir modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete preset"
+            "value": "Delete template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eliminar preset"
+            "value": "Eliminar modelo"
           }
         }
       }
@@ -4291,19 +4577,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Excluir este preset?"
+            "value": "Excluir este modelo?"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete this preset?"
+            "value": "Delete this template?"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Eliminar este preset?"
+            "value": "¿Eliminar este modelo?"
           }
         }
       }
@@ -4335,19 +4621,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descartar as alterações deste preset?"
+            "value": "Descartar as alterações deste modelo?"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Discard the changes to this preset?"
+            "value": "Discard the changes to this template?"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Descartar los cambios de este preset?"
+            "value": "¿Descartar los cambios de este modelo?"
           }
         }
       }
@@ -4440,116 +4726,6 @@
         }
       }
     },
-    "preset.extensions.audio": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Áudio"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio"
-          }
-        }
-      }
-    },
-    "preset.extensions.hint": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quais tipos de arquivo o Cardflow identifica (padrão do sistema)."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Which file types Cardflow recognizes (system default)."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qué tipos de archivo reconoce Cardflow (configuración del sistema)."
-          }
-        }
-      }
-    },
-    "preset.extensions.photos": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Photos"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotos"
-          }
-        }
-      }
-    },
-    "preset.extensions.sidecars": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sidecars (XMP, THM…)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sidecars (XMP, THM…)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sidecars (XMP, THM…)"
-          }
-        }
-      }
-    },
-    "preset.extensions.videos": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vídeos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Videos"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Videos"
-          }
-        }
-      }
-    },
     "preset.field.copy": {
       "localizations": {
         "pt-BR": {
@@ -4577,19 +4753,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nome do preset"
+            "value": "Nome do modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preset name"
+            "value": "Template name"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nombre del preset"
+            "value": "Nombre del modelo"
           }
         }
       }
@@ -4599,19 +4775,41 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pasta-mãe padrão (evento)"
+            "value": "Nome base das pastas"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Default parent folder (event)"
+            "value": "Base folder name"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Carpeta principal por defecto (evento)"
+            "value": "Nombre base de las carpetas"
+          }
+        }
+      }
+    },
+    "preset.field.parentFolder.hint": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vira a pasta principal, dá nome a tudo. Dá pra trocar a cada cópia."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Becomes the main folder and names everything. You can change it on each copy."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Es la carpeta principal y nombra todo. Puedes cambiarlo en cada copia."
           }
         }
       }
@@ -4709,19 +4907,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Travado neste preset"
+            "value": "Travado neste modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Locked to this preset"
+            "value": "Locked to this template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fijado en este preset"
+            "value": "Fijado en este modelo"
           }
         }
       }
@@ -5034,28 +5232,6 @@
         }
       }
     },
-    "preset.section.recognizedExtensions": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Extensões reconhecidas"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recognized extensions"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Extensiones reconocidas"
-          }
-        }
-      }
-    },
     "preset.section.whatToCopy": {
       "localizations": {
         "pt-BR": {
@@ -5166,28 +5342,6 @@
         }
       }
     },
-    "preset.step.advanced": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avançado"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Advanced"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avanzado"
-          }
-        }
-      }
-    },
     "preset.step.basic": {
       "localizations": {
         "pt-BR": {
@@ -5259,19 +5413,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar preset"
+            "value": "Editar modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edit preset"
+            "value": "Edit template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar preset"
+            "value": "Editar modelo"
           }
         }
       }
@@ -5281,19 +5435,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Novo preset"
+            "value": "Novo modelo"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New preset"
+            "value": "New template"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nuevo preset"
+            "value": "Nuevo modelo"
           }
         }
       }
@@ -5325,19 +5479,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dê um nome ao preset."
+            "value": "Dê um nome ao modelo."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Give the preset a name."
+            "value": "Give the template a name."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dale un nombre al preset."
+            "value": "Dale un nombre al modelo."
           }
         }
       }
@@ -5413,19 +5567,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Já existe um preset com esse nome."
+            "value": "Já existe um modelo com esse nome."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A preset with this name already exists."
+            "value": "A template with this name already exists."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ya existe un preset con ese nombre."
+            "value": "Ya existe un modelo con ese nombre."
           }
         }
       }
@@ -5870,28 +6024,6 @@
         }
       }
     },
-    "pill.tags.none": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "nenhuma"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "none"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ninguna"
-          }
-        }
-      }
-    },
     "onboarding.welcome.title": {
       "localizations": {
         "pt-BR": {
@@ -5919,19 +6051,63 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copiar os cartões com segurança, em quatro passos"
+            "value": "Copiar e organizar os cartões com segurança, em cinco passos"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copy your cards safely, in four steps"
+            "value": "Copy and organize your cards safely, in five steps"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copia las tarjetas con seguridad, en cuatro pasos"
+            "value": "Copia y organiza las tarjetas con seguridad, en cinco pasos"
+          }
+        }
+      }
+    },
+    "onboarding.organize.title": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize do seu jeito"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize your way"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organiza a tu manera"
+          }
+        }
+      }
+    },
+    "onboarding.organize.text": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O app cria as pastas por evento, data e tipo. Você decide a estrutura no Modelo de pastas, ou usa o padrão."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app creates folders by event, date and type. You set the structure in the Folder template, or use the default."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La app crea las carpetas por evento, fecha y tipo. Tú defines la estructura en el Modelo de carpetas, o usas el predeterminado."
           }
         }
       }
@@ -7039,19 +7215,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Este preset tem uma estrutura de pastas inválida (tentou gravar fora da pasta de destino). Edite o preset e tente de novo."
+            "value": "Este modelo tem uma estrutura de pastas inválida (tentou gravar fora da pasta de destino). Edite o modelo e tente de novo."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This preset has an invalid folder structure (it tried to write outside the destination folder). Edit the preset and try again."
+            "value": "This template has an invalid folder structure (it tried to write outside the destination folder). Edit the template and try again."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Este preset tiene una estructura de carpetas inválida (intentó escribir fuera de la carpeta de destino). Edita el preset e inténtalo de nuevo."
+            "value": "Este modelo tiene una estructura de carpetas inválida (intentó escribir fuera de la carpeta de destino). Edita el modelo e inténtalo de nuevo."
           }
         }
       }
@@ -7127,19 +7303,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O preset usa um campo desconhecido: “%@”. Revise a estrutura de pastas ou o padrão de nome."
+            "value": "O modelo usa um campo desconhecido: “%@”. Revise a estrutura de pastas ou o padrão de nome."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The preset uses an unknown field: “%@”. Review the folder structure or the naming pattern."
+            "value": "The template uses an unknown field: “%@”. Review the folder structure or the naming pattern."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El preset usa un campo desconocido: “%@”. Revisa la estructura de carpetas o el patrón de nombre."
+            "value": "El modelo usa un campo desconocido: “%@”. Revisa la estructura de carpetas o el patrón de nombre."
           }
         }
       }
@@ -7149,19 +7325,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O preset usa um modificador desconhecido: “%@”."
+            "value": "O modelo usa um modificador desconhecido: “%@”."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The preset uses an unknown modifier: “%@”."
+            "value": "The template uses an unknown modifier: “%@”."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El preset usa un modificador desconocido: “%@”."
+            "value": "El modelo usa un modificador desconocido: “%@”."
           }
         }
       }
@@ -7171,19 +7347,19 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A estrutura de pastas do preset é inválida — ela não pode sair da pasta de destino."
+            "value": "A estrutura de pastas do modelo é inválida — ela não pode sair da pasta de destino."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The preset’s folder structure is invalid — it can’t leave the destination folder."
+            "value": "The template’s folder structure is invalid — it can’t leave the destination folder."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La estructura de carpetas del preset es inválida: no puede salir de la carpeta de destino."
+            "value": "La estructura de carpetas del modelo es inválida: no puede salir de la carpeta de destino."
           }
         }
       }

@@ -56,7 +56,6 @@ struct PresetEditorView: View {
         switch model.step {
         case .basico: basico
         case .nomeacao: nomeacao
-        case .avancado: avancado
         }
     }
 
@@ -66,6 +65,9 @@ struct PresetEditorView: View {
             secao("preset.section.identity") {
                 campo("preset.field.name") { TextField("preset.placeholder.name", text: $model.draft.name) }
                 campo("preset.field.parentFolder") { TextField("preset.placeholder.parentFolder", text: $model.draft.evento) }
+                Text("preset.field.parentFolder.hint")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             secao("preset.section.whatToCopy") {
                 Picker("", selection: $model.draft.media.mode) {
@@ -83,10 +85,16 @@ struct PresetEditorView: View {
                     }
                 }
             }
+            secao("preset.section.options") {
+                Toggle("preset.options.copySidecars", isOn: Binding(
+                    get: { model.draft.copySidecars == .aside },
+                    set: { model.draft.copySidecars = $0 ? .aside : .skip }
+                ))
+            }
         }
     }
 
-    // 2. Nomeação (o coração)
+    // 2. Nomeação (o coração) — pastas, nome do arquivo e campos personalizados (usados como tokens).
     private var nomeacao: some View {
         VStack(alignment: .leading, spacing: 16) {
             secao("preset.section.folders") {
@@ -104,36 +112,10 @@ struct PresetEditorView: View {
                     Text("preset.rename.keepOriginal").font(.callout).foregroundStyle(.secondary)
                 }
             }
-        }
-    }
-
-    // 3. Avançado
-    private var avancado: some View {
-        VStack(alignment: .leading, spacing: 16) {
             secao("preset.section.customFields") {
                 Text("preset.customFields.hint").font(.caption).foregroundStyle(.secondary)
                 sessionFieldsEditor
             }
-            secao("preset.section.options") {
-                Toggle("preset.options.copySidecars", isOn: Binding(
-                    get: { model.draft.copySidecars == .aside },
-                    set: { model.draft.copySidecars = $0 ? .aside : .skip }
-                ))
-            }
-            secao("preset.section.recognizedExtensions") {
-                Text("preset.extensions.hint").font(.caption).foregroundStyle(.secondary)
-                extLinha("preset.extensions.photos", model.draft.photoExtensions)
-                extLinha("preset.extensions.videos", model.draft.videoExtensions)
-                extLinha("preset.extensions.audio", model.draft.audioExtensions)
-                extLinha("preset.extensions.sidecars", model.draft.sidecarExtensions)
-            }
-        }
-    }
-
-    private func extLinha(_ titulo: LocalizedStringKey, _ tags: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(titulo).font(.caption).foregroundStyle(.secondary)
-            TagListView(tags: tags)
         }
     }
 
@@ -225,7 +207,7 @@ struct PresetEditorView: View {
             if model.step != .basico {
                 Button("preset.button.back") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue - 1)! }
             }
-            if model.step != .avancado {
+            if model.step != .nomeacao {
                 Button("preset.button.next") { model.step = PresetEditorModel.Step(rawValue: model.step.rawValue + 1)! }
                     .keyboardShortcut(.defaultAction)
             } else {
