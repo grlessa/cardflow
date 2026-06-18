@@ -3,22 +3,23 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>0.2.3</title>
-      <sparkle:version>286</sparkle:version>
-      <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
+      <title>0.3.0</title>
+      <sparkle:version>289</sparkle:version>
+      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Thu, 18 Jun 2026 02:12:47 +0000</pubDate>
-      <description><![CDATA[<h2>Cardflow 0.2.3</h2>
-<p>Esta versão adiciona o filtro temporário por data de captura no cartão.</p>
+      <pubDate>Thu, 18 Jun 2026 17:44:25 +0000</pubDate>
+      <description><![CDATA[<h2>Cardflow 0.3.0</h2>
+<p>Esta versão deixa a descarga mais clara do início ao fim e coloca o modelo de pastas em primeiro plano.</p>
 <ul>
-  <li>Novo controle de data de captura no cartão: todos os arquivos, hoje, um dia específico ou intervalo.</li>
-  <li>O filtro fica claro na interface e não é salvo no preset.</li>
-  <li>O intervalo impede uma data final anterior à inicial.</li>
-  <li>Pacotes de cinema preservados continuam íntegros durante o filtro.</li>
-  <li>Ajustes visuais no seletor para facilitar uso em campo.</li>
+  <li>Retomar voltou: se você parar no meio e reconectar o cartão, o botão mostra "Retomar" e a cópia continua de onde parou, inclusive com nome de evento personalizado.</li>
+  <li>Foto, vídeo, áudio e arquivos auxiliares agora são reconhecidos pelo próprio app, com formatos de áudio que faltavam. Modelos antigos não interferem mais nisso.</li>
+  <li>Além do cartão, ele aceita SSD e pastas com cartões de cinema aninhados (RED, Blackmagic, P2) como origem, e deixa Time Machine e disco de rede de fora.</li>
+  <li>Editor de modelo de pastas redesenhado em duas abas, Básico e Nomeação, com uma explicação em cada campo e a pasta principal mais fácil de configurar.</li>
+  <li>Tela de cópia concluída com mais espaço, ícones alinhados e um relatório em HTML legível, que abre no navegador e mostra a verificação arquivo por arquivo.</li>
+  <li>A apresentação inicial e o site agora mostram o modelo de pastas, não só a cópia com verificação.</li>
 </ul>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.2.3/Cardflow.dmg" sparkle:edSignature="y1RO0gHJZgNVj47CLqR0jw6ikx3soLJM/KilE04M17BfAHhg5iHMq/Iou3yv1NVy+zXJPOEQT3KBUCFWOUDOBg==" length="5884663" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.3.0/Cardflow.dmg" sparkle:edSignature="b3XKWO0H7GrEo95v0Fw/C0A2XoDu/E3l4hWZd2Zjn2hJUpNl7GW4HUNvI/DrmHGYv58T8Ger2+iyaIxMJn35Aw==" length="5928619" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
