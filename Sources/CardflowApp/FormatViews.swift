@@ -77,26 +77,6 @@ struct FormatConfirmSheet: View {
     }
 }
 
-/// Interruptor "Formatar ao terminar" (vale pra sessão; cada cartão leva o valor da hora de copiar).
-struct AutoFormatToggle: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        if model.formatter.permission != .unavailable {
-            Toggle("format.auto.toggle", isOn: Binding(
-                get: { model.autoFormatThisSession },
-                set: { on in
-                    if on && !model.formattingAvailable { model.formatter.activate(); return }
-                    model.autoFormatThisSession = on
-                }))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .fixedSize()
-                .help("format.auto.help")
-        }
-    }
-}
-
 /// Estado da permissão + ação (onboarding e Ajustes).
 struct FormatActivationRow: View {
     @Environment(AppModel.self) private var model

@@ -11,14 +11,20 @@ extension AppModel {
         for v in srcs {
             if let existing = cards.first(where: { $0.id == v.id && Self.sameMedium($0.volume, v) }) {
                 next.append(existing)
+            } else if let owner = cards.first(where: { Self.ownsRemount($0, v) }), !next.contains(where: { $0 === owner }) {
+                // o volume que volta da formatação (mesmo disco físico) é o MESMO cartão, não um novo e vazio
+                next.append(owner)
             } else {
                 let c = CardSession(volume: v, mediaChoice: defaultMediaChoice)
                 c.defaultCamera = CameraMetadata.defaultName(avoiding: Set((cards + next).map(\.defaultCamera)))
                 c.camera = c.defaultCamera
                 next.append(c)
                 startScan(c)
+                startWatching(c)
             }
         }
+        // formatando: o cartão some do Mac por uns segundos (desmonta e remonta) sem ter "saído"
+        for c in cards where Self.isFormatInFlight(c) && !next.contains(where: { $0 === c }) { next.append(c) }
         let leaving = cards.filter { old in !next.contains { $0 === old } }
         let arrived = next.filter { new in !cards.contains { $0 === new } }
         cards = next
@@ -40,22 +46,71 @@ extension AppModel {
         return false
     }
 
+    /// Formatação em andamento, ou recém-terminada esperando o volume voltar.
+    private static func isFormatInFlight(_ c: CardSession) -> Bool {
+        switch c.formatState {
+        case .checking, .confirming, .formatting: return true
+        case .done: return !c.ejected && (c.formattedAt.map { Date().timeIntervalSince($0) < 30 } ?? false)
+        default: return false
+        }
+    }
+
+    /// Este cartão é dono do volume `v`? Durante e depois da formatação (até ejetar), o volume novo que
+    /// aparece no mesmo disco físico é ele mesmo.
+    private static func ownsRemount(_ c: CardSession, _ v: ExternalVolume) -> Bool {
+        guard let disk = c.volume.physicalDeviceID, disk == v.physicalDeviceID else { return false }
+        switch c.formatState {
+        case .checking, .confirming, .formatting: return true
+        case .done: return !c.ejected
+        default: return false
+        }
+    }
+
     private static func sameMedium(_ a: ExternalVolume, _ b: ExternalVolume) -> Bool {
         a.volumeUUID == b.volumeUUID && a.totalBytes == b.totalBytes
     }
 
-    /// O cartão saiu do Mac. Sai da fila sem erro; se estava selecionado e já tinha resultado, a seleção
-    /// passa pro item dele em Recentes (o resultado continua à vista, sem "Formatar" apontando pro nada).
+    /// O cartão saiu do Mac. Sai da fila sem erro. Se tinha terminado bem, deixa um resumo (CompletedCard)
+    /// que fica à vista no lugar dele: quem volta encontra "pronto, pode tirar" e não uma tela vazia.
     func cardDidLeave(_ card: CardSession) {
         card.scanTask?.cancel()
+        card.watcher?.stop(); card.watcher = nil
         queue.remove(card.id)
-        let wasSelected: Bool = { if case .card(let id)? = selection { return id == card.id }; return false }()
+        let wasSelected: Bool = {
+            switch selection {
+            case .card(let id)?: return id == card.id
+            case nil: return true   // sem escolha, o detalhe mostrava este cartão
+            default: return false
+            }
+        }()
+        reloadHistory()   // em segundo plano: Recentes ganha a cópia assim que a lista chega
+        if let done = completion(for: card) {
+            completed.insert(done, at: 0)
+            if completed.count > 6 { completed.removeLast(completed.count - 6) }
+            if wasSelected {
+                selection = .completed(done.id)
+                selectionByUser = true   // fica no resumo; cartão novo que chegar toma a vez
+            }
+            return
+        }
         guard wasSelected else { return }
-        reloadHistory()   // em segundo plano: o detalhe de Recentes aparece assim que a lista chega
-        if case .finished(let o) = card.phase, let id = Self.offloadId(fromManifestPaths: o.manifestPaths) {
-            selection = .recent(id)
-            selectionByUser = true   // fica no resultado; não volta sozinha pro primeiro cartão
-        } else {
+        selection = cards.first.map { .card($0.id) }
+    }
+
+    private func completion(for card: CardSession) -> CompletedCard? {
+        let ctx = card.offloadContext
+        let dests = ctx?.destinations ?? offloadDestinations
+        var paths: [String] = []
+        if case .finished = card.phase {} else if card.isAlreadyCopied, let c = ctx ?? currentOffloadContext(for: card) {
+            paths = manifestPaths(of: card, ctx: c)
+        }
+        return CompletedCard.make(from: card, destinations: dests, manifestPaths: paths)
+    }
+
+    /// Fecha o resumo de um cartão concluído.
+    func dismissCompleted(_ id: String) {
+        completed.removeAll { $0.id == id }
+        if case .completed(let sel)? = selection, sel == id {
             selection = cards.first.map { .card($0.id) }
         }
     }
@@ -64,6 +119,69 @@ extension AppModel {
         guard let p = paths.first, let data = FileManager.default.contents(atPath: p) else { return nil }
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
         return (try? dec.decode(Manifest.self, from: data))?.offloadId
+    }
+
+    // MARK: Mudanças no cartão conectado
+
+    /// Relê o cartão quando algo muda nele (FSEvents), pra a prévia nunca ficar velha.
+    func startWatching(_ card: CardSession) {
+        card.watcher = FolderWatcher(path: card.volume.url.path) { [weak self, weak card] in
+            guard let self, let card else { return }
+            self.rescan(card)
+        }
+    }
+
+    /// Dá pra reler agora? Não durante a leitura, a fila, a cópia ou a formatação (que troca o volume).
+    func canRescan(_ card: CardSession) -> Bool {
+        guard card.scanTask == nil, !card.isBusy, card.scanned != nil else { return false }
+        switch card.formatState {
+        case .checking, .confirming, .formatting, .done: return false
+        default: break
+        }
+        switch card.phase {
+        case .ready, .finished, .failed: return true
+        default: return false
+        }
+    }
+
+    func rescan(_ card: CardSession) {
+        guard canRescan(card) else { return }
+        let root = card.volume.url
+        card.scanTask = Task.detached { [weak self] in
+            let files = try? CardScanner(classifier: FileClassifier()).scan(cardRoot: root)
+            await MainActor.run {
+                card.scanTask = nil
+                guard let self, let files, self.cards.contains(where: { $0 === card }) else { return }
+                _ = self.applyRescan(card, files: files)
+            }
+        }
+    }
+
+    /// Aplica a releitura. Mudou alguma coisa: atualiza a lista e a prévia; um cartão que já tinha terminado
+    /// e ganhou ou perdeu arquivos volta a "pronto pra copiar" (o resultado anterior não vale mais pra ele).
+    @discardableResult
+    func applyRescan(_ card: CardSession, files: [MediaFile]) -> Bool {
+        func key(_ f: [MediaFile]) -> [String: Int64] { Dictionary(f.map { ($0.relPath, $0.size) }, uniquingKeysWith: { a, _ in a }) }
+        guard key(files) != key(card.scanned ?? []) else { return false }
+        card.scanned = files
+        switch card.phase {
+        case .finished, .failed:
+            card.phase = .ready
+            card.finishedAt = nil; card.startedAt = nil; card.lastElapsed = nil
+            card.formatState = .idle
+        default: break
+        }
+        autoDetectCamera(card)
+        recomputePreview(card)
+        return true
+    }
+
+    /// Ao voltar pro app: relê os cartões parados e recalcula as prévias (espaço livre dos discos muda por fora).
+    func refreshOnActivate() {
+        for c in cards {
+            recomputePreview(c)
+            if canRescan(c) { rescan(c) }
+        }
     }
 
     func startScan(_ card: CardSession) {

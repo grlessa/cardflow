@@ -11,6 +11,8 @@ struct DetailRouter: View {
             if let v = model.volume(url) { DestinationDetailView(volume: v) } else { EmptyStateView() }
         case .recent(let id)?:
             if let item = model.history.item(id) { RecentDetailView(item: item) } else { EmptyStateView() }
+        case .completed(let id)?:
+            if let item = model.completedCard(id: id) { CompletedCardView(item: item).id(id) } else { EmptyStateView() }
         default:
             if let card = model.selectedCard { CardDetailView(card: card).id(card.id) } else { EmptyStateView() }
         }
@@ -25,6 +27,28 @@ struct CardDetailView: View {
     @State private var showingIgnored = false
 
     var body: some View {
+        if let summary = liveSummary {
+            // terminou e ainda está conectado: o resumo das etapas (formatar e ejetar por fazer ou andando);
+            // os botões continuam na barra de baixo, no lugar de sempre
+            DetailScroll {
+                CompletionSummary(item: summary, live: true)
+                    .frame(maxWidth: 620)
+                    .frame(maxWidth: .infinity)
+                Color.clear.frame(height: 70)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) { ActionBar(card: card) }
+            .navigationTitle(card.volume.name)
+        } else {
+            copyView
+        }
+    }
+
+    private var liveSummary: CompletedCard? {
+        CompletedCard.make(from: card, destinations: card.offloadContext?.destinations ?? model.offloadDestinations,
+                           live: true, formattingAvailable: model.formattingAvailable)
+    }
+
+    private var copyView: some View {
         DetailScroll {
             CopyRouteView(card: card)
             alerts
@@ -37,6 +61,12 @@ struct CardDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     SectionTitle("camera.section")
                     CameraEntriesView(card: card)
+                }
+            }
+            if card.scanned != nil && !card.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionTitle("after.section")
+                    AfterCopyOptions(card: card)
                 }
             }
             DetailSection("detail.section.tree") {
@@ -58,7 +88,16 @@ struct CardDetailView: View {
     @ViewBuilder private var alerts: some View {
         if let title = card.resumeCardTitle, let detail = card.resumeCardDetail {
             Callout(symbol: card.isComplementalCopy ? "plus.circle.fill" : "arrow.clockwise.circle.fill",
-                    tint: .accentColor, title: title, detail: detail)
+                    tint: .accentColor, title: title, detail: detail) {
+                // a alternativa de retomar mora aqui, junto da explicação; a barra fica com um botão só
+                if card.showsVerifiedResumeOption {
+                    Button("main.resume.verifyAll") { model.enqueueCopy(card, fastResume: false) }
+                        .controlSize(.small)
+                        .help(String(localized: "main.resume.verifiedHelp"))
+                        .disabled(!model.canStart(card))
+                        .padding(.top, 4)
+                }
+            }
         }
         if let inc = card.preview?.lote?.anteriorIncompleto {
             Callout(symbol: "exclamationmark.octagon.fill", tint: .red,

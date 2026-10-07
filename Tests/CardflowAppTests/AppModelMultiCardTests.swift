@@ -78,7 +78,7 @@ import Foundation
         #expect(html.contains("A001") && html.contains("B002"))
     }
 
-    @Test func cartaoQueSaiDepoisDeCopiadoViraRecente() async throws {
+    @Test func cartaoQueSaiDepoisDeCopiadoViraConcluidoEEntraEmRecentes() async throws {
         let a = try cardDir("A001"), d = try destDir()
         let m = AppModel(formatter: FakeFormatter())
         m.watcher.volumes = [a, d]; m.reconcileVolumes()
@@ -89,8 +89,12 @@ import Foundation
         await waitUntil { if case .finished = card.phase { return true }; return false }
         m.watcher.volumes = [d]; m.reconcileVolumes()
         #expect(m.cards.isEmpty)
-        guard case .recent(let id)? = m.selection else { Issue.record("seleção não foi pra Recentes"); return }
-        await waitUntil { m.history.item(id) != nil }
-        #expect(m.history.item(id)?.title == "A001")
+        guard case .completed(let id)? = m.selection, let done = m.completedCard(id: id) else {
+            Issue.record("seleção não foi pro resumo de concluído"); return
+        }
+        #expect(done.name == "A001")
+        #expect(done.steps.map(\.kind).starts(with: [.copied, .verified]))
+        await waitUntil { !m.history.items.isEmpty }
+        #expect(m.history.items.first?.title == "A001")
     }
 }

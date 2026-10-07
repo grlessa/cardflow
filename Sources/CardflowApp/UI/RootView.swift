@@ -47,6 +47,10 @@ struct RootView: View {
         .onAppear {
             if !didOnboard { didOnboard = true; model.showOnboarding = true }
         }
+        // voltou pro app: relê os cartões e recalcula o espaço dos discos (rede de segurança do FSEvents)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshOnActivate()
+        }
     }
 }
 

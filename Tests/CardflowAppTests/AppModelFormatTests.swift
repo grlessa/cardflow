@@ -20,13 +20,29 @@ import CardFormatXPC
 }
 
 @MainActor @Suite struct AppModelFormatTests {
-    @Test func comFormatacaoAtivaNaoEjetaSozinho() {
-        let fake = FakeFormatter()
-        let m = AppModel(formatter: fake)
-        #expect(m.shouldAutoEject(canFormat: true) == false)
-        fake.permission = .notActivated
-        #expect(m.shouldAutoEject(canFormat: true) == true)
-        #expect(m.shouldAutoEject(canFormat: false) == false)
+    /// Formatar e ejetar ao terminar são duas opções independentes: cada combinação tem um fim claro.
+    @Test func depoisDeConferirCadaCombinacaoTemUmFim() {
+        func next(_ fmt: Bool, _ ej: Bool) -> AppModel.AfterCopy {
+            AppModel.afterCopy(safe: true, keptCameras: false, formatOn: fmt, formattingAvailable: true, ejectOn: ej)
+        }
+        #expect(next(true, true) == .format)    // formata; ejeta depois de formatar
+        #expect(next(true, false) == .format)   // formata; fica conectado
+        #expect(next(false, true) == .eject)
+        #expect(next(false, false) == .stay)    // os dois manuais: fica na tela com os botões
+    }
+
+    @Test func semFormatacaoAtivadaSoEjetaSeAOpcaoPedir() {
+        #expect(AppModel.afterCopy(safe: true, keptCameras: false, formatOn: true, formattingAvailable: false, ejectOn: true) == .eject)
+        #expect(AppModel.afterCopy(safe: true, keptCameras: false, formatOn: true, formattingAvailable: false, ejectOn: false) == .stay)
+    }
+
+    @Test func copiaComFalhaNuncaFormataNemEjeta() {
+        #expect(AppModel.afterCopy(safe: false, keptCameras: false, formatOn: true, formattingAvailable: true, ejectOn: true) == .stay)
+    }
+
+    @Test func cameraDeixadaDeForaEjetaMasNaoFormata() {
+        #expect(AppModel.afterCopy(safe: false, keptCameras: true, formatOn: true, formattingAvailable: true, ejectOn: true) == .eject)
+        #expect(AppModel.afterCopy(safe: false, keptCameras: true, formatOn: true, formattingAvailable: true, ejectOn: false) == .stay)
     }
 
     @Test func automaticoComecaDesligado() {

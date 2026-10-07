@@ -9,6 +9,7 @@ enum SidebarItem: Hashable {
     case card(String)          // CardSession.id (caminho do volume)
     case destination(URL)
     case recent(String)        // offloadId
+    case completed(String)     // CompletedCard.id (cartão que terminou e saiu do Mac)
 }
 
 /// Estado do PROJETO (modelo, destinos, nome, campos) e a coleção de cartões conectados. O estado de
@@ -76,6 +77,9 @@ final class AppModel {
         }
     }
     func card(id: String) -> CardSession? { cards.first { $0.id == id } }
+    /// Cartões que terminaram e saíram do Mac nesta sessão, o mais recente primeiro (resumo na tela).
+    var completed: [CompletedCard] = []
+    func completedCard(id: String) -> CompletedCard? { completed.first { $0.id == id } }
 
     @ObservationIgnored var batchCount = 0   // cartões na leva atual da fila (aviso "fila terminou")
     @ObservationIgnored lazy var queue = CopyQueue { [unowned self] id in await self.runOffload(cardID: id) }

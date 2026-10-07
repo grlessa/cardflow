@@ -67,8 +67,9 @@ extension AppModel {
         _ = ManifestStore().annotateCardFormatted(rec, manifestJSONPaths: manifestPaths(of: card, ctx: ctx),
                                                   locale: AppLocale.effective)
         card.formatState = .done(plan)
+        card.formattedAt = Date()
         reloadHistory()
-        Task { await eject(card) }
+        if ejectWhenDone { Task { await eject(card) } }   // a opção vale também depois de formatar
         Notifier.notify(title: String(localized: "format.notif.doneTitle"),
                         body: String(localized: "format.notif.doneBody \(ctx.cardName)"))
     }

@@ -41,7 +41,17 @@ extension AppModel {
     }
 
     /// Com a formatação ativa, o cartão fica conectado pra formatar (botão ou automático).
-    func shouldAutoEject(canFormat: Bool) -> Bool { canFormat && !formattingAvailable && ejectWhenDone }
+    /// O que acontece sozinho depois de conferir. Formatar e ejetar ao terminar são opções independentes:
+    /// formatar (só com tudo salvo) vem antes e, depois dele, ejeta se a opção pedir; sem nenhuma das duas,
+    /// o cartão fica na tela com os botões. Câmera deixada de fora: nunca formata, mas pode ejetar.
+    enum AfterCopy: Equatable { case format, eject, stay }
+
+    nonisolated static func afterCopy(safe: Bool, keptCameras: Bool, formatOn: Bool, formattingAvailable: Bool,
+                                      ejectOn: Bool) -> AfterCopy {
+        if safe && formatOn && formattingAvailable { return .format }
+        if (safe || keptCameras) && ejectOn { return .eject }
+        return .stay
+    }
 
     var ejectWhenDone: Bool { UserDefaults.standard.object(forKey: "cardflow.ejectWhenDone") as? Bool ?? true }
 
@@ -133,13 +143,15 @@ extension AppModel {
     private func finishOffload(_ card: CardSession, _ outcome: OffloadOutcome) {
         if let s = card.startedAt { card.lastElapsed = Date().timeIntervalSince(s) }
         card.phase = .finished(outcome)
+        card.finishedAt = Date()
         reloadHistory()
-        // decisão ÚNICA: só ejeta quando é seguro formatar. Com a formatação ativa, o cartão fica
-        // conectado: o botão Formatar (ou o automático) decide o que acontece.
-        if shouldAutoEject(canFormat: outcome.canSafelyFormatCard) {
-            Task { await eject(card) }
-        } else if outcome.canSafelyFormatCard && card.offloadContext?.formatWhenDone == true && formattingAvailable {
-            requestFormat(card, auto: true)
+        // decisão ÚNICA (afterCopy): formatar e ejetar ao terminar, cada um pela sua opção.
+        switch Self.afterCopy(safe: outcome.canSafelyFormatCard, keptCameras: outcome.copiedKeepingCameras,
+                              formatOn: card.offloadContext?.formatWhenDone == true,
+                              formattingAvailable: formattingAvailable, ejectOn: ejectWhenDone) {
+        case .format: requestFormat(card, auto: true)   // ejeta depois de formatar, se a opção pedir
+        case .eject: Task { await eject(card) }
+        case .stay: break
         }
         notifyFinished(outcome, cardName: card.volume.name)
         if Preferences.opensReportWhenDone, outcome.canSafelyFormatCard || outcome.copiedKeepingCameras || !outcome.failures.isEmpty {
@@ -175,7 +187,7 @@ extension AppModel {
         if let scan = card.scanTask { scan.cancel(); await scan.value }
         do {
             try NSWorkspace.shared.unmountAndEjectDevice(at: card.volume.url)
-            card.ejected = true; card.ejectError = nil
+            card.ejected = true; card.ejectError = nil; card.ejectedAt = Date()
         } catch {
             card.ejected = false; card.ejectError = error.localizedDescription
         }

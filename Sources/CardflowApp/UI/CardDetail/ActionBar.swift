@@ -140,13 +140,6 @@ struct ActionBar: View {
             } else if card.isEmpty {
                 ejectButton
             } else {
-                AutoFormatToggle()
-                    .disabled(!card.excludedCameras.isEmpty)   // câmera de fora: formatar fica travado
-                if card.showsVerifiedResumeOption {
-                    Button("main.resume.verifyAll") { model.enqueueCopy(card, fastResume: false) }
-                        .help(String(localized: "main.resume.verifiedHelp"))
-                        .disabled(!model.canStart(card))
-                }
                 Button { model.enqueueCopy(card) } label: {
                     Text(card.isResume ? "action.resume" : "action.copy").frame(minWidth: 130)
                 }
@@ -197,10 +190,22 @@ struct ActionBar: View {
             return String(localized: "main.dest.noSpace")
         }
         if model.internalPermissionDenied { return String(localized: "main.dest.permissionDenied") }
-        if let h = card.resumeActionHint { return h }
+        if let h = card.resumeActionHint { return h + afterSentence }
         let dests = model.offloadDestinations.compactMap { model.volume($0)?.name }
         guard !dests.isEmpty else { return nil }
-        return String(localized: "action.ready.to \(ListFormatter.localizedString(byJoining: dests))")
+        return String(localized: "action.ready.to \(ListFormatter.localizedString(byJoining: dests))") + afterSentence
+    }
+
+    /// O que acontece no fim, numa frase, logo ao lado do destino ("No fim, formata e ejeta o cartão.").
+    private var afterSentence: String {
+        let format = model.autoFormatThisSession && model.formattingAvailable && card.excludedCameras.isEmpty
+        let eject = UserDefaults.standard.object(forKey: "cardflow.ejectWhenDone") as? Bool ?? true
+        switch (format, eject) {
+        case (true, true): return " " + String(localized: "after.summary.both")
+        case (true, false): return " " + String(localized: "after.summary.format")
+        case (false, true): return " " + String(localized: "after.summary.eject")
+        case (false, false): return ""
+        }
     }
 
     // MARK: Copiando

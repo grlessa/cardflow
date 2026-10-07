@@ -10,7 +10,7 @@ struct SidebarView: View {
         @Bindable var model = model
         List(selection: Binding(get: { model.selection }, set: { model.selection = $0; model.selectionByUser = true })) {
             Section("sidebar.cards") {
-                if model.cards.isEmpty {
+                if model.cards.isEmpty && model.completed.isEmpty {
                     Text("sidebar.cards.none")
                         .foregroundStyle(.secondary)
                         .selectionDisabled()
@@ -19,6 +19,11 @@ struct SidebarView: View {
                     CardRow(card: card)
                         .tag(SidebarItem.card(card.id))
                         .contextMenu { CardContextMenu(card: card) }
+                }
+                ForEach(model.completed) { item in
+                    CompletedRow(item: item)
+                        .tag(SidebarItem.completed(item.id))
+                        .contextMenu { Button("completed.close") { model.dismissCompleted(item.id) } }
                 }
             }
             Section("sidebar.destinations") {

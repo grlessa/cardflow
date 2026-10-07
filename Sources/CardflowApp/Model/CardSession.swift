@@ -47,6 +47,10 @@ final class CardSession: Identifiable {
     var startedAt: Date?
     var lastElapsed: TimeInterval?
     var ejected = false
+    /// Horário de cada etapa, pro resumo de conclusão (CompletedCard).
+    var finishedAt: Date?
+    var formattedAt: Date?
+    var ejectedAt: Date?
     var ejectError: String?
     var isCancelling = false
     /// Cópia/fila ou formatação em andamento: o cartão não pode ser trocado de papel nem ejetado.
@@ -58,6 +62,8 @@ final class CardSession: Identifiable {
     }
 
     @ObservationIgnored var scanTask: Task<Void, Never>?
+    /// Acompanha mudanças no cartão conectado (arquivo novo, apagado) pra reler a lista sozinho.
+    @ObservationIgnored var watcher: FolderWatcher?
     @ObservationIgnored var offloadTask: Task<Void, Never>?
     @ObservationIgnored var previewGeneration = 0
 

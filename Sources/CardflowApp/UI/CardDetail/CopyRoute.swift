@@ -98,22 +98,7 @@ struct CopyRouteView: View {
         model.destinations.filter { $0.url != model.destinationURL && !model.samePhysicalDisk($0.url, model.destinationURL) }
     }
 
-    /// Caminho até onde os arquivos caem: segue a árvore enquanto ela tem um galho só; na bifurcação,
-    /// junta os nomes ("Foto · Vídeo").
-    private var pathSegments: [String] {
-        var out: [String] = []
-        var level = card.tree
-        while !level.isEmpty {
-            if level.count == 1 {
-                out.append(level[0].name)
-                level = level[0].children ?? []
-            } else {
-                out.append(level.map(\.name).joined(separator: " · "))
-                break
-            }
-        }
-        return out
-    }
+    private var pathSegments: [String] { card.pathSegments }
 }
 
 // MARK: - Câmera
@@ -500,10 +485,11 @@ struct ProjectedCapacityBar: View {
 struct PathChips: View {
     let disk: ExternalVolume?
     let segments: [String]
+    var label: LocalizedStringKey = "route.goesTo"
 
     var body: some View {
         FlowLayout(spacing: 4, lineSpacing: 6) {
-            Text("route.goesTo").font(.subheadline).foregroundStyle(.secondary).padding(.trailing, 4)
+            Text(label).font(.subheadline).foregroundStyle(.secondary).padding(.trailing, 4)
             if let disk {
                 chip { MediaIllustration(kind: disk.mediaKind, size: 14, volumeURL: disk.url); Text(disk.name) }
                 separator
