@@ -3,23 +3,27 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>0.3.0</title>
-      <sparkle:version>289</sparkle:version>
-      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Thu, 18 Jun 2026 17:44:25 +0000</pubDate>
-      <description><![CDATA[<h2>Cardflow 0.3.0</h2>
-<p>Esta versão deixa a descarga mais clara do início ao fim e coloca o modelo de pastas em primeiro plano.</p>
+      <title>1.0.0</title>
+      <sparkle:version>373</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 07 Oct 2026 01:12:19 +0000</pubDate>
+      <description><![CDATA[<h2>Cardflow 1.0</h2>
+<p>A 1.0 formata o cartão dentro do próprio app, entende cartão com várias câmeras e deixa a tela bem mais visual. Agora o app precisa do macOS 26 ou mais novo.</p>
 <ul>
-  <li>Retomar voltou: se você parar no meio e reconectar o cartão, o botão mostra "Retomar" e a cópia continua de onde parou, inclusive com nome de evento personalizado.</li>
-  <li>Foto, vídeo, áudio e arquivos auxiliares agora são reconhecidos pelo próprio app, com formatos de áudio que faltavam. Modelos antigos não interferem mais nisso.</li>
-  <li>Além do cartão, ele aceita SSD e pastas com cartões de cinema aninhados (RED, Blackmagic, P2) como origem, e deixa Time Machine e disco de rede de fora.</li>
-  <li>Editor de modelo de pastas redesenhado em duas abas, Básico e Nomeação, com uma explicação em cada campo e a pasta principal mais fácil de configurar.</li>
-  <li>Tela de cópia concluída com mais espaço, ícones alinhados e um relatório em HTML legível, que abre no navegador e mostra a verificação arquivo por arquivo.</li>
-  <li>A apresentação inicial e o site agora mostram o modelo de pastas, não só a cópia com verificação.</li>
+  <li>Formatar o cartão: depois do verde, o botão Formatar cartão apaga o cartão no padrão oficial do SD. Ele só aparece quando tudo foi copiado e conferido.</li>
+  <li>Você vê para onde vai antes de copiar: De e Para lado a lado, quanto espaço sobra no disco depois da cópia e a pasta exata de cada arquivo. Para trocar de disco, é só clicar nele.</li>
+  <li>Pastas mais fáceis: cada nível da pasta tem formatos prontos que mostram o nome real (06 Out 2026, 2026-10-06, Outubro 2026), e dá para personalizar se quiser.</li>
+  <li>A câmera vem do arquivo, com nome curto: FX30, A7S III, S5II, R5. Arquivo sem câmera identificada vira CAM A, CAM B.</li>
+  <li>Cartão com várias câmeras: cada arquivo sai com o nome da sua câmera, e você pode deixar uma delas no cartão. Nesse caso o app não deixa formatar.</li>
+  <li>Gerenciar modelos: uma tela para renomear, duplicar, importar, exportar e apagar modelos de pastas.</li>
+  <li>Relatório novo, para mandar ao cliente, com os ícones dos discos e o que ficou no cartão.</li>
+  <li>A janela aguenta bem ficar pequena ou grande, e o botão Ajustes está à mão na barra lateral.</li>
+  <li>Pastas em português com acento: Vídeo e Áudio.</li>
+  <li>Botão Apoiar, para quem quiser ajudar o Cardflow a continuar gratuito.</li>
 </ul>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v0.3.0/Cardflow.dmg" sparkle:edSignature="b3XKWO0H7GrEo95v0Fw/C0A2XoDu/E3l4hWZd2Zjn2hJUpNl7GW4HUNvI/DrmHGYv58T8Ger2+iyaIxMJn35Aw==" length="5928619" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v1.0.0/Cardflow.dmg" sparkle:edSignature="CcvuysV1BjDYGfm+gpHMlOqk8VgRD57vT5XJvsCdcUmABYgyQ7avQm4I2zqYVZ1IWLlpm2fXDuHeeDDDtRXmCg==" length="6690669" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
