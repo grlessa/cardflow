@@ -25,6 +25,7 @@ enum FormatResultSection {
         case .planRejected: return String(localized: "format.fail.unsupported")
         case .deviceRejected: return String(localized: "format.fail.rejected")
         case .diskAccessDenied: return String(localized: "format.fail.diskAccess")
+        case .helperUnavailable: return String(localized: "format.fail.helperUnavailable")
         case .writeFailed, .verifyFailed, .fsckFailed, .internalError: return String(localized: "format.fail.incomplete")
         }
     }

@@ -19,6 +19,7 @@ public struct FormatRequest: Codable, Equatable, Sendable {
 public enum FormatFailure: String, Codable, Sendable {
     case busy, deviceRejected, cardChanged, unmountFailed, planRejected, writeFailed, verifyFailed, fsckFailed, internalError
     case diskAccessDenied   // o macOS negou o disco cru: o ajudante precisa de Acesso Total ao Disco
+    case helperUnavailable  // o ajudante não respondeu (nem depois de registrar de novo); o cartão não foi mexido
 }
 
 public struct FormatResponse: Codable, Equatable, Sendable {

@@ -22,7 +22,48 @@ final class FormatController: CardFormatting {
     private(set) var permission: FormatPermission = .notActivated
     @ObservationIgnored private let service = SMAppService.daemon(plistName: CardFormatXPC.plistName)
 
-    init() { refreshPermission() }
+    init() {
+        repairRegistrationAfterUpdate()
+        refreshPermission()
+    }
+
+    // MARK: Registro depois de atualizar
+
+    static let registeredBuildKey = "formatHelper.registeredBuild"
+    static var currentBuild: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "" }
+
+    /// Depois que o app é atualizado no disco (Sparkle, ou arrastando a versão nova), o macOS deixa o registro
+    /// do ajudante emperrado ("needs LWCR update", saída 78) e não se recupera sozinho. Registrar de novo,
+    /// uma vez por build, desemperra. Só pra quem já ativou: registrar sem pedido mostraria aviso do sistema.
+    nonisolated static func shouldReRegister(isEnabled: Bool, registeredBuild: String?, currentBuild: String) -> Bool {
+        isEnabled && registeredBuild != currentBuild
+    }
+
+    /// Só `register()` de novo não basta (o registro velho fica no launchd): desfaz e refaz.
+    private func repairRegistrationAfterUpdate() {
+        let registered = UserDefaults.standard.string(forKey: Self.registeredBuildKey)
+        guard Self.shouldReRegister(isEnabled: service.status == .enabled, registeredBuild: registered,
+                                    currentBuild: Self.currentBuild) else { return }
+        Task { await reRegister() }
+    }
+
+    /// Registrar logo depois de desfazer não pega (o macOS ainda está limpando o registro velho): tenta de
+    /// novo por alguns segundos. A aprovação dada antes continua valendo, sem pedir de novo.
+    private func reRegister() async {
+        do { try await service.unregister() } catch { NSLog("Cardflow: desfazer registro do ajudante: \(error)") }
+        for _ in 0..<8 {
+            try? await Task.sleep(for: .seconds(1))
+            register()
+            if service.status == .enabled { break }
+        }
+        refreshPermission()
+    }
+
+    /// Registra (ou registra de novo) e anota o build quando ficou ativo.
+    private func register() {
+        do { try service.register() } catch { NSLog("Cardflow: registro do ajudante: \(error)") }
+        if service.status == .enabled { UserDefaults.standard.set(Self.currentBuild, forKey: Self.registeredBuildKey) }
+    }
 
     func refreshPermission() {
         switch service.status {
@@ -51,7 +92,7 @@ final class FormatController: CardFormatting {
             openDiskAccessSettings(); revealHelperInFinder(); return
         }
         // register() lança quando falta aprovação; o status (lido logo depois) diz o que aconteceu.
-        do { try service.register() } catch { NSLog("Cardflow: registro do ajudante: \(error)") }
+        register()
         refreshPermission()
         if permission == .needsApproval { openSystemSettings() }
     }
@@ -85,6 +126,45 @@ final class FormatController: CardFormatting {
     }
 
     func format(_ request: FormatRequest, progress: @escaping @MainActor (FormatStep) -> Void) async -> FormatResponse {
+        // Sem ajudante de pé, a conexão XPC espera para sempre. Confere antes; se não responde, registra de
+        // novo (o launchd tenta subir a cada ~10 s) e, como último recurso, desfaz e refaz o registro.
+        if await !helperResponds() {
+            NSLog("Cardflow: ajudante sem resposta; registrando de novo")
+            await reRegister()
+            if await !helperResponds(within: 25) {
+                await reRegister()
+                if await !helperResponds(within: 25) {
+                    refreshPermission()
+                    return FormatResponse(failure: .helperUnavailable, detail: "o ajudante não respondeu", plan: nil)
+                }
+            }
+        }
+        return await sendFormat(request, progress: progress)
+    }
+
+    /// O ajudante responde ao ping dentro do prazo?
+    private func helperResponds(within seconds: Double = 6) async -> Bool {
+        await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            let conn = NSXPCConnection(machServiceName: CardFormatXPC.machServiceName, options: .privileged)
+            conn.remoteObjectInterface = CardFormatXPC.serviceInterface()
+            conn.setCodeSigningRequirement(CardFormatXPC.helperRequirement)
+            let once = OnceBox()
+            let finish: (Bool) -> Void = { ok in
+                guard once.claim() else { return }
+                conn.invalidate()
+                cont.resume(returning: ok)
+            }
+            conn.interruptionHandler = { finish(false) }
+            conn.invalidationHandler = { finish(false) }
+            conn.resume()
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { finish(false) }
+            guard let proxy = conn.remoteObjectProxyWithErrorHandler({ _ in finish(false) }) as? CardFormatServiceProtocol
+            else { finish(false); return }
+            proxy.ping { _ in finish(true) }
+        }
+    }
+
+    private func sendFormat(_ request: FormatRequest, progress: @escaping @MainActor (FormatStep) -> Void) async -> FormatResponse {
         await withCheckedContinuation { (cont: CheckedContinuation<FormatResponse, Never>) in
             let conn = NSXPCConnection(machServiceName: CardFormatXPC.machServiceName, options: .privileged)
             conn.remoteObjectInterface = CardFormatXPC.serviceInterface()

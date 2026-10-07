@@ -13085,6 +13085,28 @@
           }
         }
       }
+    },
+    "format.fail.helperUnavailable": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O ajudante de formatação não respondeu, e o cartão não foi mexido. Feche e abra o Cardflow e tente de novo."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The formatting helper didn't respond, and the card wasn't touched. Quit and reopen Cardflow, then try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El ayudante de formateo no respondió, y la tarjeta no se tocó. Cierra y vuelve a abrir Cardflow e inténtalo de nuevo."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
