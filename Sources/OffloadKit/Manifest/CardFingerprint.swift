@@ -9,4 +9,17 @@ public enum CardFingerprint {
         let total = files.reduce(Int64(0)) { $0 + $1.size }
         return String(format: "%016llx-%d-%lld", h, files.count, total)
     }
+
+    /// Identidade do volume de um cartão: o UUID do volume, quando a origem é a raiz de um volume montado.
+    public static func volumeIdentity(of root: URL) -> String? {
+        guard let v = try? root.resourceValues(forKeys: [.isVolumeKey, .volumeUUIDStringKey]), v.isVolume == true,
+              let uuid = v.volumeUUIDString, !uuid.isEmpty else { return nil }
+        return uuid
+    }
+
+    /// Identificador curto e estável de uma cópia (nome do registro, âncora no relatório). Hash do id
+    /// inteiro: o começo do id é o hash dos arquivos, igual em cartões gêmeos.
+    public static func shortID(_ offloadId: String) -> String {
+        String(String(format: "%016llx", XXHash64.hash(Data(offloadId.utf8))).prefix(8))
+    }
 }

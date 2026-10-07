@@ -314,19 +314,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cardflow — verified card copy (the OffloadKit engine on the command line)\n\nusage:\n  cardflow --card <path> --to <destination> [--to <destination2>] \\\n           [--media tudo|foto|video|audio] [--camera <name>] [--evento <name>] \\\n           [--set field=value] [--rename] [--dry-run] [--yes] [--preset <file.cfp>]"
+            "value" : "cardflow — verified card copy (the OffloadKit engine on the command line)\n\nusage:\n  cardflow --card <path> --to <destination> [--to <destination2>] \\\n           [--media tudo|foto|video|audio] [--camera <name>] [--projeto <name>] \\\n           [--set field=value] [--rename] [--dry-run] [--yes] [--preset <file.cfp>]"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cardflow — copia verificada de la tarjeta (el motor OffloadKit en la línea de comandos)\n\nuso:\n  cardflow --card <ruta> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nombre>] [--evento <nombre>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <archivo.cfp>]"
+            "value" : "cardflow — copia verificada de la tarjeta (el motor OffloadKit en la línea de comandos)\n\nuso:\n  cardflow --card <ruta> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nombre>] [--projeto <nombre>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <archivo.cfp>]"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)\n\nuso:\n  cardflow --card <caminho> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nome>] [--evento <nome>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <arquivo.cfp>]"
+            "value" : "cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)\n\nuso:\n  cardflow --card <caminho> --to <destino> [--to <destino2>] \\\n           [--media tudo|foto|video|audio] [--camera <nome>] [--projeto <nome>] \\\n           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset <arquivo.cfp>]"
           }
         }
       }

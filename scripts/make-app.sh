@@ -1,11 +1,21 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")/.."
-swift build -c release --product CardflowApp
+BUILD_LOG="$(mktemp)"
+swift build -c release --product CardflowApp 2>&1 | tee "$BUILD_LOG"
+# o swift build não falha quando o catálogo de textos (.xcstrings) não compila: o app sairia sem os
+# textos, mostrando as chaves. Trava aqui.
+if grep -q "xcstrings: error" "$BUILD_LOG"; then echo "❌ Localizable.xcstrings não compilou (veja acima)"; exit 1; fi
+swift build -c release --product CardflowFormatHelper
 APP="$(pwd)/Cardflow.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/CardflowApp "$APP/Contents/MacOS/Cardflow"
+# ajudante de formatação (daemon registrado pelo app via SMAppService): binário + plist do launchd no bundle
+/bin/cp -f .build/release/CardflowFormatHelper "$APP/Contents/MacOS/CardflowFormatHelper"
+mkdir -p "$APP/Contents/Library/LaunchDaemons"
+/bin/cp -f Resources/LaunchDaemons/com.cardflow.app.formathelper.plist "$APP/Contents/Library/LaunchDaemons/"
+plutil -lint "$APP/Contents/Library/LaunchDaemons/com.cardflow.app.formathelper.plist" >/dev/null
 # Sparkle.framework: embute no bundle e aponta o rpath do executável pro Frameworks.
 SPARKLE_FW="$(find .build/release -maxdepth 2 -name 'Sparkle.framework' -type d 2>/dev/null | head -1)"
 [ -n "$SPARKLE_FW" ] || SPARKLE_FW="$(find .build -name 'Sparkle.framework' -type d 2>/dev/null | head -1)"
@@ -46,7 +56,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>
-  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSRemovableVolumesUsageDescription</key><string>O Cardflow precisa ler os cartões de câmera para fazer a cópia.</string>
   <key>NSNetworkVolumesUsageDescription</key><string>O Cardflow precisa acessar discos de rede quando você usa um NAS como destino de backup.</string>
@@ -59,5 +69,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --deep --sign - "$APP" >/dev/null
+# ad hoc pro teste local, de dentro pra fora e SEM --deep no app: o --deep reassinaria o ajudante com um
+# identificador automático, e o requisito do XPC depende de "com.cardflow.app.formathelper".
+codesign --force --deep --sign - "$APP/Contents/Frameworks/Sparkle.framework" >/dev/null
+codesign --force --sign - --identifier com.cardflow.app.formathelper "$APP/Contents/MacOS/CardflowFormatHelper" >/dev/null
+codesign --force --sign - "$APP" >/dev/null
 echo "Pronto. Rode:  open \"$APP\""

@@ -25,16 +25,16 @@ import Foundation
 
     @Test func factoryDefaultIsPtBrByDate() throws {
         let p = Preset.factoryDefault
-        #expect(p.evento == "Sessão")
-        #expect(p.folderStructure == "{evento}/{dia} {mes_abrev} {ano}/{tipo}")
+        #expect(p.evento == Preset.factoryProjectName)
+        #expect(p.folderStructure == "{projeto}/{dia} {mes_abrev} {ano}/{tipo}")
         try PresetStore.validate(p)   // tokens {dia}{mes_abrev}{ano} são válidos
-        // render determinístico com captureDate fixo → "Sessão/<data pt-BR>/Video/clip.mov"
+        // render determinístico com captureDate fixo → "Projeto/<data pt-BR>/Vídeo/clip.mov"
         let file = MediaFile(sourceURL: URL(fileURLWithPath: "/c/clip.mov"), relPath: "clip.mov",
                              size: 1, type: .video, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
         let nb = NameBuilder(preset: p, timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
         let dest = try nb.relativeDestination(for: file, context: .init(camera: "Cam", counter: 1))
-        #expect(dest.hasPrefix("Sessão/"))
-        #expect(dest.contains("/Video/clip.mov"))
+        #expect(dest.hasPrefix(Preset.factoryProjectName + "/"))
+        #expect(dest.contains("/Vídeo/clip.mov"))
         #expect(dest.split(separator: "/")[1].contains("2026"))   // subpasta de data tem o ano
     }
 

@@ -26,7 +26,7 @@ PUBDATE="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 
 swift build -c release --product make-appcast
 .build/release/make-appcast \
-  --short-version "$VERSION" --build "$BUILD" --min-system 14.0 \
+  --short-version "$VERSION" --build "$BUILD" --min-system 26.0 \
   --url "$URL" --ed-signature "$ED" --length "$LEN" \
   --pubdate "$PUBDATE" --notes-file "$NOTES" > docs/appcast.xml
 

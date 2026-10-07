@@ -30,6 +30,8 @@ FW="$APP/Contents/Frameworks/Sparkle.framework"
 [ -e "$FW/Versions/B/Autoupdate" ]                 && "${SIGN[@]}" "$FW/Versions/B/Autoupdate"
 [ -e "$FW/Versions/B/Updater.app" ]                && "${SIGN[@]}" "$FW/Versions/B/Updater.app"
 "${SIGN[@]}" "$FW"
+# Ajudante de formatação (daemon via SMAppService), antes do app; identificador fixo (requisito XPC).
+"${SIGN[@]}" --identifier com.cardflow.app.formathelper "$APP/Contents/MacOS/CardflowFormatHelper"
 # Por fim o app inteiro, sem --deep (cada parte foi assinada acima individualmente).
 "${SIGN[@]}" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"

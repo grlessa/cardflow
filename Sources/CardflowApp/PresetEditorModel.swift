@@ -43,6 +43,16 @@ final class PresetEditorModel: Identifiable {
         otherNames.contains(trimmedName) ? String(localized: "preset.warning.duplicateName") : nil
     }
 
+    /// Nome do arquivo sem peça única por arquivo ({contador} ou {nome_original}): dois arquivos geram o
+    /// mesmo nome e o motor desempata acrescentando data e hora (_2026-06-22_172640), o que surpreende.
+    /// Aviso, não bloqueio: há quem queira mesmo só {camera} ou {evento}.
+    var nameMayRepeat: Bool {
+        draft.rename.enabled && !nameSegments.contains {
+            if case .token(let name, _) = $0 { return name == "contador" || name == "nome_original" }
+            return false
+        }
+    }
+
     /// "Novo": começa do preset de fábrica com id fresco e nome em branco.
     static func creating() -> PresetEditorModel {
         var p = Preset.factoryDefault

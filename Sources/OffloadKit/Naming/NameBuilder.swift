@@ -14,7 +14,7 @@ extension NamingError: LocalizedError {
         case .unknownModifier(let m):
             return "O preset usa um modificador desconhecido: “\(m)”."
         case .pathTraversal:
-            return "A estrutura de pastas do preset é inválida — ela não pode sair da pasta de destino."
+            return "A estrutura de pastas do modelo é inválida: ela sairia da pasta de destino."
         }
     }
 }
@@ -43,30 +43,37 @@ public struct NameBuilder {
     }
 
     public static let knownTokens: Set<String> = [
-        "evento", "tipo", "camera", "cartao", "lote", "nome_original", "ext", "pasta_origem", "contador",
+        "projeto", "evento", "tipo", "camera", "cartao", "lote", "nome_original", "ext", "pasta_origem", "contador",
         "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "dia_semana", "dia_semana_abrev",
         "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
     public static let knownModifiers: Set<String> = ["maiuscula", "minuscula"]
 
+    /// Nomes antigos que continuam valendo em modelos salvos, mas não aparecem mais no editor.
+    /// `{evento}` virou `{projeto}` na 1.0 (o mesmo valor: a pasta principal).
+    public static let tokenAliases: [String: String] = ["evento": "projeto"]
+
     /// Ordem de exibição dos tokens no picker do editor (mais comuns primeiro).
-    /// `Set(tokenOrder) == knownTokens` é garantido por teste — não deixar um token de fora.
+    /// `Set(tokenOrder) ∪ aliases == knownTokens` é garantido por teste — não deixar um token de fora.
     public static let tokenOrder: [String] = [
-        "evento", "tipo", "camera", "cartao", "lote",
+        "projeto", "tipo", "camera", "cartao", "lote",
         "nome_original", "ext", "contador", "pasta_origem",
         "ano", "ano2", "mes", "mes_abrev", "mes_nome", "dia", "dia_semana", "dia_semana_abrev",
         "horas", "minutos", "segundos", "data", "hora", "turno",
     ]
 
     // valor NATURAL (caixa normal) — pra o toggle Aa/AB/ab funcionar: Aa="Foto", AB="FOTO", ab="foto".
-    // Sem acento de propósito: vira nome de pasta, e nome de pasta tem que ser seguro.
+    // Português com acento, como os dias da semana (APFS e exFAT aceitam; forma composta NFC). Espanhol
+    // fica "Video"/"Audio", que vale em toda a América Latina.
     private func tipoFolder(for type: FileType) -> String {
         let lang = locale.language.languageCode?.identifier ?? "pt"
         switch (type, lang) {
         case (.photo, "en"): return "Photo"
         case (.photo, _):    return "Foto"
-        case (.video, _):    return "Video"
-        case (.audio, _):    return "Audio"
+        case (.video, "en"), (.video, "es"): return "Video"
+        case (.video, _):    return "Vídeo"
+        case (.audio, "en"), (.audio, "es"): return "Audio"
+        case (.audio, _):    return "Áudio"
         case (_, "en"):      return "Other"
         case (_, "es"):      return "Otros"
         default:             return "Outros"
@@ -137,7 +144,7 @@ public struct NameBuilder {
     private func baseValue(_ name: String, file: MediaFile, ctx: NamingContext) -> String? {
         let last = (file.relPath as NSString).lastPathComponent
         switch name {
-        case "evento": return preset.evento
+        case "projeto", "evento": return preset.evento
         case "tipo": return tipoFolder(for: file.type)
         case "camera": return ctx.camera
         case "cartao": return ctx.cardName

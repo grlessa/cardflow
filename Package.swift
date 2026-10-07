@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 // Os alvos usam o modo de linguagem .v5 (mesmo com tools do Swift 6). O motor de cópia tem
@@ -8,12 +8,13 @@ import PackageDescription
 let package = Package(
     name: "OffloadKit",
     defaultLocalization: "pt-BR",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v26)],
     products: [
         .library(name: "OffloadKit", targets: ["OffloadKit"]),
         .executable(name: "cardflow", targets: ["cardflow"]),
         .executable(name: "CardflowApp", targets: ["CardflowApp"]),
         .executable(name: "make-appcast", targets: ["make-appcast"]),
+        .executable(name: "CardflowFormatHelper", targets: ["CardflowFormatHelper"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
@@ -55,6 +56,8 @@ let package = Package(
             name: "CardflowApp",
             dependencies: [
                 "OffloadKit",
+                "CardFormatKit",
+                "CardFormatXPC",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             // os String Catalogs do app são compilados pro bundle pelo scripts/make-app.sh
@@ -65,6 +68,36 @@ let package = Package(
         .testTarget(
             name: "CardflowAppTests",
             dependencies: ["CardflowApp"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .target(
+            name: "CardFormatKit",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "CardFormatKitTests",
+            dependencies: ["CardFormatKit", "CardFormatXPC"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .target(
+            name: "CardFormatXPC",
+            dependencies: ["CardFormatKit"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .target(
+            name: "FormatHelperCore",
+            dependencies: ["CardFormatKit", "CardFormatXPC"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "FormatHelperCoreTests",
+            dependencies: ["FormatHelperCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .executableTarget(
+            name: "CardflowFormatHelper",
+            dependencies: ["FormatHelperCore"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(

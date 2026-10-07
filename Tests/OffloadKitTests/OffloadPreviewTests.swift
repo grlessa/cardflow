@@ -20,6 +20,18 @@ import Foundation
         #expect(p.shortfalls.isEmpty)
     }
 
+    @Test func previaSobreListaVarridaIgualAPreviaQueVarre() throws {
+        let card = try FakeCard(); defer { card.cleanup() }
+        let service = CopyService(preset: .sampleConferencia, spaceProvider: Enough(), timeZone: .current)
+        let dest = URL(fileURLWithPath: "/Volumes/SSD")
+        let scanned = try CardScanner(classifier: FileClassifier(preset: .sampleConferencia)).scan(cardRoot: card.root)
+        let a = try service.preview(cardRoot: card.root, chosenMedia: .both, destinations: [dest])
+        let b = try service.preview(scanned: scanned, cardRoot: card.root, chosenMedia: .both, destinations: [dest])
+        #expect(a == b)
+        let c = try service.preview(scanned: scanned, cardRoot: card.root, chosenMedia: .photo, destinations: [dest])
+        #expect(c.videos == 0 && c.photos == a.photos)
+    }
+
     @Test func previewReportsShortfall() throws {
         let card = try FakeCard(); defer { card.cleanup() }
         let service = CopyService(preset: .sampleConferencia, spaceProvider: Tiny(), timeZone: .current)

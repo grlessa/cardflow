@@ -43,12 +43,12 @@ import Foundation
 
         let service = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(),
                                   timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
-        // escolhendo Áudio: o .wav é copiado e verificado pra <evento>/Audio/
+        // escolhendo Áudio: o .wav é copiado e verificado pra <evento>/Áudio/
         let dest = work.appendingPathComponent("SSD")
         let comAudio = try service.run(cardRoot: card, chosenMedia: .audio, destinations: [dest], camera: "Cam01")
         #expect(comAudio.verifiedCount == 1)
         #expect(comAudio.failures.isEmpty)
-        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Offload/Audio/REC001.WAV").path))
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Offload/Áudio/REC001.WAV").path))
 
         // escolhendo Foto: o áudio NÃO entra (nem como não-reconhecido — é áudio, só não foi pedido)
         let dest2 = work.appendingPathComponent("SSD2")
@@ -396,15 +396,251 @@ import Foundation
 
         let c1 = try card("CARD1", "C0001")
         _ = try svc.run(cardRoot: c1, chosenMedia: .video, destinations: [dest], camera: "Cam")
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/Video/C0001.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/Vídeo/C0001.MP4").path))
 
         let c2 = try card("CARD2", "C0002")   // conteúdo disjunto (cartão formatado)
         _ = try svc.run(cardRoot: c2, chosenMedia: .video, destinations: [dest], camera: "Cam")
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/Video/C0002.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/Vídeo/C0002.MP4").path))
 
         // re-rodar o CARD1 (mesmo conteúdo do Lote 01) não cria Lote 03
         _ = try svc.run(cardRoot: c1, chosenMedia: .video, destinations: [dest], camera: "Cam")
         #expect(!fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 03").path))
+    }
+
+    // Cartão não formatado reusado pro lote seguinte (template com {lote}): o material NOVO entra num
+    // LOTE NOVO; o antigo (já num lote concluído) NÃO é recopiado pro lote novo — fica onde está.
+    @Test func cartaoNaoFormatadoComNovosVaiPraLoteNovoSemDuplicar() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("v1".utf8) + Data(count: 2000))
+        let dest = work.appendingPathComponent("DEST")
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}/{tipo}"
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        let o1 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o1.verifiedCount == 1)
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/Vídeo/C0001.MP4").path))
+
+        // esqueceu de formatar e gravou um clipe NOVO no mesmo cartão
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("v2-novo".utf8) + Data(count: 2000))
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+
+        #expect(o2.verifiedCount == 1)                                                                    // só o novo foi copiado
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))                                               // o antigo, reconhecido como salvo
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/Vídeo/C0002.MP4").path))   // novo no Lote 02
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/Vídeo/C0001.MP4").path))  // antigo NÃO duplicado no Lote 02
+        let videos = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
+        #expect(videos.count == 2)                                                                        // C0001 (Lote 01) + C0002 (Lote 02)
+    }
+
+    // Duas câmeras iguais (ou cartão formatado que reiniciou a numeração) gravando RAW sem compressão:
+    // MESMO caminho no cartão e MESMO tamanho, conteúdo diferente. O cartão B NÃO pode ser dado como
+    // "já salvo" só por caminho+tamanho — senão o app libera formatar um cartão que não foi copiado.
+    @Test func cartaoDiferenteComMesmoCaminhoETamanhoNaoEhPulado() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        func card(_ name: String, _ content: String, created: Date) throws -> URL {
+            let c = work.appendingPathComponent(name)
+            try fm.createDirectory(at: c.appendingPathComponent("DCIM/100MSDCF"), withIntermediateDirectories: true)
+            let f = c.appendingPathComponent("DCIM/100MSDCF/DSC00001.ARW")
+            fm.createFile(atPath: f.path, contents: Data(content.utf8) + Data(count: 4000))
+            try fm.setAttributes([.creationDate: created, .modificationDate: created], ofItemAtPath: f.path)
+            return c
+        }
+        let a = try card("CARD_A", "camera-A", created: Date(timeIntervalSince1970: 1_780_000_000))
+        let b = try card("CARD_B", "camera-B", created: Date(timeIntervalSince1970: 1_780_000_600))
+        for structure in ["{evento}/{tipo}", "{evento}/{lote}/{tipo}"] {
+            try? fm.removeItem(at: dest)
+            var preset = Preset.flatDefault
+            preset.evento = "EV"; preset.folderStructure = structure
+            let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+            let oa = try svc.run(cardRoot: a, chosenMedia: .photo, destinations: [dest], camera: "Cam")
+            #expect(oa.verifiedCount == 1)
+
+            let pb = try svc.preview(cardRoot: b, chosenMedia: .photo, destinations: [dest])
+            #expect(pb.alreadyPresent == 0, "prévia de \(structure) não pode dizer que o cartão B já está salvo")
+            let ob = try svc.run(cardRoot: b, chosenMedia: .photo, destinations: [dest], camera: "Cam")
+            #expect(ob.verifiedCount == 1, "o cartão B tem que ser copiado em \(structure)")
+            #expect(ob.skipped.isEmpty)
+            let arws = (fm.enumerator(at: dest, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+                .filter { $0.pathExtension.uppercased() == "ARW" }
+            #expect(arws.count == 2)
+            let conteudos = Set(arws.compactMap { try? Data(Data(contentsOf: $0).prefix(8)) })
+            #expect(conteudos == [Data("camera-A".utf8), Data("camera-B".utf8)])
+        }
+    }
+
+    // Manifesto de versão antiga (sem a data da origem no registro): o pulo por conteúdo entre lotes
+    // só confia depois de conferir o hash da origem. Mesmo arquivo → pula; conteúdo trocado → copia.
+    @Test func manifestoAntigoSemDataConfereHashAntesDePular() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        let clip = card.appendingPathComponent("DCIM/100/C0001.MP4")
+        fm.createFile(atPath: clip.path, contents: Data("v1".utf8) + Data(count: 2000))
+        let dest = work.appendingPathComponent("DEST")
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}/{tipo}"
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        #expect(try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam").verifiedCount == 1)
+        try stripSourceDates(fromManifestsIn: dest.appendingPathComponent("EV/.cardflow"))
+
+        // cartão não formatado + clipe novo: o antigo confere pelo hash e é pulado (sem duplicar)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("v2".utf8) + Data(count: 2000))
+        let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(o2.verifiedCount == 1)
+        #expect(o2.skipped.contains("DCIM/100/C0001.MP4"))
+        try stripSourceDates(fromManifestsIn: dest.appendingPathComponent("EV/.cardflow"))
+
+        // outro conteúdo com o mesmo caminho e tamanho: o hash não bate → copia
+        try (Data("vX".utf8) + Data(count: 2000)).write(to: clip)
+        let o3 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(!o3.skipped.contains("DCIM/100/C0001.MP4"))
+        #expect(o3.verifiedCount >= 1)
+    }
+
+    /// Simula manifesto gravado por versão antiga: remove `sourceDate` de todos os registros.
+    private func stripSourceDates(fromManifestsIn dir: URL) throws {
+        for name in try FileManager.default.contentsOfDirectory(atPath: dir.path) where name.hasSuffix(".json") {
+            let url = dir.appendingPathComponent(name)
+            guard var obj = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
+                  let files = obj["files"] as? [[String: Any]] else { continue }
+            obj["files"] = files.map { var f = $0; f.removeValue(forKey: "sourceDate"); return f }
+            try JSONSerialization.data(withJSONObject: obj).write(to: url)
+        }
+    }
+
+    // Contador contínuo entre lotes (opt-in): cartão formatado entre lotes — o lote 2 continua a
+    // numeração de onde o lote 1 parou (0003, 0004), em vez de reiniciar em 0001.
+    @Test func contadorContinuoEntreLotesQuandoLigado() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        func card(_ name: String, _ clips: [String]) throws -> URL {
+            let c = work.appendingPathComponent(name)
+            try fm.createDirectory(at: c.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+            for clip in clips {
+                fm.createFile(atPath: c.appendingPathComponent("DCIM/100/\(clip).MP4").path, contents: Data(clip.utf8) + Data(count: 500))
+            }
+            return c
+        }
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}"
+        preset.rename = .init(enabled: true, template: "{contador}", counterPadding: 4, counterContinuesAcrossLotes: true)
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        let c1 = try card("CARD1", ["C0001", "C0002"])
+        _ = try svc.run(cardRoot: c1, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/0001.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 01/0002.MP4").path))
+
+        let c2 = try card("CARD2", ["D0001", "D0002"])   // cartão formatado, conteúdo novo
+        _ = try svc.run(cardRoot: c2, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0003.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0004.MP4").path))
+    }
+
+    // Sem o opt-in, cada lote reinicia o contador (comportamento padrão preservado).
+    @Test func contadorReiniciaPorLoteQuandoDesligado() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        func card(_ name: String, _ clips: [String]) throws -> URL {
+            let c = work.appendingPathComponent(name)
+            try fm.createDirectory(at: c.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+            for clip in clips {
+                fm.createFile(atPath: c.appendingPathComponent("DCIM/100/\(clip).MP4").path, contents: Data(clip.utf8) + Data(count: 500))
+            }
+            return c
+        }
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}"
+        preset.rename = .init(enabled: true, template: "{contador}", counterPadding: 4)   // default: reinicia
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+
+        _ = try svc.run(cardRoot: try card("CARD1", ["C0001", "C0002"]), chosenMedia: .video, destinations: [dest], camera: "Cam")
+        _ = try svc.run(cardRoot: try card("CARD2", ["D0001", "D0002"]), chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0001.MP4").path))   // reiniciou
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0002.MP4").path))
+    }
+
+    // Cenário REAL do dono: cartão NÃO formatado reusado pro lote seguinte. Com o flag DESLIGADO, o
+    // material novo do Lote 02 reinicia em 0001 (não herda a posição dos arquivos antigos do Lote 01).
+    @Test func contadorNaoFormatadoReiniciaPorLoteFlagOff() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        let card = work.appendingPathComponent("CARD")
+        func add(_ clip: String) {
+            try? fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+            fm.createFile(atPath: card.appendingPathComponent("DCIM/100/\(clip).MP4").path, contents: Data(clip.utf8) + Data(count: 300))
+        }
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}"
+        preset.rename = .init(enabled: true, template: "{contador}", counterPadding: 4)   // flag OFF
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        add("C0001"); add("C0002")
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        add("C0003"); add("C0004")   // mesmo cartão, NÃO formatado → Lote 02
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0001.MP4").path))   // reiniciou
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0002.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0003.MP4").path))  // NÃO herdou 0003
+    }
+
+    // Mesmo cenário com o flag LIGADO: aí sim o Lote 02 continua a numeração (0003, 0004).
+    @Test func contadorNaoFormatadoContinuaFlagOn() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let dest = work.appendingPathComponent("DEST")
+        let card = work.appendingPathComponent("CARD")
+        func add(_ clip: String) {
+            try? fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+            fm.createFile(atPath: card.appendingPathComponent("DCIM/100/\(clip).MP4").path, contents: Data(clip.utf8) + Data(count: 300))
+        }
+        var preset = Preset.flatDefault
+        preset.evento = "EV"; preset.folderStructure = "{evento}/{lote}"
+        preset.rename = .init(enabled: true, template: "{contador}", counterPadding: 4, counterContinuesAcrossLotes: true)
+        let svc = CopyService(preset: preset, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        add("C0001"); add("C0002")
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        add("C0003"); add("C0004")
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0003.MP4").path))   // continuou
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0004.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("EV/Lote 02/0001.MP4").path))  // não reiniciou
+    }
+
+    // Multi-destino: um arquivo presente só em UM destino (removido do outro) é RE-copiado pro destino
+    // que perdeu, não pulado. O skip por presença (conteúdo) só pula quando está em TODOS os destinos.
+    @Test func arquivoPresenteSoEmUmDestinoEhRecopiadoNoOutro() throws {
+        let work = try tempDir(); defer { try? FileManager.default.removeItem(at: work) }
+        let fm = FileManager.default
+        let d1 = work.appendingPathComponent("D1")
+        let d2 = work.appendingPathComponent("D2")
+        let card = work.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card.appendingPathComponent("DCIM/100"), withIntermediateDirectories: true)
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0001.MP4").path, contents: Data("um".utf8) + Data(count: 200))
+        let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [d1, d2], camera: "Cam")
+        #expect(fm.fileExists(atPath: d1.appendingPathComponent("Offload/Vídeo/C0001.MP4").path))
+        #expect(fm.fileExists(atPath: d2.appendingPathComponent("Offload/Vídeo/C0001.MP4").path))
+
+        // remove só de D2 e grava um arquivo NOVO no cartão
+        try fm.removeItem(at: d2.appendingPathComponent("Offload/Vídeo/C0001.MP4"))
+        fm.createFile(atPath: card.appendingPathComponent("DCIM/100/C0002.MP4").path, contents: Data("dois".utf8) + Data(count: 200))
+        _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [d1, d2], camera: "Cam")
+
+        #expect(fm.fileExists(atPath: d2.appendingPathComponent("Offload/Vídeo/C0001.MP4").path))   // voltou pro D2
+        #expect(fm.fileExists(atPath: d1.appendingPathComponent("Offload/Vídeo/C0002.MP4").path))   // novo nos dois
+        #expect(fm.fileExists(atPath: d2.appendingPathComponent("Offload/Vídeo/C0002.MP4").path))
+        // sem duplicata em D1 (C0001 não recopiado lá)
+        #expect(filesRecursively(under: d1).filter { $0.uppercased().hasSuffix(".MP4") }.count == 2)
     }
 
     // Opt-in: estrutura SEM {lote} não separa e preview.lote é nil (comportamento de antes intacto).
@@ -421,7 +657,7 @@ import Foundation
         let pv = try svc.preview(cardRoot: card, chosenMedia: .video, destinations: [dest])
         #expect(pv.lote == nil)
         _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Video/C0001.MP4").path))   // sem "Lote NN"
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("EV/Vídeo/C0001.MP4").path))   // sem "Lote NN"
     }
 
     @Test func pipelineVerifiesManyFilesToTwoDestinations() throws {
@@ -440,7 +676,7 @@ import Foundation
         #expect(o.verifiedCount == 24)   // 12 vídeos × 2 destinos, todos conferidos byte a byte
         #expect(o.failures.isEmpty)
         for i in 0..<12 {
-            let rel = "Offload/Video/C\(String(format: "%04d", i)).MP4"
+            let rel = "Offload/Vídeo/C\(String(format: "%04d", i)).MP4"
             #expect(fm.fileExists(atPath: d1.appendingPathComponent(rel).path))
             #expect(fm.fileExists(atPath: d2.appendingPathComponent(rel).path))
         }
@@ -483,7 +719,7 @@ import Foundation
         #expect(o.verifiedCount == 0)                                   // nada conferido
         #expect(!o.failures.isEmpty)                                    // a falha É reportada → "não formate"
         #expect(o.failures.contains { $0.hasSuffix("C0001.MP4") })
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0001.MP4").path))  // corrompido removido
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/C0001.MP4").path))  // corrompido removido
     }
 
     /// Lista os NOMES de todos os arquivos (não-pastas) sob um diretório, recursivamente.
@@ -632,9 +868,9 @@ import Foundation
         let outcome = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest],
                                   camera: "Cam", capturedIn: capturedIn)
         #expect(outcome.verifiedCount == 1)
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/INSIDE.MP4").path))
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/BEFORE.MP4").path))
-        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/AFTER.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/INSIDE.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/BEFORE.MP4").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/AFTER.MP4").path))
     }
 
     // Retomada RÁPIDA: a 2ª rodada pula os arquivos que o manifesto anterior já conferiu, sem reler —
@@ -652,7 +888,7 @@ import Foundation
         #expect(o1.verifiedCount == 1)
 
         // adultera o destino com OUTRO conteúdo do MESMO tamanho, sem tocar no manifesto
-        let destFile = dest.appendingPathComponent("Offload/Video/C0001.MP4")
+        let destFile = dest.appendingPathComponent("Offload/Vídeo/C0001.MP4")
         try Data("conteudo-trocado!".utf8).write(to: destFile)   // mesmo nº de bytes
 
         let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam", fastResume: true)
@@ -683,8 +919,8 @@ import Foundation
         let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
         #expect(o2.verifiedCount == 2)   // SÓ os 2 novos foram copiados+conferidos
         #expect(Set(o2.skipped) == Set(["DCIM/100/C0000.MP4", "DCIM/100/C0001.MP4"]))   // os 2 antigos, pulados
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0002.MP4").path))
-        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Video/C0003.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/C0002.MP4").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("Offload/Vídeo/C0003.MP4").path))
         // nenhuma duplicata: exatamente 4 vídeos no destino
         let videos = filesRecursively(under: dest).filter { $0.uppercased().hasSuffix(".MP4") }
         #expect(videos.count == 4)
@@ -799,7 +1035,7 @@ import Foundation
         let dest = work.appendingPathComponent("SSD")
         let svc = CopyService(preset: .flatDefault, spaceProvider: AlwaysEnoughSpace(), timeZone: .current)
         _ = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam")
-        try Data("conteudo-trocado!".utf8).write(to: dest.appendingPathComponent("Offload/Video/C0001.MP4"))
+        try Data("conteudo-trocado!".utf8).write(to: dest.appendingPathComponent("Offload/Vídeo/C0001.MP4"))
 
         let o2 = try svc.run(cardRoot: card, chosenMedia: .video, destinations: [dest], camera: "Cam", fastResume: false)
         #expect(o2.verifiedCount == 1)   // reconferiu, viu diferente, gravou cópia (não confiou)

@@ -10,6 +10,16 @@ import Foundation
         #expect(decoded == preset)
     }
 
+    // O toggle "Continuar do lote anterior" (counterContinuesAcrossLotes) tem que SOBREVIVER ao salvar/
+    // carregar o preset — senão a opção do editor não faz efeito na próxima descarga.
+    @Test func counterContinuesAcrossLotesPersiste() throws {
+        var preset = Preset.sampleConferencia
+        preset.rename = .init(enabled: true, template: "{contador}", counterPadding: 4, counterContinuesAcrossLotes: true)
+        let decoded = try JSONDecoder().decode(Preset.self, from: try JSONEncoder().encode(preset))
+        #expect(decoded.rename.counterContinuesAcrossLotes == true)
+        #expect(decoded == preset)
+    }
+
     @Test func decodesFromSpecShapedJSON() throws {
         let json = """
         {

@@ -71,7 +71,7 @@ public enum ArgParser {
                 default: throw CLIError.badValue("--media \(v)")
                 }
             case "--camera": camera = try nextValue("--camera")
-            case "--evento": evento = try nextValue("--evento")
+            case "--projeto", "--evento": evento = try nextValue(args[i])
             case "--preset": presetPath = try nextValue("--preset")
             case "--set":
                 let kv = try nextValue("--set")

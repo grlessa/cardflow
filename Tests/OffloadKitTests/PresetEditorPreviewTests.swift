@@ -10,8 +10,9 @@ import Foundation
     /// O picker mostra UM chip por token conhecido — nem a mais, nem a menos.
     /// Se alguém adicionar um token no motor sem listar aqui, este teste pega.
     @Test func tokenOrderCobreTodosOsTokensConhecidos() {
-        #expect(Set(NameBuilder.tokenOrder) == NameBuilder.knownTokens)
-        #expect(NameBuilder.tokenOrder.count == NameBuilder.knownTokens.count)  // sem duplicatas
+        #expect(Set(NameBuilder.tokenOrder).union(NameBuilder.tokenAliases.keys) == NameBuilder.knownTokens)
+        #expect(NameBuilder.tokenOrder.count + NameBuilder.tokenAliases.count == NameBuilder.knownTokens.count)  // sem duplicatas
+        #expect(NameBuilder.tokenOrder.first == "projeto" && !NameBuilder.tokenOrder.contains("evento"))
     }
 
     @Test func modificadoresExpostos() {

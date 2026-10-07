@@ -23,7 +23,7 @@ public enum CardflowRunner {
             if let e = config.evento { preset.evento = e }   // só sobrescreve se --evento foi passado
         } else {
             preset = .factoryDefault
-            if let e = config.evento { preset.evento = e }    // sem preset: usa o de fábrica (evento "Sessão")
+            if let e = config.evento { preset.evento = e }    // sem preset: usa o de fábrica (projeto "Projeto")
         }
         if config.renameOverride == true { preset.rename.enabled = true }
         try PresetStore.validate(preset)                       // schema + tokens, antes de qualquer cópia

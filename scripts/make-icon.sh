@@ -15,7 +15,7 @@ xcrun actool "$SRC" \
   --compile "$OUT" \
   --app-icon cardflow \
   --platform macosx \
-  --minimum-deployment-target 14.0 \
+  --minimum-deployment-target 26.0 \
   --output-partial-info-plist "$OUT/partial.plist" \
   --errors --warnings >/dev/null
 

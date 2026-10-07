@@ -28,6 +28,20 @@ import Foundation
         return d
     }
 
+    // destino num caminho com /private (ex.: /private/tmp, /private/var/folders) não pode ser recusado
+    // como "fora da pasta de destino": o relatório e o manifesto são gravados normalmente.
+    @Test func destinoEmCaminhoPrivateCopiaERelata() throws {
+        let card = try FakeCard(); defer { card.cleanup() }
+        let plain = try tempDir(); defer { try? FileManager.default.removeItem(at: plain) }
+        let dest = URL(fileURLWithPath: "/private" + plain.resolvingSymlinksInPath().path.replacingOccurrences(of: "/private", with: ""))
+        let service = CopyService(preset: .sampleConferencia, spaceProvider: Enough(),
+                                  clock: { Date(timeIntervalSince1970: 1_780_000_000) },
+                                  activityKeeper: NoopActivityKeeper())
+        let outcome = try service.run(cardRoot: card.root, chosenMedia: .both, destinations: [dest], camera: "Cam01")
+        #expect(outcome.failures.isEmpty && outcome.manifestPaths.count == 1)
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Conferencia-Junho-2026/Relatório Cardflow.html").path))
+    }
+
     @Test func copiesSidecarAsideAndWritesManifest() throws {
         let card = try FakeCard(); defer { card.cleanup() }
         let dest = try tempDir(); defer { try? FileManager.default.removeItem(at: dest) }

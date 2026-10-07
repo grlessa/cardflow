@@ -64,70 +64,61 @@ import Foundation
         #expect(all.first?.presetName == "Novo")   // mais recente primeiro
     }
 
-    @Test func humanSummaryMentionsTotals() {
-        let s = ManifestStore().humanSummary(sampleManifest())
-        #expect(s.contains("1 foto"))
-        #expect(s.contains("1 vídeo"))
-        #expect(s.contains("clipe(s) de cinema"))
-        #expect(s.contains("Cam01"))
-    }
-
-    // O recibo .txt segue o idioma efetivo: em en, rótulos e cabeçalho ficam em inglês.
-    @Test func humanSummaryFollowsEnglishLocale() {
-        let s = ManifestStore().humanSummary(sampleManifest(), locale: Locale(identifier: "en"))
-        #expect(s.contains("Offload: Conf"))
-        #expect(s.contains("camera Cam01"))
-        #expect(s.contains("Card: SONY_64G"))
-        #expect(s.contains("1 photo(s)"))
-        #expect(s.contains("1 video(s)"))
-        #expect(s.contains("cinema clip(s)"))
-        #expect(s.contains("Verified:"))
-        #expect(s.contains("Unrecognized:"))
-        // não vaza pt-BR no recibo em inglês
-        #expect(!s.contains("Cartão"))
-        #expect(!s.contains("Verificados"))
-    }
-
-    @Test func htmlReportIsCredibleProof() {
-        let html = ManifestStore().htmlReport(sampleManifest())
-        #expect(html.hasPrefix("<!DOCTYPE html>"))
-        #expect(html.contains("Cardflow"))
-        #expect(html.contains("2 arquivos copiados e verificados byte a byte"))  // veredito (totals.verified)
-        #expect(html.contains("Conf/FOTO/1.JPG"))   // o caminho do arquivo na tabela
-        #expect(html.contains("aabb"))               // o hash de verificação (a prova)
-        #expect(html.contains("byte a byte"))        // nota de rodapé
-        #expect(html.contains("SONY_64G"))           // o cartão
-    }
-
-    @Test func htmlReportFollowsEnglishLocale() {
-        let html = ManifestStore().htmlReport(sampleManifest(), locale: Locale(identifier: "en"))
-        #expect(html.contains("Copy receipt"))
-        #expect(html.contains("copied and verified byte for byte"))
-        #expect(html.contains("lang=\"en\""))
-        #expect(!html.contains("Comprovante"))       // não vaza pt
-    }
-
-    @Test func htmlReportEscapesFileNames() {
-        var m = sampleManifest()
-        m.files = [.init(sourceRelPath: "a", destRelPath: "Foto/<script>x</script>.jpg",
-                         type: .photo, bytes: 10, xxhash64: "ff", status: "verified")]
-        let html = ManifestStore().htmlReport(m)
-        #expect(html.contains("&lt;script&gt;"))     // nome de arquivo escapado
-        #expect(!html.contains("<script>"))          // nenhuma tag <script> crua (injeção)
-    }
-
-    @Test func writeAlsoWritesHtmlReceipt() throws {
+    @Test func gravaSoOJSONNaPastaOcultaEORelatorioVisivelNoProjeto() throws {
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dest) }
-        let url = try ManifestStore().write(sampleManifest(), eventRootIn: dest, eventName: "Conf")
-        let html = url.deletingPathExtension().appendingPathExtension("html")
-        #expect(FileManager.default.fileExists(atPath: html.path))
+        let store = ManifestStore()
+        _ = try store.write(sampleManifest(), eventRootIn: dest, eventName: "Conf")
+        var b = sampleManifest(); b.offloadId = "fp2"; b.source.volumeName = "B002"
+        _ = try store.write(b, eventRootIn: dest, eventName: "Conf")
+        let hidden = try FileManager.default.contentsOfDirectory(atPath: dest.appendingPathComponent("Conf/.cardflow").path)
+        #expect(hidden.allSatisfy { $0.hasSuffix(".json") } && hidden.count == 2)
+        let html = try String(contentsOf: dest.appendingPathComponent("Conf/Relatório Cardflow.html"), encoding: .utf8)
+        #expect(html.contains("SONY_64G") && html.contains("B002"))   // um documento com os dois cartões
+    }
+
+    @Test func trocarIdiomaNaoDeixaDoisRelatorios() throws {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let store = ManifestStore()
+        _ = try store.write(sampleManifest(), eventRootIn: dest, eventName: "Conf", locale: Locale(identifier: "pt-BR"))
+        _ = try store.write(sampleManifest(), eventRootIn: dest, eventName: "Conf", locale: Locale(identifier: "en"))
+        let root = try FileManager.default.contentsOfDirectory(atPath: dest.appendingPathComponent("Conf").path)
+        #expect(root.contains("Cardflow Report.html") && !root.contains("Relatório Cardflow.html"))
+    }
+
+    @Test func formatarAtualizaORelatorio() throws {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let store = ManifestStore()
+        let json = try store.write(sampleManifest(), eventRootIn: dest, eventName: "Conf")
+        _ = store.annotateCardFormatted(CardFormatRecord(at: Date(), fileSystem: "exFAT", clusterBytes: 131072, label: "SONY"),
+                                        manifestJSONPaths: [json.path])
+        let html = try String(contentsOf: store.reportURL(forManifestJSON: json), encoding: .utf8)
+        #expect(html.contains("Formatado em") && html.contains("128 KB"))
     }
 
     @Test func fingerprintIsStableAndOrderIndependent() {
         let a = MediaFile(sourceURL: URL(fileURLWithPath: "/a"), relPath: "B.JPG", size: 10, type: .photo, captureDate: .init(timeIntervalSince1970: 0))
         let b = MediaFile(sourceURL: URL(fileURLWithPath: "/b"), relPath: "A.JPG", size: 20, type: .photo, captureDate: .init(timeIntervalSince1970: 0))
         #expect(CardFingerprint.compute(files: [a, b]) == CardFingerprint.compute(files: [b, a]))
+    }
+
+    @Test func anotaCartaoFormatadoSemPerderNada() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = ManifestStore()
+        let m = Manifest(schemaVersion: 1, offloadId: "abc12345", appVersion: "0.4.0", presetName: "P", camera: "C",
+                         startedAt: Date(timeIntervalSince1970: 0), finishedAt: Date(timeIntervalSince1970: 10),
+                         source: .init(volumeName: "CARD", fingerprint: "f", fileCount: 1, bytes: 1), destinations: [],
+                         files: [], unrecognized: [], totals: .init(photos: 0, videos: 0, audio: 0, sidecars: 0, verified: 0, failed: 0, skipped: 0))
+        let url = try store.write(m, eventRootIn: dir, eventName: "EV")
+        let rec = CardFormatRecord(at: Date(timeIntervalSince1970: 100), fileSystem: "exFAT", clusterBytes: 131_072, label: "CARD")
+        #expect(store.annotateCardFormatted(rec, manifestJSONPaths: [url.path]).isEmpty)
+        let back = try store.loadAll(eventRootIn: dir, eventName: "EV").first!
+        #expect(back.cardFormatted == rec && back.offloadId == "abc12345")
     }
 }

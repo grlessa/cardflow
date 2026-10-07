@@ -20,6 +20,11 @@ import Testing
         #expect(classifier.classify(fileName: fileName) == expected)
     }
 
+    @Test(arguments: ["._C0001.MP4", "._DSC00001.JPG", ".VolumeIcon.icns", ".DS_Store", ".hidden.wav"])
+    func ocultoEhSistema(_ name: String) {
+        #expect(FileClassifier().classify(fileName: name) == .junk)
+    }
+
     @Test func audioIsNativeMesmoComPresetSemAudio() {
         // sampleConferencia tem audioExtensions vazio; áudio comum ainda é reconhecido (nativo, como cinema).
         let c = FileClassifier(preset: .sampleConferencia)

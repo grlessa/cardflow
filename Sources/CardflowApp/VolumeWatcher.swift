@@ -31,7 +31,8 @@ final class VolumeWatcher {
                                   isRemovable: removable, isInternal: v.volumeIsInternal ?? false,
                                   totalBytes: v.volumeTotalCapacity.map { Int64($0) },
                                   physicalDeviceID: PhysicalDisk.wholeDiskBSD(for: url),
-                                  volumeUUID: v.allValues[.volumeUUIDStringKey] as? String)
+                                  volumeUUID: v.allValues[.volumeUUIDStringKey] as? String,
+                                  traits: PhysicalDisk.traits(for: url))
         }
     }
 }

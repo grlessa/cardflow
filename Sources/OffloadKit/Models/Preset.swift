@@ -17,9 +17,14 @@ public struct Preset: Codable, Equatable, Sendable {
         public var counterPadding: Int
         public var counterStart: Int
         public var counterStep: Int
-        public init(enabled: Bool, template: String, counterPadding: Int, counterStart: Int = 1, counterStep: Int = 1) {
+        /// {contador} continua a numeração do lote anterior (0042 → 0043) em vez de reiniciar a cada
+        /// lote. Opt-in: presets que já zeram por lote não mudam. Default false (decodeIfPresent).
+        public var counterContinuesAcrossLotes: Bool
+        public init(enabled: Bool, template: String, counterPadding: Int, counterStart: Int = 1, counterStep: Int = 1,
+                    counterContinuesAcrossLotes: Bool = false) {
             self.enabled = enabled; self.template = template; self.counterPadding = counterPadding
             self.counterStart = counterStart; self.counterStep = counterStep
+            self.counterContinuesAcrossLotes = counterContinuesAcrossLotes
         }
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -28,6 +33,7 @@ public struct Preset: Codable, Equatable, Sendable {
             counterPadding = try c.decode(Int.self, forKey: .counterPadding)
             counterStart = try c.decodeIfPresent(Int.self, forKey: .counterStart) ?? 1
             counterStep = try c.decodeIfPresent(Int.self, forKey: .counterStep) ?? 1
+            counterContinuesAcrossLotes = try c.decodeIfPresent(Bool.self, forKey: .counterContinuesAcrossLotes) ?? false
         }
     }
 
@@ -101,8 +107,8 @@ extension Preset {
         Preset(
             id: "abc", name: "Conferência Junho 2026", evento: "Conferencia-Junho-2026",
             media: .init(mode: .open, lockedTo: .both),
-            rename: .init(enabled: false, template: "{evento}_{camera}_{data}_{hora}_{nome_original}", counterPadding: 4),
-            destinationRoles: ["Cópia", "Backup"], folderStructure: "{evento}/{tipo}",
+            rename: .init(enabled: false, template: "{projeto}_{camera}_{data}_{hora}_{nome_original}", counterPadding: 4),
+            destinationRoles: ["Cópia", "Backup"], folderStructure: "{projeto}/{tipo}",
             photoExtensions: ["jpg", "jpeg", "heic", "heif", "arw", "cr2", "cr3", "raf", "rw2", "dng", "nef", "orf"],
             videoExtensions: ["mp4", "mov"], audioExtensions: [],
             sidecarExtensions: ["xml", "thm", "xmp", "bim", "cube"], copySidecars: .aside,

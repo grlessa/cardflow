@@ -11,10 +11,11 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     private var controller: SPUStandardUpdaterController!
 
-    override init() {
+    /// `startingUpdater: false` em teste/captura de tela: não toca a rede nem mostra alerta.
+    init(startingUpdater: Bool = true) {
         super.init()
         // controller criado depois do super.init pra poder passar self como delegate.
-        controller = SPUStandardUpdaterController(startingUpdater: true,
+        controller = SPUStandardUpdaterController(startingUpdater: startingUpdater,
                                                   updaterDelegate: self,
                                                   userDriverDelegate: nil)
         // a gente dirige a checagem (probe no launch); sem agendamento nem prompt de 1ª execução.

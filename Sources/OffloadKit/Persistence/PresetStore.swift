@@ -4,12 +4,12 @@ extension Preset {
     /// Preset de fábrica neutro, sempre disponível (usado quando nada foi configurado).
     public static var factoryDefault: Preset {
         Preset(
-            schemaVersion: 2, id: "factory-default", name: "Padrão", evento: "Sessão",
+            schemaVersion: 2, id: "factory-default", name: "Padrão", evento: factoryProjectName,
             media: .init(mode: .open, lockedTo: .both),
             rename: .init(enabled: false,
-                          template: "{evento}_{data}_{hora}_{nome_original}",   // Data/Hora consolidados (menos peças)
+                          template: "{projeto}_{data}_{hora}_{nome_original}",   // Data/Hora consolidados (menos peças)
                           counterPadding: 4),
-            destinationRoles: ["Cópia"], folderStructure: "{evento}/{dia} {mes_abrev} {ano}/{tipo}",
+            destinationRoles: ["Cópia"], folderStructure: "{projeto}/{dia} {mes_abrev} {ano}/{tipo}",
             photoExtensions: ["jpg", "jpeg", "heic", "heif", "hif", "arw", "cr2", "cr3", "crw", "raf",
                               "rw2", "rwl", "dng", "nef", "nrw", "orf", "gpr", "tif", "tiff", "insp"],
             videoExtensions: ["mp4", "mov", "mts", "m2ts", "avi", "insv", "360", "3gp"],
@@ -17,8 +17,22 @@ extension Preset {
             // sidecars desligados por padrão: a maioria não usa os XMLs de metadados e eles
             // inflavam a contagem (106 vídeos viravam 211 arquivos). Dá pra religar no editor.
             sidecarExtensions: ["xml", "thm", "xmp", "bim", "cube"], copySidecars: .skip,
-            dateFormat: "yyyy-MM-dd", sessionFields: []
+            // hora COM separador legível (17h26m40s), pra casar com a data já separada — o "172640"
+            // grudado surpreendia. Trocável no editor (clicar no token {hora}).
+            // 17h26: legível; o nome original ou o número garantem nome único
+            dateFormat: "yyyy-MM-dd", timeFormat: "HH'h'mm", sessionFields: []
         )
+    }
+
+    /// Nome do projeto do modelo de fábrica no idioma de quem usa (vira a pasta principal quando o campo
+    /// Projeto fica vazio): "Projeto", "Project", "Proyecto".
+    public static var factoryProjectName: String {
+        let lang = Locale.preferredLanguages.first.map { Locale(identifier: $0).language.languageCode?.identifier ?? "pt" } ?? "pt"
+        switch lang {
+        case "en": return "Project"
+        case "es": return "Proyecto"
+        default: return "Projeto"
+        }
     }
 
     /// Fixture neutro (evento "Offload", estrutura plana) — usado por testes que fixam caminho exato,
@@ -28,9 +42,9 @@ extension Preset {
             schemaVersion: 2, id: "flat-default", name: "Plano", evento: "Offload",
             media: .init(mode: .open, lockedTo: .both),
             rename: .init(enabled: false,
-                          template: "{evento}_{ano}{mes}{dia}_{horas}{minutos}{segundos}_{nome_original}",
+                          template: "{projeto}_{ano}{mes}{dia}_{horas}{minutos}{segundos}_{nome_original}",
                           counterPadding: 4),
-            destinationRoles: ["Cópia"], folderStructure: "{evento}/{tipo}",
+            destinationRoles: ["Cópia"], folderStructure: "{projeto}/{tipo}",
             photoExtensions: ["jpg", "jpeg", "heic", "heif", "hif", "arw", "cr2", "cr3", "raf",
                               "rw2", "rwl", "dng", "nef", "nrw", "orf", "gpr", "tif", "tiff"],
             videoExtensions: ["mp4", "mov", "mts", "m2ts", "avi"],

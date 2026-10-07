@@ -35,12 +35,12 @@ import Foundation
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dest) }
-        // sem --preset → preset de fábrica (evento "Sessão", organiza por data)
+        // sem --preset → preset de fábrica (projeto "Projeto", organiza por data)
         let cfg = try ArgParser.parse(["--card", card.root.path, "--to", dest.path, "--yes"])
         try CardflowRunner.run(cfg, input: { _ in nil }, output: { _ in })
-        // caminho tem data variável; confirma que caiu sob Sessão/.../Foto/ sem fixar a data.
+        // caminho tem data variável; confirma que caiu sob Projeto/.../Foto/ sem fixar a data.
         let all = (FileManager.default.enumerator(at: dest, includingPropertiesForKeys: nil)?
                        .allObjects as? [URL]) ?? []
-        #expect(all.contains { $0.path.contains("/Sessão/") && $0.path.contains("/Foto/") })
+        #expect(all.contains { $0.path.contains("/\(Preset.factoryProjectName)/") && $0.path.contains("/Foto/") })
     }
 }

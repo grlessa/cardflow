@@ -35,7 +35,7 @@
 
 usage:
   cardflow --card &lt;path&gt; --to &lt;destination&gt; [--to &lt;destination2&gt;] \
-           [--media tudo|foto|video|audio] [--camera &lt;name&gt;] [--evento &lt;name&gt;] \
+           [--media tudo|foto|video|audio] [--camera &lt;name&gt;] [--projeto &lt;name&gt;] \
            [--set field=value] [--rename] [--dry-run] [--yes] [--preset &lt;file.cfp&gt;]</string>
 	<key>report.outcome.cardAlreadyCopied</key>
 	<string>This card had already been copied (nothing new).</string>

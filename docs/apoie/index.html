@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apoie o Cardflow</title>
+  <meta name="description" content="O Cardflow é gratuito. Se ele te poupa trabalho, dá para apoiar com Pix.">
+  <link rel="icon" type="image/png" href="../assets/cardflow-icon.png">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="Apoie o Cardflow">
+  <meta property="og:description" content="O Cardflow é gratuito. Se ele te poupa trabalho, dá para apoiar.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://cardflow.lessafilms.com/apoie/">
+  <meta property="og:image" content="https://cardflow.lessafilms.com/assets/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #ffffff;
+      --parchment: #f5f5f7;
+      --ink: #1d1d1f;
+      --gray: #6e6e73;
+      --blue: #0a6fd5;
+      --blue-press: #0a5fb8;
+      --blue-bright: #4aa3ff;
+      --green: #1a9f6a;
+      --pink: #e0245e;
+      --hairline: #e0e0e0;
+      font-family: system-ui, -apple-system, "SF Pro Text", BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-synthesis: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--parchment); }
+    body { margin: 0; color: var(--ink); background: var(--parchment); font-size: 17px; line-height: 1.47; letter-spacing: -0.022em; text-wrap: pretty; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: inherit; }
+    .wrap { width: min(980px, calc(100% - 44px)); margin-inline: auto; }
+
+    .nav { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, 0.78); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    .nav .row { display: flex; align-items: center; gap: 18px; height: 52px; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 26px; height: 26px; }
+    .nav .right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .lang { display: inline-flex; border: 1px solid var(--hairline); border-radius: 99px; padding: 2px; background: #fff; }
+    .lang button { font: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0; border: 0; background: none; color: var(--gray); padding: 3px 9px; border-radius: 99px; cursor: pointer; }
+    .lang button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+    main { flex: 1; }
+    .intro { text-align: center; padding: 64px 0 40px; }
+    .intro .heart { width: 52px; height: 52px; color: #ff375f; margin: 0 auto 18px; display: block; }
+    h1 { font-size: clamp(36px, 5.4vw, 56px); line-height: 1.06; letter-spacing: -0.04em; margin: 0; font-weight: 700; }
+    .intro p { color: var(--gray); font-size: clamp(18px, 2.1vw, 21px); max-width: 40ch; margin: 16px auto 0; }
+
+    .pix { background: #fff; border-radius: 24px; padding: 32px; display: grid; grid-template-columns: 248px 1fr; gap: 36px; align-items: center; max-width: 860px; margin: 0 auto; }
+    .pix h2 { font-size: 30px; letter-spacing: -0.035em; margin: 0 0 8px; }
+    .pix p { color: var(--gray); margin: 0; }
+    .qr { width: 248px; padding: 10px; background: #fff; border: 1px solid var(--hairline); border-radius: 22px; }
+    .qr img { width: 100%; height: auto; display: block; }
+    @media (max-width: 720px) {
+      .pix { grid-template-columns: 1fr; gap: 24px; padding: 26px 22px; }
+      .qr { width: min(248px, 100%); margin: 0 auto; }
+    }
+    .key { margin-top: 18px; }
+    .key .label { display: block; font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 6px; }
+    .key code { display: block; font: 14px/1.3 ui-monospace, "SF Mono", Menlo, monospace; background: var(--parchment); border-radius: 10px; padding: 10px 12px; overflow-wrap: anywhere; letter-spacing: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-weight: 600; font-size: 16px; letter-spacing: -0.01em; border-radius: 99px; padding: 11px 20px; border: 0; cursor: pointer; text-decoration: none; transition: background .15s; }
+    .btn svg { width: 17px; height: 17px; }
+    .btn-solid { background: var(--blue); color: #fff; }
+    .btn-solid:hover { background: var(--blue-press); }
+    .btn-soft { background: var(--parchment); color: var(--ink); }
+    .btn-soft:hover { background: #e8e8ed; }
+    .btn.copied { background: var(--green); color: #fff; }
+    .hint { font-size: 14px; margin-top: 12px; }
+
+    .more { padding: 56px 0 72px; }
+    .more h2 { text-align: center; font-size: 28px; letter-spacing: -0.03em; margin: 0 0 24px; }
+    .tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .tip { background: #fff; border-radius: 18px; padding: 22px; display: grid; grid-template-columns: 24px 1fr; column-gap: 12px; align-content: start; }
+    .tip svg { width: 24px; height: 24px; color: var(--blue); grid-row: span 2; margin-top: 1px; }
+    .tip b { display: block; margin: 0 0 4px; font-size: 17px; }
+    .tip span { color: var(--gray); font-size: 15px; }
+    .tip a { color: var(--blue); text-decoration: none; }
+    .tip a:hover { text-decoration: underline; }
+    @media (max-width: 760px) { .tips { grid-template-columns: 1fr; } .intro { padding-top: 44px; } }
+
+    footer { border-top: 1px solid var(--hairline); padding: 24px 0 40px; font-size: 13px; color: var(--gray); background: var(--parchment); }
+    footer a { text-decoration: none; }
+    footer a:hover { color: var(--ink); text-decoration: underline; }
+
+    :focus-visible { outline: 3px solid var(--blue-bright); outline-offset: 3px; border-radius: 6px; }
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap row">
+      <a class="brand" href="../"><img src="../assets/cardflow-icon.png" width="26" height="26" alt=""><span>Cardflow</span></a>
+      <div class="right">
+        <span class="lang" role="group" data-i18n-attr="aria-label:lang.aria" aria-label="Idioma">
+          <button type="button" data-lang="pt" lang="pt-BR">PT</button>
+          <button type="button" data-lang="en" lang="en">EN</button>
+          <button type="button" data-lang="es" lang="es">ES</button>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="wrap">
+        <svg class="heart" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.2 5 6.7 5c2 0 3.6 1.1 5.3 3 1.7-1.9 3.3-3 5.3-3 3.5 0 5.5 3.6 4.2 6.8C19.5 16.4 12 21 12 21Z"/></svg>
+        <h1 data-i18n="title">Apoie o Cardflow</h1>
+        <p data-i18n="lead">O app é gratuito e vai continuar assim. Se ele te poupa trabalho no set, qualquer valor ajuda a manter as atualizações saindo.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <article class="pix">
+          <div class="qr"><img src="pix-qr.svg" width="226" height="226" data-i18n-attr="alt:pix.qrAlt" alt="Código QR do Pix para apoiar o Cardflow"></div>
+          <div>
+            <h2>Pix</h2>
+            <p data-i18n="pix.p">Abra o app do banco e leia o código, ou use o Pix copia e cola. O valor é você quem escolhe.</p>
+            <div class="key">
+              <span class="label" data-i18n="pix.key">Chave Pix</span>
+              <code id="pix-key">ced3c1ab-75a8-41e7-a780-2b48bd99b020</code>
+            </div>
+            <div class="actions">
+              <button class="btn btn-solid" type="button" data-copy="payload">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                <span data-i18n="pix.copyPayload">Copiar Pix copia e cola</span>
+              </button>
+              <button class="btn btn-soft" type="button" data-copy="key">
+                <span data-i18n="pix.copyKey">Copiar chave</span>
+              </button>
+            </div>
+            <p class="hint" data-i18n="pix.to">No app do banco, quem recebe aparece como Gabriel Rafael Brandão Lessa de Carvalho, o Gabriel da Lessa Films.</p>
+            <span class="sr" role="status" aria-live="polite" id="copy-status"></span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="more">
+      <div class="wrap">
+        <h2 data-i18n="more.title">Sem dinheiro também ajuda.</h2>
+        <div class="tips">
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1-4.5-4.2 6.1-.8Z"/></svg>
+            <b data-i18n="more.star.t">Dê uma estrela</b>
+            <span data-i18n="more.star.p">No <a href="https://github.com/grlessa/cardflow">repositório do GitHub</a>. Ajuda mais gente a achar o app.</span>
+          </div>
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9h8M8 13h5"/><path d="M4 5h16v11H9l-5 4Z"/></svg>
+            <b data-i18n="more.bug.t">Conte o que deu errado</b>
+            <span data-i18n="more.bug.p">Achou um problema ou sente falta de algo? <a href="https://github.com/grlessa/cardflow/issues">Abra um relato</a>.</span>
+          </div>
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8"/><path d="M16 11.5a2.7 2.7 0 1 0 0-5.4M17.5 14.5c1.6.6 2.7 2.2 3 4.5"/></svg>
+            <b data-i18n="more.share.t">Passe para a equipe</b>
+            <span data-i18n="more.share.p">O assistente que descarrega o cartão é quem mais ganha com o app.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap"><a href="../" data-i18n="footer.back">Voltar para o Cardflow</a> · Lessa Films</div>
+  </footer>
+
+  <script>
+  (function () {
+    // Pix copia e cola (BR Code estático, mesma chave e mesmo recebedor do banco, identificador CARDFLOW).
+    var PIX = { key: "ced3c1ab-75a8-41e7-a780-2b48bd99b020", payload: "00020101021126580014br.gov.bcb.pix0136ced3c1ab-75a8-41e7-a780-2b48bd99b0205204000053039865802BR592555.354.797 gabriel rafael6009SAO PAULO62120508CARDFLOW63046AE4" };
+    var I18N = {
+      pt: {},
+      en: {
+        "meta.title": "Support Cardflow",
+        "meta.description": "Cardflow is free. If it saves you work, you can support it with Pix.",
+        "lang.aria": "Language",
+        "title": "Support Cardflow",
+        "lead": "The app is free and will stay that way. If it saves you work on set, any amount helps keep the updates coming.",
+        "pix.p": "Pix is Brazil's instant payment, so it needs a Brazilian bank account. Open your bank app and scan the code, or paste the Pix code. You choose the amount.",
+        "pix.qrAlt": "Pix QR code to support Cardflow",
+        "pix.key": "Pix key", "pix.copyPayload": "Copy Pix code", "pix.copyKey": "Copy key",
+        "pix.to": "In your bank app, the recipient shows as Gabriel Rafael Brandão Lessa de Carvalho, Gabriel from Lessa Films.",
+        "copied": "Copied",
+        "more.title": "Helping without money works too.",
+        "more.star.t": "Give it a star", "more.star.p": "On the <a href=\"https://github.com/grlessa/cardflow\">GitHub repository</a>. It helps more people find the app.",
+        "more.bug.t": "Tell us what went wrong", "more.bug.p": "Found a problem or missing something? <a href=\"https://github.com/grlessa/cardflow/issues\">Open a report</a>.",
+        "more.share.t": "Pass it to your crew", "more.share.p": "The assistant who offloads the cards is the one who gains the most from the app.",
+        "footer.back": "Back to Cardflow"
+      },
+      es: {
+        "meta.title": "Apoya Cardflow",
+        "meta.description": "Cardflow es gratis. Si te ahorra trabajo, puedes apoyarlo con Pix.",
+        "lang.aria": "Idioma",
+        "title": "Apoya Cardflow",
+        "lead": "La app es gratis y va a seguir así. Si te ahorra trabajo en el rodaje, cualquier monto ayuda a que sigan saliendo actualizaciones.",
+        "pix.p": "Pix es el pago instantáneo de Brasil, así que necesita una cuenta de banco brasileña. Abre la app del banco y lee el código, o pega el código Pix. El monto lo eliges tú.",
+        "pix.qrAlt": "Código QR de Pix para apoyar Cardflow",
+        "pix.key": "Clave Pix", "pix.copyPayload": "Copiar código Pix", "pix.copyKey": "Copiar clave",
+        "pix.to": "En la app del banco, quien recibe aparece como Gabriel Rafael Brandão Lessa de Carvalho, Gabriel de Lessa Films.",
+        "copied": "Copiado",
+        "more.title": "Ayudar sin dinero también sirve.",
+        "more.star.t": "Dale una estrella", "more.star.p": "En el <a href=\"https://github.com/grlessa/cardflow\">repositorio de GitHub</a>. Ayuda a que más gente encuentre la app.",
+        "more.bug.t": "Cuenta qué salió mal", "more.bug.p": "¿Encontraste un problema o te falta algo? <a href=\"https://github.com/grlessa/cardflow/issues\">Abre un reporte</a>.",
+        "more.share.t": "Pásala a tu equipo", "more.share.p": "El asistente que descarga las tarjetas es quien más gana con la app.",
+        "footer.back": "Volver a Cardflow"
+      }
+    };
+
+    var KEY = "cardflow-lang";
+    var HTML_LANG = { pt: "pt-BR", en: "en", es: "es" };
+    var current = "pt";
+    var base = { "copied": "Copiado" };
+    document.querySelectorAll("[data-i18n]").forEach(function (el) { base[el.dataset.i18n] = el.innerHTML; });
+    document.querySelectorAll("[data-i18n-attr]").forEach(function (el) {
+      el.dataset.i18nAttr.split(";").forEach(function (pair) { var p = pair.split(":"); base[p[1]] = el.getAttribute(p[0]) || ""; });
+    });
+    base["meta.title"] = document.title;
+    base["meta.description"] = document.querySelector('meta[name="description"]').getAttribute("content");
+    I18N.pt = base;
+
+    function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function norm(c) { c = String(c || "").slice(0, 2).toLowerCase(); return (c === "pt" || c === "en" || c === "es") ? c : null; }
+    function detect() {
+      var s = norm(get(KEY)); if (s) return s;
+      var ls = navigator.languages || [navigator.language];
+      for (var i = 0; i < ls.length; i++) { var n = norm(ls[i]); if (n) return n; }
+      return "pt";
+    }
+    function t(k) { var d = I18N[current]; return (d && k in d) ? d[k] : base[k]; }
+
+    function apply(lang) {
+      current = lang;
+      document.documentElement.lang = HTML_LANG[lang];
+      document.querySelectorAll("[data-i18n]").forEach(function (el) { var v = t(el.dataset.i18n); if (v != null) el.innerHTML = v; });
+      document.querySelectorAll("[data-i18n-attr]").forEach(function (el) {
+        el.dataset.i18nAttr.split(";").forEach(function (pair) { var p = pair.split(":"); var v = t(p[1]); if (v != null) el.setAttribute(p[0], v); });
+      });
+      document.title = t("meta.title");
+      document.querySelector('meta[name="description"]').setAttribute("content", t("meta.description"));
+      document.querySelectorAll(".lang button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.lang === lang ? "true" : "false"); });
+    }
+
+    function copy(text, btn) {
+      var done = function () {
+        var label = btn.querySelector("[data-i18n]");
+        var original = label.innerHTML;
+        btn.classList.add("copied"); label.textContent = t("copied");
+        document.getElementById("copy-status").textContent = t("copied");
+        setTimeout(function () { btn.classList.remove("copied"); label.innerHTML = original; }, 1800);
+      };
+      var fallback = function () {
+        var ta = document.createElement("textarea");
+        ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        if (ok) { done(); return; }
+        // Sem acesso à área de transferência: deixa a chave selecionada para copiar na mão.
+        var r = document.createRange(); r.selectNodeContents(document.getElementById("pix-key"));
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    }
+    document.querySelectorAll("[data-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function () { copy(btn.dataset.copy === "payload" ? PIX.payload : PIX.key, btn); });
+    });
+
+    document.querySelectorAll(".lang button").forEach(function (b) {
+      b.addEventListener("click", function () { put(KEY, b.dataset.lang); apply(b.dataset.lang); });
+    });
+    apply(detect());
+  })();
+  </script>
+</body>
+</html>

@@ -9,14 +9,16 @@ public struct ExternalVolume: Equatable, Identifiable, Sendable {
     public var physicalDeviceID: String? // disco físico (whole-disk BSD, ex.: "disk4") — backup ≠ mesmo disco
     public var volumeUUID: String?       // identidade estável do volume (lembrar destino entre sessões)
     public var isInternalShortcut: Bool  // atalho de pasta no disco interno (Mesa/Documentos), não vem do watcher
+    public var traits: DeviceTraits?     // tipo físico (DiskArbitration); nil em atalho de pasta e em testes antigos
     public var id: String { url.path }
+    public var mediaKind: MediaKind { traits?.mediaKind ?? (isInternalShortcut ? .folder : .ssd) }
     public init(url: URL, name: String, isRemovable: Bool, isInternal: Bool,
                 totalBytes: Int64? = nil, physicalDeviceID: String? = nil, volumeUUID: String? = nil,
-                isInternalShortcut: Bool = false) {
+                isInternalShortcut: Bool = false, traits: DeviceTraits? = nil) {
         self.url = url; self.name = name; self.isRemovable = isRemovable
         self.isInternal = isInternal; self.totalBytes = totalBytes
         self.physicalDeviceID = physicalDeviceID; self.volumeUUID = volumeUUID
-        self.isInternalShortcut = isInternalShortcut
+        self.isInternalShortcut = isInternalShortcut; self.traits = traits
     }
 }
 
@@ -45,6 +47,8 @@ public enum CardDetection {
     /// sistema (interno E não-removível) é barrado. Time Machine nunca é fonte.
     public static func isCard(_ vol: ExternalVolume) -> Bool {
         guard vol.isRemovable || !vol.isInternal else { return false }
+        // Pelo tipo físico: SD/CFexpress/CFast é cartão mesmo vazio (recém-formatado).
+        if vol.traits?.isCameraMedia == true { return true }
         let fm = FileManager.default
         // Volume de rede (NAS): é destino/arquivo, não fonte de offload — e varrer pela rede é lento.
         if let vals = try? vol.url.resourceValues(forKeys: [.volumeIsLocalKey]), vals.volumeIsLocal == false {

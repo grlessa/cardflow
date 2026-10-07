@@ -3,6 +3,11 @@ import Testing
 @testable import OffloadKit
 
 @Suite struct ArgParserTests {
+    @Test func projetoEhOMesmoQueEvento() throws {
+        let c = try ArgParser.parse(["--card", "/c", "--to", "/d", "--projeto", "Casamento"])
+        #expect(c.evento == "Casamento")
+    }
+
     @Test func parsesFullInvocation() throws {
         let c = try ArgParser.parse([
             "--card", "/Volumes/SONY", "--to", "/Volumes/SSD", "--to", "/Volumes/HD",

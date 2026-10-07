@@ -11,6 +11,11 @@ public extension OffloadOutcome {
     /// veredito "Pode formatar" e o badge de resultado (MainView) chamam todos esta mesma função,
     /// pra a UI nunca dar luz verde divergindo do que o motor realmente faz.
     var canSafelyFormatCard: Bool {
-        failures.isEmpty && (verifiedCount > 0 || !skipped.isEmpty)
+        failures.isEmpty && cameraFilesLeft == 0 && (verifiedCount > 0 || !skipped.isEmpty)
+    }
+
+    /// Copiado e conferido, mas uma câmera ficou de fora por escolha: tudo certo, só não pode formatar.
+    var copiedKeepingCameras: Bool {
+        failures.isEmpty && cameraFilesLeft > 0 && (verifiedCount > 0 || !skipped.isEmpty)
     }
 }

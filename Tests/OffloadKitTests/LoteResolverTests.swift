@@ -13,8 +13,28 @@ import Foundation
         #expect(d == LoteDecision(numero: 1, isNovo: true, anteriorIncompleto: nil))
     }
 
-    @Test func cartaoNaoFormatadoCasaMesmoLote() {
+    // Cartão não formatado sobre um lote COMPLETO, com arquivos NOVOS → LOTE NOVO. O material novo
+    // é o próximo lote; o antigo já está salvo (a cópia o reconhece como presente, sem recopiar).
+    @Test func cartaoComLoteCompletoMaisNovosEhLoteNovo() {
+        let known = [lote(1, [("C0001.MP4", 100), ("C0002.MP4", 200)])]   // completo
+        let card: Set = [key("C0001.MP4", 100), key("C0002.MP4", 200), key("C0003.MP4", 300)]
+        let d = LoteResolver.resolve(cardFiles: card, known: known)
+        #expect(d.numero == 2 && d.isNovo == true)
+    }
+
+    // Cartão IDÊNTICO a um lote completo, SEM nada novo → NÃO cria lote novo (continua o mesmo;
+    // a cópia vê tudo presente). Espelha doisCartoesDisjuntos: re-rodar o mesmo cartão não vira Lote 03.
+    @Test func cartaoIdenticoALoteCompletoSemNovosNaoCriaLoteNovo() {
         let known = [lote(1, [("C0001.MP4", 100), ("C0002.MP4", 200)])]
+        let card: Set = [key("C0001.MP4", 100), key("C0002.MP4", 200)]
+        let d = LoteResolver.resolve(cardFiles: card, known: known)
+        #expect(d.numero == 1 && d.isNovo == false)
+    }
+
+    // Lote anterior INCOMPLETO + cartão contendo seus arquivos (e mais) → RETOMADA do mesmo lote.
+    // Aqui sim faz sentido continuar: a cópia anterior foi interrompida, não concluída.
+    @Test func cartaoSobreLoteIncompletoEhRetomada() {
+        let known = [lote(1, [("C0001.MP4", 100), ("C0002.MP4", 200)], completo: false)]
         let card: Set = [key("C0001.MP4", 100), key("C0002.MP4", 200), key("C0003.MP4", 300)]
         let d = LoteResolver.resolve(cardFiles: card, known: known)
         #expect(d.numero == 1 && d.isNovo == false)

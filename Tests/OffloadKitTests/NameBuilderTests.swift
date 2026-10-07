@@ -5,6 +5,25 @@ import Foundation
 @Suite struct NameBuilderTests {
     let tz = TimeZone(identifier: "America/Sao_Paulo")!  // 1_780_000_000 = 2026-05-28 17:26:40 -03
 
+    @Test func projetoEEventoProduzemAMesmaPasta() throws {
+        var preset = Preset.flatDefault
+        preset.evento = "Casamento Ana"
+        let f = MediaFile(sourceURL: URL(fileURLWithPath: "/c/A.JPG"), relPath: "A.JPG",
+                          size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        preset.folderStructure = "{projeto}/{tipo}"
+        let novo = try NameBuilder(preset: preset, timeZone: tz).relativeDestination(for: f, context: .init(camera: "A", counter: 1))
+        preset.folderStructure = "{evento}/{tipo}"
+        let antigo = try NameBuilder(preset: preset, timeZone: tz).relativeDestination(for: f, context: .init(camera: "A", counter: 1))
+        #expect(novo == "Casamento Ana/Foto/A.JPG" && novo == antigo)
+        #expect(throws: Never.self) { try NameBuilder.validateTokensExist(in: "{projeto}/{evento}", knownSessionKeys: []) }
+    }
+
+    @Test func modelosDeFabricaUsamProjeto() {
+        for p in [Preset.factoryDefault, Preset.flatDefault] {
+            #expect(p.folderStructure.contains("{projeto}") && !p.folderStructure.contains("{evento}"))
+        }
+    }
+
     @Test func loteTokenRenderizaLoteComDoisDigitos() throws {
         var preset = Preset.flatDefault
         preset.folderStructure = "{evento}/{lote}/{tipo}"
@@ -120,7 +139,7 @@ import Foundation
     @Test func structureWithoutRenameKeepsOriginalName() throws {
         let nb = NameBuilder(preset: .sampleConferencia, timeZone: tz)
         let rel = try nb.relativeDestination(for: file(type: .video, rel: "DCIM/X/C0001.MP4"), context: ctx())
-        #expect(rel == "Conferencia-Junho-2026/Video/C0001.MP4")
+        #expect(rel == "Conferencia-Junho-2026/Vídeo/C0001.MP4")
     }
 
     @Test(arguments: [
@@ -302,6 +321,19 @@ import Foundation
                              size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
         let rel = try nb.relativeDestination(for: file, camera: "Cam", counter: 1)
         #expect(rel.contains("17h26"))   // captureDate = 2026-05-28 17:26:40 -03
+    }
+
+    // O preset de fábrica (o que o usuário ganha de partida) usa hora COM separador legível, não
+    // "172640" grudado — pra bater com a data, que já vem separada. O formato é trocável no editor.
+    @Test func factoryDefaultUsaHoraComSeparador() throws {
+        var p = Preset.factoryDefault
+        p.rename = .init(enabled: true, template: "{hora}", counterPadding: 4)
+        p.folderStructure = "X"
+        let nb = NameBuilder(preset: p, timeZone: TimeZone(identifier: "America/Sao_Paulo")!)
+        let f = MediaFile(sourceURL: URL(fileURLWithPath: "/c/x.jpg"), relPath: "x.jpg",
+                          size: 1, type: .photo, captureDate: Date(timeIntervalSince1970: 1_780_000_000))
+        let rel = try nb.relativeDestination(for: f, camera: "Cam", counter: 1)
+        #expect(rel == "X/17h26.jpg")
     }
 
     @Test func dataRenderizaMesEmPortugues() throws {

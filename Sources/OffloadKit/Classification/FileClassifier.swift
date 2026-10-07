@@ -46,6 +46,9 @@ public struct FileClassifier {
     public func classify(fileName: String) -> FileType {
         let lowerName = fileName.lowercased()
         if Self.junkNames.contains(lowerName) { return .junk }
+        // oculto = do sistema: "._C0001.MP4" (AppleDouble que o macOS grava em exFAT/FAT), .VolumeIcon.icns,
+        // .Trashes… Sem isto, "._C0001.MP4" passava por vídeo e era copiado. Câmera não grava mídia oculta.
+        if fileName.hasPrefix(".") { return .junk }
 
         let ext = (fileName as NSString).pathExtension.lowercased()
         if ext.isEmpty { return .unknown }

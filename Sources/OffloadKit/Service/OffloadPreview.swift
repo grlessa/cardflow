@@ -15,6 +15,9 @@ public struct OffloadPreview: Equatable {
     public var alreadyPresentFromInterrupted: Int = 0 // subconjunto vindo só de manifesto interrompido
     public var remainingBytes: Int64 = 0  // bytes que ainda falta copiar (total menos o que já está no destino)
     public var lote: LoteDecision? = nil  // descarga detectada (nil quando a estrutura não usa {lote})
+    /// O que fica no cartão SEM cópia por escolha do operador (mídia, filtro de data, irmãos desligados).
+    /// Base do aviso do "Formatar ao terminar". Cinema conta por arquivo aqui.
+    public var excludedByChoice: [FileType: Int] = [:]
 
     public init(photos: Int, videos: Int, audios: Int, cinema: Int, junk: Int,
                 junkPaths: [String] = [],
@@ -55,11 +58,21 @@ extension CopyService {
     /// `capturedIn`: se dado, só inclui arquivos planos capturados dentro do intervalo. Bundles de
     /// cinema ficam fora do filtro para não quebrar um clipe pela metade.
     public func preview(cardRoot: URL, chosenMedia: Preset.Media.Kind, destinations: [URL],
-                        capturedIn: DateInterval? = nil, fastResume: Bool = true,
+                        capturedIn: DateInterval? = nil, excludedGroups: Set<String> = [], fastResume: Bool = true,
+                        internalDestinations: Set<URL> = []) throws -> OffloadPreview {
+        try preview(scanned: scanner.scan(cardRoot: cardRoot), cardRoot: cardRoot, chosenMedia: chosenMedia,
+                    destinations: destinations, capturedIn: capturedIn, excludedGroups: excludedGroups,
+                    fastResume: fastResume, internalDestinations: internalDestinations)
+    }
+
+    /// Prévia sobre uma lista do cartão JÁ varrida: trocar mídia, destino ou modelo recalcula sem reler o
+    /// cartão (reler mantinha o volume ocupado e o macOS recusava ejetar).
+    public func preview(scanned: [MediaFile], cardRoot: URL, chosenMedia: Preset.Media.Kind, destinations: [URL],
+                        capturedIn: DateInterval? = nil, excludedGroups: Set<String> = [], fastResume: Bool = true,
                         internalDestinations: Set<URL> = []) throws -> OffloadPreview {
         let destinations = destinations.reduce(into: [URL]()) { acc, u in if !acc.contains(u) { acc.append(u) } }   // dedup (igual ao run)
-        let all = try scanner.scan(cardRoot: cardRoot)
-        let dateOK = Self.dateFilter(capturedIn)
+        let all = scanned
+        let dateOK = Self.choiceFilter(capturedIn, excludedGroups: excludedGroups)
         let selected = all.filter { isSelected($0, chosenMedia) && dateOK($0) }
         let photos = selected.filter { $0.type == .photo }.count
         let videos = selected.filter { $0.type == .video }.count
@@ -76,8 +89,9 @@ extension CopyService {
         // checagem POR DESTINO descontando o que já está verificado lá (igual ao run) — senão uma
         // retomada num disco apertado deixaria o botão Iniciar bloqueado por "sem espaço".
         let eventoRoot = NameBuilder.sanitizePathComponent(preset.evento)
-        let priorByDest = fastResume ? priorVerifiedRecords(destinations, eventoRoot: eventoRoot) : [:]
-        let interruptedPresenceByDest = fastResume ? priorInterruptedPresence(destinations, eventoRoot: eventoRoot) : [:]
+        let cardID = cardIdentity(cardRoot)
+        let priorByDest = fastResume ? priorVerifiedRecords(destinations, eventoRoot: eventoRoot, scanned: all, cardID: cardID) : [:]
+        let interruptedPresenceByDest = fastResume ? priorInterruptedPresence(destinations, eventoRoot: eventoRoot, scanned: all, cardID: cardID) : [:]
         let needByDest = requiredPerDestination(payload: payload, priorByDest: priorByDest, destinations: destinations)
         let shortfalls = try destinations.compactMap { dest -> SpaceChecker.Shortfall? in
             let margin = internalDestinations.contains(dest) ? Self.internalReserveBytes : marginBytes
@@ -86,14 +100,12 @@ extension CopyService {
         }
         // Quantas mídias selecionadas já estão verificadas em TODOS os destinos (= serão puladas).
         // A UI decide se isso é retomada, complemento de mídia ou cópia já completa.
-        var presentByDest: [URL: [String: Int64]] = [:]
+        var presentByDest: [URL: [String: [Manifest.FileRecord]]] = [:]
         for dest in destinations {
-            var byteBySrc: [String: Int64] = [:]
-            for f in (priorByDest[dest] ?? []) { byteBySrc[f.sourceRelPath] = f.bytes }
-            presentByDest[dest] = byteBySrc
+            presentByDest[dest] = Dictionary(grouping: priorByDest[dest] ?? [], by: \.sourceRelPath)
         }
         func presentEverywhere(_ f: MediaFile) -> Bool {
-            !destinations.isEmpty && destinations.allSatisfy { presentByDest[$0]?[f.relPath] == f.size }
+            !destinations.isEmpty && destinations.allSatisfy { Self.isLikelyPresent(f, in: presentByDest[$0] ?? [:]) }
         }
         let alreadyPresent = selected.filter(presentEverywhere).count
         func presentFromInterruptedEverywhere(_ f: MediaFile) -> Bool {
@@ -105,13 +117,21 @@ extension CopyService {
         // bytes que ainda faltam: o total menos o que já está verificado em todos os destinos.
         let remainingBytes = total - payload.filter(presentEverywhere).reduce(Int64(0)) { $0 + $1.size }
         let loteDecision = resolveLote(selected: selected, destinations: destinations, eventoRoot: eventoRoot)
-        return OffloadPreview(photos: photos, videos: videos, audios: audios, cinema: cinema, junk: junk,
+        var excluded: [FileType: Int] = [:]
+        let choices = WipeChoices(chosenMedia: chosenMedia, capturedIn: capturedIn, excludedGroups: excludedGroups)
+        for f in all where !(f.type == .junk && !f.preserve)
+            && CardWipeCheck.isExcludedByChoice(f, service: self, choices: choices, preset: preset, dateOK: dateOK) {
+            excluded[f.preserve ? .cinema : f.type, default: 0] += 1
+        }
+        var result = OffloadPreview(photos: photos, videos: videos, audios: audios, cinema: cinema, junk: junk,
                               junkPaths: junkPaths,
                               selectedCount: selected.count, totalBytes: total,
                               unrecognized: unrecognized, shortfalls: shortfalls,
                               alreadyPresent: alreadyPresent,
                               alreadyPresentFromInterrupted: alreadyPresentFromInterrupted,
                               remainingBytes: remainingBytes, lote: loteDecision)
+        result.excludedByChoice = excluded
+        return result
     }
 
 }
