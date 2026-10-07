@@ -3,19 +3,23 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>1.0.1</title>
-      <sparkle:version>380</sparkle:version>
-      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+      <title>1.0.2</title>
+      <sparkle:version>387</sparkle:version>
+      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <pubDate>Wed, 07 Oct 2026 01:49:31 +0000</pubDate>
-      <description><![CDATA[<h2>Cardflow 1.0.1</h2>
-<p>Corrige a formatação de cartão depois de atualizar o app.</p>
+      <pubDate>Wed, 07 Oct 2026 04:18:27 +0000</pubDate>
+      <description><![CDATA[<h2>Cardflow 1.0.2</h2>
+<p>O fim da cópia agora fica claro, do começo ao fim, e o cartão acompanha o que muda nele.</p>
 <ul>
-  <li>Depois de atualizar o Cardflow, o macOS às vezes deixava o ajudante de formatação preso à versão anterior, e o botão Formatar ficava parado em "Conferindo o cartão…". Agora o app arruma isso sozinho quando abre numa versão nova, sem pedir aprovação de novo.</li>
-  <li>Se o ajudante não responder, o Cardflow avisa em vez de esperar para sempre e deixa claro que o cartão não foi mexido.</li>
+  <li>Nova seção &quot;Ao terminar&quot;, com Formatar e Ejetar lado a lado. Cada combinação tem um fim claro, e a barra de baixo diz numa frase o que vai acontecer.</li>
+  <li>Quando o cartão termina, a tela mostra cada etapa com a hora: copiado, conferido, formatado e ejetado. Ela fica à vista depois que o cartão sai, e o cartão aparece na lateral como &quot;Concluído&quot; até você fechar.</li>
+  <li>Formatar não faz mais a tela pular para um cartão vazio: o cartão formatado continua sendo o mesmo até ejetar.</li>
+  <li>A opção de ejetar ao terminar passa a valer também depois de formatar.</li>
+  <li>Arquivos novos ou apagados no cartão conectado aparecem sozinhos, sem fechar o app. O espaço livre dos discos também é recalculado.</li>
+  <li>A barra de baixo ficou com um botão só. &quot;Retomar conferindo tudo&quot; foi para o aviso de retomada.</li>
 </ul>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v1.0.1/Cardflow.dmg" sparkle:edSignature="/dJJm8fzLNbIrJdJxf6Ep7E2MePe4BASoIh4xPaK5HWs1zuiCqcsE4RWZPN3cEuWu0sOk2Y4cCVziokIrzSNAA==" length="6698353" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v1.0.2/Cardflow.dmg" sparkle:edSignature="mbYALYr8YbdBCI1zPLwg86nVsIdVxQ7cwMKDAqRBrULAvHwN7lweA6M4fKbQ7np2j27Igr6cxcq15fO4W7PjCQ==" length="6757279" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
