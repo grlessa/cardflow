@@ -9,23 +9,33 @@ enum CardPhase: Equatable {
     case queued                      // esperando a vez na fila
     case running(OffloadProgress)
     case finished(OffloadOutcome)
-    case failed(String, cardUncertain: Bool)   // cardUncertain: falhou DURANTE a cópia → não formatar
+    case failed(String, cardUncertain: Bool)   // cardUncertain: falhou DURANTE a cópia -> não formatar
 }
 
 /// Estado e regras de um cartão conectado. Cada cartão tem a sua prévia, a sua escolha de mídia, a sua
 /// câmera e a sua formatação; o que é do projeto (modelo, destinos, nome) fica no `AppModel`.
 @MainActor @Observable
-final class CardSession: Identifiable {
-    nonisolated let volume: ExternalVolume
-    nonisolated var id: String { volume.id }
+final class CardSession: @MainActor Identifiable {
+    /// Identificador único desta sessão (chave na `CopyQueue`, não colide entre dois cartões `/Volumes/Untitled`).
+    nonisolated let sessionID = UUID()
+    /// Volume atual (atualizado quando o cartão volta da formatação com novo UUID ou novo nome/caminho).
+    var volume: ExternalVolume
+    var id: String { volume.id }
 
     var phase: CardPhase = .scanning
     /// Lista do cartão, lida uma vez por montagem. A prévia é recalculada sobre ela.
-    var scanned: [MediaFile]?
+    var scanned: [MediaFile]? { didSet { invalidateCameraEntriesCache() } }
     var preview: OffloadPreview?
     /// Prévia "Vai ficar assim", calculada junto com a prévia.
     var tree: [TreeNode] = []
-    var mediaChoice: Preset.Media.Kind
+    /// Caminho e bytes congelados no momento em que a cópia termina (mudar projeto pro cartão seguinte não altera este).
+    var frozenPathSegments: [String]?
+    var frozenTotalBytes: Int64?
+    var mediaChoice: Preset.Media.Kind {
+        didSet { lastPreviewMedia = mediaChoice }
+    }
+    /// Mídia efetiva da última prévia (considerando travamento do modelo).
+    var lastPreviewMedia: Preset.Media.Kind = .both
     var camera: String = "CAM A"
     var cameraDetected = false
     /// Câmera lida do metadado dos arquivos, já no nome curto ("FX30", "A7S III").
@@ -35,13 +45,33 @@ final class CardSession: Identifiable {
     /// Nome de câmera de reserva deste cartão (CAM A, CAM B…), pra arquivo sem câmera identificada.
     var defaultCamera = "CAM A"
     /// Câmera lida em cada grupo de origem (pasta do cartão), no nome curto.
-    var detectedByGroup: [String: String] = [:]
+    var detectedByGroup: [String: String] = [:] { didSet { invalidateCameraEntriesCache() } }
     /// Cartão com várias câmeras: o nome escolhido de cada uma e as que ficam de fora.
     var cameraNames: [String: String] = [:]
     var excludedCameras: Set<String> = []
     var captureDateFilter: AppModel.CaptureDateFilter = .all
     var acknowledgedIncompleteLote: Int?
-    var formatState: AppModel.FormatUIState = .idle
+    var formatState: AppModel.FormatUIState = .idle {
+        didSet {
+            switch formatState {
+            case .formatting:
+                awaitingPostFormatRemount = true
+            case .done:
+                if case .done = oldValue {} else if !remountedAfterFormat {
+                    awaitingPostFormatRemount = true
+                }
+            case .idle, .checking, .confirming, .blocked, .failed:
+                awaitingPostFormatRemount = false
+                remountedAfterFormat = false
+            }
+        }
+    }
+    /// Flag única: o cartão acabou de formatar e ainda espera o volume remontar uma vez no mesmo disco físico.
+    /// Limpa assim que o volume formatado volta, para que tirar o cartão e pôr outro nunca engula o cartão novo.
+    @ObservationIgnored var awaitingPostFormatRemount = false
+    @ObservationIgnored var remountedAfterFormat = false
+    /// Tamanho real do disco inteiro capturado no scan (evita reler no clique de confirmar e perder proteção contra troca).
+    @ObservationIgnored var wholeDiskBytes: UInt64?
     var confirmingAutomatically = false
     var offloadContext: AppModel.OffloadContext?
     var startedAt: Date?
@@ -62,15 +92,20 @@ final class CardSession: Identifiable {
     }
 
     @ObservationIgnored var scanTask: Task<Void, Never>?
+    @ObservationIgnored var cameraTask: Task<Void, Never>?
     /// Acompanha mudanças no cartão conectado (arquivo novo, apagado) pra reler a lista sozinho.
     @ObservationIgnored var watcher: FolderWatcher?
     @ObservationIgnored var offloadTask: Task<Void, Never>?
     @ObservationIgnored var previewGeneration = 0
+    @ObservationIgnored private var cachedCameraEntries: [CameraEntry]?
 
     init(volume: ExternalVolume, mediaChoice: Preset.Media.Kind = .both) {
         self.volume = volume
         self.mediaChoice = mediaChoice
+        self.lastPreviewMedia = mediaChoice
     }
+
+    private func invalidateCameraEntriesCache() { cachedCameraEntries = nil }
 
     var isRunning: Bool { if case .running = phase { return true }; return false }
     /// Já resolvido: conferido, formatado, ejetado ou tudo já estava no destino. Cartão novo pode tomar a vez.
@@ -81,7 +116,7 @@ final class CardSession: Identifiable {
         return phase == .ready && isAlreadyCopied
     }
 
-    // MARK: Regras da prévia (vieram do AppModel, mesmos nomes)
+    // MARK: Regras da prévia
 
     /// Há um lote anterior incompleto detectado e ainda não confirmado pelo usuário? (trava o início).
     var loteLossUnconfirmed: Bool {
@@ -103,7 +138,7 @@ final class CardSession: Identifiable {
     }
     /// Complemento: o usuário mudou a seleção (copiou Foto antes e agora marcou Tudo).
     var isComplementalCopy: Bool {
-        guard let pv = preview, mediaChoice == .both else { return false }
+        guard let pv = preview, lastPreviewMedia == .both else { return false }
         guard pv.alreadyPresent > 0 && pv.alreadyPresent < pv.selectedCount else { return false }
         guard pv.alreadyPresentFromInterrupted == 0 else { return false }
         return alreadyPresentMediaPhrase != nil
@@ -124,25 +159,51 @@ final class CardSession: Identifiable {
         return showsRemainingHeadline ? pv.remainingBytes : pv.totalBytes
     }
 
+    /// Identifica o tipo exato já presente usando o detalhamento real por tipo da prévia (evita confundir
+    /// fotos e vídeos quando têm a mesma quantidade).
     var alreadyPresentMediaPhrase: (lower: String, sentenceStart: String, copied: String, ignored: String)? {
         guard let pv = preview else { return nil }
-        var labels: [(lower: String, sentenceStart: String, copied: String, ignored: String, count: Int)] = []
-        if pv.photos > 0 {
-            labels.append((String(localized: "media.photos.lower"), String(localized: "media.photos.sentenceStart"),
-                           String(localized: "media.photos.copied"), String(localized: "media.photos.ignored"), pv.photos))
+        let byType = pv.alreadyPresentByType
+        let nonZeroTypes = byType.filter { $0.value > 0 }
+        // Complemento limpo: exatamente UM tipo de mídia já está 100% presente no destino.
+        if nonZeroTypes.count == 1, let (type, count) = nonZeroTypes.first {
+            switch type {
+            case .photo where count == pv.photos && pv.photos > 0:
+                return (String(localized: "media.photos.lower"), String(localized: "media.photos.sentenceStart"),
+                        String(localized: "media.photos.copied"), String(localized: "media.photos.ignored"))
+            case .video where count == pv.videos && pv.videos > 0:
+                return (String(localized: "media.videos.lower"), String(localized: "media.videos.sentenceStart"),
+                        String(localized: "media.videos.copied"), String(localized: "media.videos.ignored"))
+            case .audio where count == pv.audios && pv.audios > 0:
+                return (String(localized: "media.audios.lower"), String(localized: "media.audios.sentenceStart"),
+                        String(localized: "media.audios.copied"), String(localized: "media.audios.ignored"))
+            default:
+                return nil
+            }
         }
-        if pv.videos > 0 {
-            labels.append((String(localized: "media.videos.lower"), String(localized: "media.videos.sentenceStart"),
-                           String(localized: "media.videos.copied"), String(localized: "media.videos.ignored"), pv.videos))
+        // Fallback para prévias construídas manualmente em testes sem `alreadyPresentByType` preenchido.
+        if nonZeroTypes.isEmpty {
+            var labels: [(lower: String, sentenceStart: String, copied: String, ignored: String, count: Int)] = []
+            if pv.photos > 0 {
+                labels.append((String(localized: "media.photos.lower"), String(localized: "media.photos.sentenceStart"),
+                               String(localized: "media.photos.copied"), String(localized: "media.photos.ignored"), pv.photos))
+            }
+            if pv.videos > 0 {
+                labels.append((String(localized: "media.videos.lower"), String(localized: "media.videos.sentenceStart"),
+                               String(localized: "media.videos.copied"), String(localized: "media.videos.ignored"), pv.videos))
+            }
+            if pv.audios > 0 {
+                labels.append((String(localized: "media.audios.lower"), String(localized: "media.audios.sentenceStart"),
+                               String(localized: "media.audios.copied"), String(localized: "media.audios.ignored"), pv.audios))
+            }
+            let matching = labels.filter { $0.count == pv.alreadyPresent }
+            if matching.count == 1, let m = matching.first {
+                return (m.lower, m.sentenceStart, m.copied, m.ignored)
+            }
         }
-        if pv.audios > 0 {
-            labels.append((String(localized: "media.audios.lower"), String(localized: "media.audios.sentenceStart"),
-                           String(localized: "media.audios.copied"), String(localized: "media.audios.ignored"), pv.audios))
-        }
-        return labels.first { $0.count == pv.alreadyPresent }.map { ($0.lower, $0.sentenceStart, $0.copied, $0.ignored) }
+        return nil
     }
 
-    var alreadyCopiedTitle: String? { isAlreadyCopied ? String(localized: "main.alreadyCopied.title") : nil }
     var alreadyCopiedDetail: String? {
         guard isAlreadyCopied, let pv = preview else { return nil }
         return String(localized: "main.alreadyCopied.detail \(pv.selectedCount)")
@@ -212,8 +273,9 @@ struct CameraEntry: Identifiable, Equatable {
 }
 
 extension CardSession {
-    /// Câmeras do cartão, a maior primeiro.
+    /// Câmeras do cartão, a maior primeiro (memoizado até `scanned` ou `detectedByGroup` mudar).
     var cameraEntries: [CameraEntry] {
+        if let cached = cachedCameraEntries { return cached }
         var byID: [String: CameraEntry] = [:]
         for f in scanned ?? [] where f.preserve || [.photo, .video, .audio].contains(f.type) {
             let g = CameraGroups.key(for: f)
@@ -228,7 +290,9 @@ extension CardSession {
             e.bytes += f.size
             byID[e.id] = e
         }
-        return byID.values.sorted { $0.files != $1.files ? $0.files > $1.files : $0.id < $1.id }
+        let sorted = byID.values.sorted { $0.files != $1.files ? $0.files > $1.files : $0.id < $1.id }
+        cachedCameraEntries = sorted
+        return sorted
     }
 
     var isMultiCamera: Bool { cameraEntries.count > 1 }
@@ -252,4 +316,3 @@ extension CardSession {
         return cameraEntries.filter { excludedCameras.contains($0.id) }.reduce(into: Set<String>()) { $0.formUnion($1.groups) }
     }
 }
-

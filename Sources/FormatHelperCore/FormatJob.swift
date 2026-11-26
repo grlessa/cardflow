@@ -19,11 +19,15 @@ public struct FormatJob {
     }
 
     public func run(_ request: FormatRequest, progress onStep: (FormatStep) -> Void) -> FormatResponse {
+        defer { system.invalidate() }
         func progress(_ step: FormatStep) {
             Self.log.info("etapa \(String(describing: step), privacy: .public) em \(request.bsdName, privacy: .public)")
             onStep(step)
         }
         progress(.validating)
+        guard DeviceGuard.isValidWholeDiskBSD(request.bsdName) else {
+            return fail(.deviceRejected, "nome de disco inválido: \(request.bsdName)")
+        }
         let plan: FormatPlan
         do {
             let d = try system.describe(bsdName: request.bsdName)
@@ -35,6 +39,10 @@ public struct FormatJob {
             case .failure(let e): return fail(.deviceRejected, "\(e)")
             }
         } catch { return fail(.internalError, "descrever disco: \(error)") }
+
+        do { try system.claim(bsdName: request.bsdName) }
+        catch { return fail(.unmountFailed, "reservar disco: \(error)", plan) }
+        defer { system.unclaim(bsdName: request.bsdName) }
 
         system.suppressAutomount(bsdName: request.bsdName)
         defer { system.restoreAutomount() }
@@ -63,11 +71,15 @@ public struct FormatJob {
                 try ExFATVolumeWriter(plan: plan, label: request.label, volumeSerial: volumeSerial())
                     .write(to: dev, mbrSignature: mbrSignature())
                 (dev as? FileBlockDevice)?.close()
-                slice = try system.waitForSlice(bsdName: request.bsdName, slice: 1, timeout: 15)
+                slice = try system.waitForSlice(bsdName: request.bsdName, slice: 1,
+                                                expectedStartSector: plan.partitionStartSector,
+                                                expectedSectorCount: plan.partitionSectorCount, timeout: 15)
             case .fat32:
                 try FAT32Format.writePartitionTable(plan: plan, to: dev, mbrSignature: mbrSignature())
                 (dev as? FileBlockDevice)?.close()
-                slice = try system.waitForSlice(bsdName: request.bsdName, slice: 1, timeout: 15)
+                slice = try system.waitForSlice(bsdName: request.bsdName, slice: 1,
+                                                expectedStartSector: plan.partitionStartSector,
+                                                expectedSectorCount: plan.partitionSectorCount, timeout: 15)
                 progress(.writingFileSystem)
                 let r = try system.run(FAT32Format.newfsPath,
                                        FAT32Format.newfsArguments(plan: plan, label: request.label, partitionRawDevice: "/dev/r\(slice)"))
@@ -89,6 +101,7 @@ public struct FormatJob {
 
         progress(.remounting)
         system.restoreAutomount()
+        system.unclaim(bsdName: request.bsdName)
         try? system.mount(bsdName: slice)        // não remontar não é falha: o app ejeta em seguida
         return FormatResponse(failure: nil, detail: nil, plan: plan)
     }

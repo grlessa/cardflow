@@ -93,6 +93,10 @@ import Foundation
         defer { try? FileManager.default.removeItem(at: dest) }
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
 
+        try FileManager.default.createDirectory(at: dest.appendingPathComponent("x"), withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 2_048).write(to: dest.appendingPathComponent("x/1.JPG"))
+        try Data(repeating: 2, count: 1_024).write(to: dest.appendingPathComponent("x/2.JPG"))
+
         let preset = Preset.sampleConferencia
         let eventName = NameBuilder.sanitizePathComponent(preset.evento)
         let manifest = Manifest(

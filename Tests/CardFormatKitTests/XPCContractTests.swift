@@ -7,7 +7,9 @@ import CardFormatKit
     @Test func requisitosApontamProTimeEOsIdentificadores() {
         #expect(CardFormatXPC.clientRequirement.contains("identifier \"com.cardflow.app\""))
         #expect(CardFormatXPC.clientRequirement.contains("NAS37P6Q53"))
+        #expect(CardFormatXPC.clientRequirement.contains("1.2.840.113635.100.6.1.13"))
         #expect(CardFormatXPC.helperRequirement.contains("identifier \"com.cardflow.app.formathelper\""))
+        #expect(CardFormatXPC.helperRequirement.contains("1.2.840.113635.100.6.2.6"))
     }
     @Test func respostaIdaEVolta() throws {
         let plan = try FormatPlan.make(totalSectors: 134_217_728, sectorSize: 512)

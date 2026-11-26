@@ -23,7 +23,6 @@ import UserNotifications
     }
 
     /// Idioma só deste app ("" = o do sistema). Vale ao reabrir o app.
-    static let languages = ["", "pt-BR", "en", "es"]
     static var language: String {
         get { (UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?["AppleLanguages"] as? [String])?.first ?? "" }
         set {
@@ -32,12 +31,13 @@ import UserNotifications
         }
     }
 
-    /// Reabre o app (pra valer o idioma novo).
+    /// Reabre o app (pra valer o idioma novo). Só encerra o processo atual se a nova instância abriu.
     @MainActor static func relaunch() {
         let url = Bundle.main.bundleURL
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in
+        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, error in
+            guard error == nil else { return }
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
@@ -57,6 +57,14 @@ final class PermissionsCenter {
     var desktopFolders: State = .unknown
 
     func refresh(volumes: [URL]) {
+        refreshNotifications()
+        probe(volumes, into: \.externalVolumes)
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        probe([home.appendingPathComponent("Desktop"), home.appendingPathComponent("Documents")], into: \.desktopFolders)
+    }
+
+    func refreshNotifications() {
+        guard Bundle.main.bundleIdentifier != nil else { notifications = .unknown; return }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let s: State
             switch settings.authorizationStatus {
@@ -66,9 +74,6 @@ final class PermissionsCenter {
             }
             Task { @MainActor in self.notifications = s }
         }
-        probe(volumes, into: \.externalVolumes)
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        probe([home.appendingPathComponent("Desktop"), home.appendingPathComponent("Documents")], into: \.desktopFolders)
     }
 
     /// Lê a pasta em segundo plano: na primeira vez o macOS pergunta; depois, a leitura diz se pode.
@@ -81,8 +86,9 @@ final class PermissionsCenter {
     }
 
     func requestNotifications() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
-            Task { @MainActor in self.refresh(volumes: []) }
+            Task { @MainActor in self.refreshNotifications() }
         }
     }
 

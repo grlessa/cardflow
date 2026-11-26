@@ -7,6 +7,8 @@ struct RecentOffload: Identifiable, Equatable {
     let manifest: Manifest
     /// JSON do registro no destino onde foi achado (relatório, pasta do projeto).
     let manifestURL: URL
+    /// Total de bytes de mídia (fora de `.cardflow/`), pré-calculado para não reter arrays gigantes em RAM.
+    let totalBytes: Int64
 
     var title: String { manifest.source.volumeName }
     var projectName: String { manifest.projectName ?? manifestURL.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent }
@@ -22,14 +24,17 @@ final class HistoryStore {
     nonisolated static let limit = 50
 
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var scanTask: Task<Void, Never>?
 
     /// Relê em segundo plano: abrir pasta pode esperar a permissão do macOS (Mesa, Documentos) ou um
-    /// disco lento, e isso nunca pode travar a janela.
+    /// disco lento, e isso nunca pode travar a janela. Cancela varreduras anteriores sobrepostas.
     func reload(destinations: [URL]) {
         generation &+= 1
         let gen = generation
-        Task.detached {
+        scanTask?.cancel()
+        scanTask = Task.detached {
             let found = Self.scan(destinations)
+            guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
                 guard let self, self.generation == gen else { return }
                 self.items = found
@@ -45,10 +50,20 @@ final class HistoryStore {
         var all: [RecentOffload] = []
         let fm = FileManager.default
         for dest in destinations {
-            guard let projects = try? fm.contentsOfDirectory(at: dest, includingPropertiesForKeys: [.isDirectoryKey]) else { continue }
+            if Task.isCancelled { return [] }
+            guard let projects = try? fm.contentsOfDirectory(at: dest, includingPropertiesForKeys: [.isDirectoryKey],
+                                                             options: [.skipsHiddenFiles]) else { continue }
             for project in projects where (try? project.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                if Task.isCancelled { return [] }
                 all += store.loadAllWithURLs(eventRootIn: dest, eventName: project.lastPathComponent)
-                    .map { RecentOffload(manifest: $0.manifest, manifestURL: $0.url) }
+                    .map { entry -> RecentOffload in
+                        let mediaBytes = entry.manifest.files
+                            .filter { !$0.destRelPath.contains("/.cardflow/") }
+                            .reduce(Int64(0)) { $0 + $1.bytes }
+                        var compact = entry.manifest
+                        compact.files = []   // libera memória: Recentes usa só resumo e totais
+                        return RecentOffload(manifest: compact, manifestURL: entry.url, totalBytes: mediaBytes)
+                    }
             }
         }
         // mesmo offloadId (outro destino, ou retomada que reescreveu): fica o registro mais recente.

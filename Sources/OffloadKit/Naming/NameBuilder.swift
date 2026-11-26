@@ -1,6 +1,6 @@
 import Foundation
 
-public enum NamingError: Error, Equatable {
+public enum NamingError: Error, Equatable, Sendable {
     case unknownToken(String)
     case unknownModifier(String)
     case pathTraversal(String)   // template tenta escapar da pasta de destino (../, /abs, ~)
@@ -19,7 +19,7 @@ extension NamingError: LocalizedError {
     }
 }
 
-public struct NamingContext {
+public struct NamingContext: Sendable {
     public var camera: String
     public var counter: Int        // índice 1-based da execução
     public var cardName: String
@@ -35,11 +35,21 @@ public struct NameBuilder {
     private let preset: Preset
     let timeZone: TimeZone
     private let locale: Locale
+    private let calendar: Calendar
+    private let shortMonths: [String]
+    private let fullMonths: [String]
 
     /// `locale` controla o idioma de mês/dia ({mes_nome}, {mes_abrev}, {data}). Sem injeção, cai no pt-BR base.
     public init(preset: Preset, timeZone: TimeZone = .current, locale: Locale? = nil) {
         self.preset = preset; self.timeZone = timeZone
-        self.locale = locale ?? Locale(identifier: "pt-BR")
+        let loc = locale ?? Locale(identifier: "pt-BR")
+        self.locale = loc
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        self.calendar = cal
+        let f = DateFormatter(); f.locale = loc
+        self.shortMonths = f.shortStandaloneMonthSymbols ?? []
+        self.fullMonths = f.standaloneMonthSymbols ?? []
     }
 
     public static let knownTokens: Set<String> = [
@@ -83,8 +93,7 @@ public struct NameBuilder {
     // Dia da semana por idioma (tabelas fixas → "Segunda"/"Seg" limpos, sem "-feira" nem ponto que o
     // DateFormatter traria em pt). Fuso do builder. Calendar.weekday: 1=Domingo … 7=Sábado.
     private func diaSemana(for date: Date, abbreviated: Bool) -> String {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
-        let i = cal.component(.weekday, from: date) - 1   // 0=Domingo
+        let i = calendar.component(.weekday, from: date) - 1   // 0=Domingo
         let lang = locale.language.languageCode?.identifier ?? "pt"
         let full: [String], abbr: [String]
         switch lang {
@@ -112,9 +121,8 @@ public struct NameBuilder {
     // Turno pela hora LOCAL de captura (fuso do builder). Noite engole a madrugada (18h–6h).
     // Strings por idioma — mesmo critério de faixa horária em todos.
     private func turnoFolder(for date: Date) -> String {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
         let lang = locale.language.languageCode?.identifier ?? "pt"
-        let h = cal.component(.hour, from: date)
+        let h = calendar.component(.hour, from: date)
         let idx = (6..<12).contains(h) ? 0 : (12..<18).contains(h) ? 1 : 2   // manhã / tarde / noite
         switch lang {
         case "en": return ["Morning", "Afternoon", "Night"][idx]
@@ -132,11 +140,9 @@ public struct NameBuilder {
     }
 
     private func month(_ date: Date, abbreviated: Bool) -> String {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
-        let m = cal.component(.month, from: date) - 1   // 0-based
-        let f = DateFormatter(); f.locale = locale
-        let symbols = abbreviated ? f.shortStandaloneMonthSymbols : f.standaloneMonthSymbols
-        guard let raw0 = symbols?[safe: m] else { return "" }
+        let m = calendar.component(.month, from: date) - 1   // 0-based
+        let symbols = abbreviated ? shortMonths : fullMonths
+        guard let raw0 = symbols[safe: m] else { return "" }
         let raw = raw0.replacingOccurrences(of: ".", with: "")
         return raw.isEmpty ? raw : raw.prefix(1).uppercased() + raw.dropFirst()
     }
@@ -155,17 +161,17 @@ public struct NameBuilder {
         case "contador":
             let n = preset.rename.counterStart + (ctx.counter - 1) * preset.rename.counterStep
             return String(format: "%0\(preset.rename.counterPadding)d", n)
-        case "ano": return df("yyyy", file.captureDate)
-        case "ano2": return df("yy", file.captureDate)
-        case "mes": return df("MM", file.captureDate)
+        case "ano": return String(format: "%04d", calendar.component(.year, from: file.captureDate))
+        case "ano2": return String(format: "%02d", calendar.component(.year, from: file.captureDate) % 100)
+        case "mes": return String(format: "%02d", calendar.component(.month, from: file.captureDate))
         case "mes_abrev": return month(file.captureDate, abbreviated: true)
         case "mes_nome": return month(file.captureDate, abbreviated: false)
-        case "dia": return df("dd", file.captureDate)
+        case "dia": return String(format: "%02d", calendar.component(.day, from: file.captureDate))
         case "dia_semana": return diaSemana(for: file.captureDate, abbreviated: false)
         case "dia_semana_abrev": return diaSemana(for: file.captureDate, abbreviated: true)
-        case "horas": return df("HH", file.captureDate)
-        case "minutos": return df("mm", file.captureDate)
-        case "segundos": return df("ss", file.captureDate)
+        case "horas": return String(format: "%02d", calendar.component(.hour, from: file.captureDate))
+        case "minutos": return String(format: "%02d", calendar.component(.minute, from: file.captureDate))
+        case "segundos": return String(format: "%02d", calendar.component(.second, from: file.captureDate))
         case "data": return df(preset.dateFormat, file.captureDate, locale: locale)   // mês segue o idioma do builder
         case "hora": return df(preset.timeFormat, file.captureDate)
         case "turno": return turnoFolder(for: file.captureDate)
@@ -221,8 +227,10 @@ public struct NameBuilder {
             let ext = ns.pathExtension
             let stem = ns.deletingPathExtension
             let extBudget = ext.isEmpty ? 0 : ext.utf8.count + 1   // ".ext"
-            let cut = truncateToBytes(stem, maxBytes: max(1, maxBytes - extBudget))
-            return ext.isEmpty ? cut : "\(cut).\(ext)"
+            if !ext.isEmpty && extBudget < maxBytes {
+                let cut = truncateToBytes(stem, maxBytes: max(1, maxBytes - extBudget))
+                return "\(cut).\(ext)"
+            }
         }
         return truncateToBytes(s, maxBytes: maxBytes)
     }
@@ -239,27 +247,28 @@ public struct NameBuilder {
     }
 
     /// Rejeita um template cuja PARTE LITERAL permitiria escapar da pasta de destino
-    /// (path traversal): caminho absoluto ("/…"), home ("~…") ou um segmento ".." literal.
-    /// Os VALORES de token já são saneados em `sanitizePathComponent` (não viram "/" nem ".."),
-    /// então aqui só importam os literais que o usuário/preset escreveu fora dos `{…}`.
+    /// (path traversal): caminho absoluto ("/…"), home ("~…") ou um segmento ".." literal
+    /// (inclusive quando um token adjacente renderiza vazio, ex.: `..{operador}`).
     public static func validateNoTraversal(in template: String) throws {
         if template.hasPrefix("/") || template.hasPrefix("~") {
             throw NamingError.pathTraversal(template)
         }
-        // Esqueleto literal: troca cada {token} por uma sentinela (não-vazia, sem "/")
-        // pra checar os segmentos de pasta sem confundir com o conteúdo dos tokens.
-        var skeleton = ""
-        var i = template.startIndex
-        while i < template.endIndex {
-            if template[i] == "{", let close = template[i...].firstIndex(of: "}") {
-                skeleton.append("X")
-                i = template.index(after: close)
-            } else {
-                skeleton.append(template[i]); i = template.index(after: i)
+        // Checa com tokens substituídos por "X" E por "" (vazio): barra tanto literal `..`
+        // quanto `..{campo_vazio}` que viraria `..` em runtime.
+        for sentinel in ["X", ""] {
+            var skeleton = ""
+            var i = template.startIndex
+            while i < template.endIndex {
+                if template[i] == "{", let close = template[i...].firstIndex(of: "}") {
+                    skeleton.append(sentinel)
+                    i = template.index(after: close)
+                } else {
+                    skeleton.append(template[i]); i = template.index(after: i)
+                }
             }
-        }
-        for seg in skeleton.split(separator: "/", omittingEmptySubsequences: false) where seg == ".." {
-            throw NamingError.pathTraversal(template)
+            for seg in skeleton.split(separator: "/", omittingEmptySubsequences: false) where seg == ".." {
+                throw NamingError.pathTraversal(template)
+            }
         }
     }
 
@@ -300,12 +309,15 @@ public struct NameBuilder {
             fileName = originalName
         }
         // #8: nenhum componente pode passar do limite do filesystem, senão o FileManager lança
-        // ENAMETOOLONG e derruba o offload INTEIRO. Trunca cada segmento de pasta e o nome do arquivo.
-        let safeFolder = folder.split(separator: "/", omittingEmptySubsequences: false)
-            .map { Self.truncateComponent(String($0), maxBytes: 200, keepingExtension: false) }
-            .joined(separator: "/")
+        // ENAMETOOLONG e derruba o offload INTEIRO. Trunca cada segmento de pasta e o nome do arquivo,
+        // descartando segmentos vazios (tokens em branco não podem gerar `//` nem caminho absoluto).
+        let folderSegments = folder.split(separator: "/", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { Self.truncateComponent($0, maxBytes: 200, keepingExtension: false) }
+        let safeFolder = folderSegments.joined(separator: "/")
         let safeFile = Self.truncateComponent(fileName, maxBytes: 200, keepingExtension: true)
-        return safeFolder + "/" + safeFile
+        return safeFolder.isEmpty ? safeFile : safeFolder + "/" + safeFile
     }
 
     /// "Vazio na prática": só separadores/espaços (ou nada). Um stem assim viraria arquivo oculto.

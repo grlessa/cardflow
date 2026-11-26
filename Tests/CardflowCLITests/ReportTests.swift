@@ -48,16 +48,33 @@ import Foundation
 
     @Test func outcomeMentionsSidecarsAndManifest() {
         let o = OffloadOutcome(verifiedCount: 4, failures: [], unrecognized: [], skipped: [],
-                               sidecarsCopied: 2, cardAlreadyCopied: false,
+                               sidecarsCopied: 2,
                                manifestPaths: ["/Volumes/SSD/Conf/.cardflow/manifest-x.json"])
         let s = Report.outcome(o)
-        #expect(s.contains("Sidecars: 2"))
+        #expect(s.contains("Arquivos auxiliares: 2"))
         #expect(s.contains("manifest-x.json"))
+    }
+
+    @Test func verdictWhenNothingSavedDoesNotClaimZeroFailures() {
+        let o = OffloadOutcome(verifiedCount: 0, failures: [], unrecognized: [], skipped: [])
+        let v = Report.verdict(o)
+        #expect(v.ok == false)
+        #expect(v.line.contains("NÃO formate"))
+        #expect(!v.line.contains("0 falha"))
+    }
+
+    @Test func errorReportLocalizesOffloadAndNamingErrors() {
+        let line1 = CLIErrorReport.line(for: OffloadError.diskFullDuringCopy)
+        #expect(!line1.contains("cli.error."))
+        #expect(line1.contains("erro:"))
+        let line2 = CLIErrorReport.line(for: NamingError.unknownToken("foo"))
+        #expect(!line2.contains("cli.error."))
+        #expect(line2.contains("{foo}"))
     }
 
     @Test func outcomeMentionsRelocatedCinema() {
         let o = OffloadOutcome(verifiedCount: 2, failures: [], unrecognized: [], skipped: [],
-                               sidecarsCopied: 0, cardAlreadyCopied: false, manifestPaths: [],
+                               sidecarsCopied: 0, manifestPaths: [],
                                relocatedCinema: ["A001.RDM"])
         let s = Report.outcome(o)
         #expect(s.contains("movido"))

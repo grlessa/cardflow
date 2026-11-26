@@ -36,7 +36,7 @@ import CardFormatXPC
     }
 
     @Test func discoSemVolumeLegivelPassaSeTamanhoBate() throws {
-        var d = card; d.partitionFileSystems = []; d.volumeUUIDs = []
+        var d = card; d.partitionFileSystems = []; d.volumeUUIDs = []; d.sliceCount = 0
         let r = FormatRequest(bsdName: "disk4", expectedTotalBytes: 64_088_965_120, expectedVolumeUUID: nil, label: "")
         _ = try DeviceGuard.validate(d, request: r).get()
     }
@@ -45,5 +45,31 @@ import CardFormatXPC
     @Test func leitorDeSDEmbutidoDoMacPassa() throws {
         var d = card; d.isInternal = true; d.isRemovable = true
         _ = try DeviceGuard.validate(d, request: req).get()
+    }
+
+    @Test func recusaMultiParticaoSynthesizedAPFSFatiaDesconhecidaENomeInvalido() {
+        var multi = card; multi.sliceCount = 2; multi.partitionFileSystems = ["exfat", "exfat"]
+        if case .failure(.multiplePartitions(2)) = DeviceGuard.validate(multi, request: req) {} else {
+            Issue.record("devia recusar multi-partição")
+        }
+
+        var synth = card; synth.isSynthesizedAPFS = true; synth.partitionFileSystems = []; synth.sliceCount = 0
+        if case .failure(.unsupportedFileSystem("apfs")) = DeviceGuard.validate(synth, request: req) {} else {
+            Issue.record("devia recusar contêiner APFS sintetizado")
+        }
+
+        // Fatia presente sem VolumeKind conhecido (ex.: partição GPT APFS/EFI desmontada)
+        var unk = card; unk.sliceCount = 1; unk.partitionFileSystems = []
+        if case .failure(.unsupportedFileSystem("unknown")) = DeviceGuard.validate(unk, request: req) {} else {
+            Issue.record("devia recusar fatia sem sistema conhecido")
+        }
+
+        for bad in ["/dev/disk4", "rdisk4", "disk4s1", "disk", ""] {
+            let r = FormatRequest(bsdName: bad, expectedTotalBytes: card.totalBytes, expectedVolumeUUID: "UUID-A", label: "X")
+            var d = card; d.bsdName = bad
+            if case .failure(.notWhole) = DeviceGuard.validate(d, request: r) {} else {
+                Issue.record("devia recusar bsdName inválido \(bad)")
+            }
+        }
     }
 }

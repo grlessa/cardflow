@@ -12,17 +12,19 @@ public struct CardScanner {
 
     public func scan(cardRoot: URL) throws -> [MediaFile] {
         let fm = FileManager.default
+        let canonicalRoot = cardRoot.resolvingSymlinksInPath().standardizedFileURL
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .fileSizeKey, .creationDateKey, .contentModificationDateKey]
         guard let enumerator = fm.enumerator(
-            at: cardRoot, includingPropertiesForKeys: keys, options: []
+            at: canonicalRoot, includingPropertiesForKeys: keys, options: []
         ) else { return [] }
 
-        let rootPath = cardRoot.standardizedFileURL.path
+        let rootPath = canonicalRoot.path
+        let rootSlash = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         // fallback estável quando o FS não dá data NENHUMA do arquivo (raro, ex. exFAT estranho):
         // a data de modificação da RAIZ do cartão (≈ quando o cartão foi usado), em vez de 1970 —
         // que faria footage de hoje cair numa pasta "jan 1970" e parecer perdido. Estável entre
         // execuções (não muda em leitura), então não quebra a idempotência por nome/pasta.
-        let rootFallback = (try? cardRoot.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        let rootFallback = (try? canonicalRoot.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
             ?? Date(timeIntervalSince1970: 0)
         var result: [MediaFile] = []
 
@@ -32,18 +34,17 @@ public struct CardScanner {
                 if url.lastPathComponent.hasPrefix(".") { enumerator.skipDescendants() }
                 continue
             }
-            // symlink → resolve pro alvo (alguns fluxos usam link pra mídia real; sem isso a mídia sumia).
+            // symlink -> resolve pro alvo (alguns fluxos usam link pra mídia real; sem isso a mídia sumia).
             if values.isRegularFile != true {
-                guard let tv = try? url.resolvingSymlinksInPath().resourceValues(forKeys: Set(keys)),
-                      tv.isRegularFile == true else { continue }   // symlink quebrado / pra pasta → ignora
-                values = tv   // tamanho/data do ALVO; relPath e sourceURL seguem o do link (lê o alvo ao copiar)
+                let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+                guard let tv = try? resolved.resourceValues(forKeys: Set(keys)),
+                      tv.isRegularFile == true else { continue }   // symlink quebrado / pra pasta -> ignora
+                values = tv
             }
 
             let fullPath = url.standardizedFileURL.path
-            var rel = fullPath
-            if fullPath.hasPrefix(rootPath + "/") {
-                rel = String(fullPath.dropFirst(rootPath.count + 1))
-            }
+            guard fullPath.hasPrefix(rootSlash) else { continue }
+            let rel = String(fullPath.dropFirst(rootSlash.count))
             // captura: creationDate, senão modificationDate, senão a data da raiz do cartão (não 1970).
             let capture = Self.resolveCapture(creation: values.creationDate,
                                               modification: values.contentModificationDate,

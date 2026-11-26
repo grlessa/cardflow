@@ -23,21 +23,39 @@ public final class FileBlockDevice: BlockDevice {
     public init(path: String, sectorCount: UInt64? = nil, exclusive: Bool = false) throws {
         fd = open(path, O_RDWR | (exclusive ? O_EXLOCK | O_NONBLOCK : 0))
         guard fd >= 0 else { throw BlockDeviceError(operation: "open \(path)", errno: errno) }
-        if let sectorCount {
+        if exclusive {
+            // O_NONBLOCK serviu só para não travar esperando O_EXLOCK; limpa depois pra I/O bloqueante.
+            let flags = fcntl(fd, F_GETFL)
+            if flags >= 0 { _ = fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) }
+        }
+        var st = stat()
+        guard fstat(fd, &st) == 0 else {
+            let e = errno; Darwin.close(fd); fd = -1; throw BlockDeviceError(operation: "fstat", errno: e)
+        }
+        let mode = st.st_mode & S_IFMT
+        if mode == S_IFCHR || mode == S_IFBLK {
+            // Dispositivo de bloco/cru: confere diretamente no descritor aberto tamanho de setor e total
+            // de setores (evita confiar cegamente no tamanho informado antes do open).
+            let dkiocGetBlockSize: UInt = 0x4004_6418   // _IOR('d', 24, uint32_t)
+            let dkiocGetBlockCount: UInt = 0x4008_6419  // _IOR('d', 25, uint64_t)
+            var blockSize: UInt32 = 0
+            var actualSectors: UInt64 = 0
+            guard ioctl(fd, dkiocGetBlockSize, &blockSize) == 0,
+                  ioctl(fd, dkiocGetBlockCount, &actualSectors) == 0 else {
+                let e = errno; Darwin.close(fd); fd = -1; throw BlockDeviceError(operation: "ioctl", errno: e)
+            }
+            guard blockSize == 512 else {
+                Darwin.close(fd); fd = -1; throw BlockDeviceError(operation: "blockSize", errno: EINVAL)
+            }
+            if let expected = sectorCount, expected != actualSectors {
+                Darwin.close(fd); fd = -1; throw BlockDeviceError(operation: "sectorCount", errno: EINVAL)
+            }
+            self.sectorCount = actualSectors
+        } else if let sectorCount {
             self.sectorCount = sectorCount
         } else {
-            var st = stat()
-            guard fstat(fd, &st) == 0 else {
-                let e = errno; Darwin.close(fd); throw BlockDeviceError(operation: "fstat", errno: e)
-            }
             self.sectorCount = UInt64(st.st_size) / 512
         }
-    }
-
-    /// Usa um descritor já aberto por outro caminho (ex.: o authopen do sistema). Passa a ser dono dele.
-    public init(fd: Int32, sectorCount: UInt64) {
-        self.fd = fd
-        self.sectorCount = sectorCount
     }
 
     public static func createSparse(at path: String, sectors: UInt64) throws -> FileBlockDevice {
@@ -54,19 +72,52 @@ public final class FileBlockDevice: BlockDevice {
     public func close() { if fd >= 0 { Darwin.close(fd); fd = -1 } }
 
     public func read(sector: UInt64, count: Int) throws -> [UInt8] {
-        var buf = [UInt8](repeating: 0, count: count * 512)
-        let n = buf.withUnsafeMutableBytes { pread(fd, $0.baseAddress, $0.count, off_t(sector * 512)) }
-        guard n == buf.count else { throw BlockDeviceError(operation: "pread", errno: errno) }
+        guard count >= 0, sector <= sectorCount, UInt64(count) <= sectorCount - sector else {
+            throw BlockDeviceError(operation: "pread (limites)", errno: EINVAL)
+        }
+        let total = count * 512
+        if total == 0 { return [] }
+        var buf = [UInt8](repeating: 0, count: total)
+        try buf.withUnsafeMutableBytes { raw in
+            var done = 0
+            while done < total {
+                let n = pread(fd, raw.baseAddress!.advanced(by: done), total - done, off_t(sector * 512) + off_t(done))
+                if n < 0 {
+                    if errno == EINTR { continue }
+                    throw BlockDeviceError(operation: "pread", errno: errno)
+                }
+                if n == 0 { throw BlockDeviceError(operation: "pread (EOF)", errno: EIO) }
+                done += n
+            }
+        }
         return buf
     }
 
     public func write(sector: UInt64, _ bytes: [UInt8]) throws {
         guard bytes.count % 512 == 0 else { throw BlockDeviceError(operation: "write (tamanho)", errno: EINVAL) }
-        let n = bytes.withUnsafeBytes { pwrite(fd, $0.baseAddress, $0.count, off_t(sector * 512)) }
-        guard n == bytes.count else { throw BlockDeviceError(operation: "pwrite", errno: errno) }
+        let count = UInt64(bytes.count / 512)
+        guard sector <= sectorCount, count <= sectorCount - sector else {
+            throw BlockDeviceError(operation: "pwrite (limites)", errno: EINVAL)
+        }
+        if bytes.isEmpty { return }
+        try bytes.withUnsafeBytes { raw in
+            var done = 0
+            while done < bytes.count {
+                let n = pwrite(fd, raw.baseAddress!.advanced(by: done), bytes.count - done, off_t(sector * 512) + off_t(done))
+                if n < 0 {
+                    if errno == EINTR { continue }
+                    throw BlockDeviceError(operation: "pwrite", errno: errno)
+                }
+                if n == 0 { throw BlockDeviceError(operation: "pwrite (EOF)", errno: EIO) }
+                done += n
+            }
+        }
     }
 
     public func zero(sector: UInt64, count: UInt64) throws {
+        guard sector <= sectorCount, count <= sectorCount - sector else {
+            throw BlockDeviceError(operation: "zero (limites)", errno: EINVAL)
+        }
         let chunk: UInt64 = 2048   // 1 MiB por escrita
         let zeros = [UInt8](repeating: 0, count: Int(chunk) * 512)
         var s = sector, left = count

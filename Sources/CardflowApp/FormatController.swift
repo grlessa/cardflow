@@ -21,10 +21,19 @@ enum FormatPermission: Equatable { case notActivated, needsApproval, needsDiskAc
 final class FormatController: CardFormatting {
     private(set) var permission: FormatPermission = .notActivated
     @ObservationIgnored private let service = SMAppService.daemon(plistName: CardFormatXPC.plistName)
+    @ObservationIgnored private var repairTask: Task<Void, Never>?
 
     init() {
-        repairRegistrationAfterUpdate()
-        refreshPermission()
+        let registered = UserDefaults.standard.string(forKey: Self.registeredBuildKey)
+        if Self.shouldReRegister(isEnabled: service.status == .enabled, registeredBuild: registered,
+                                 currentBuild: Self.currentBuild) {
+            // Repara primeiro e só depois consulta XPC (evita corrida entre unregister e checkDiskAccess).
+            Task { [weak self] in
+                await self?.reRegister()
+            }
+        } else {
+            refreshPermission()
+        }
     }
 
     // MARK: Registro depois de atualizar
@@ -39,24 +48,25 @@ final class FormatController: CardFormatting {
         isEnabled && registeredBuild != currentBuild
     }
 
-    /// Só `register()` de novo não basta (o registro velho fica no launchd): desfaz e refaz.
-    private func repairRegistrationAfterUpdate() {
-        let registered = UserDefaults.standard.string(forKey: Self.registeredBuildKey)
-        guard Self.shouldReRegister(isEnabled: service.status == .enabled, registeredBuild: registered,
-                                    currentBuild: Self.currentBuild) else { return }
-        Task { await reRegister() }
-    }
-
-    /// Registrar logo depois de desfazer não pega (o macOS ainda está limpando o registro velho): tenta de
-    /// novo por alguns segundos. A aprovação dada antes continua valendo, sem pedir de novo.
+    /// Serializa o reparo: chamadas simultâneas aguardam o mesmo Task em vez de desfazer o registro uma da outra.
     private func reRegister() async {
-        do { try await service.unregister() } catch { NSLog("Cardflow: desfazer registro do ajudante: \(error)") }
-        for _ in 0..<8 {
-            try? await Task.sleep(for: .seconds(1))
-            register()
-            if service.status == .enabled { break }
+        if let existing = repairTask {
+            await existing.value
+            return
         }
-        refreshPermission()
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do { try await self.service.unregister() } catch { NSLog("Cardflow: desfazer registro do ajudante: \(error)") }
+            for _ in 0..<8 {
+                try? await Task.sleep(for: .seconds(1))
+                self.register()
+                if self.service.status == .enabled { break }
+            }
+            self.refreshPermission()
+        }
+        repairTask = task
+        await task.value
+        repairTask = nil
     }
 
     /// Registra (ou registra de novo) e anota o build quando ficou ativo.
@@ -68,9 +78,7 @@ final class FormatController: CardFormatting {
     func refreshPermission() {
         switch service.status {
         case .enabled:
-            // aprovado; falta saber se o ajudante tem Acesso Total ao Disco (sem ele, o leitor de SD
-            // embutido recusa). Enquanto não responde, mantém o último estado conhecido.
-            if permission != .needsDiskAccess { permission = .ready }
+            // Aprovado; falta saber se o ajudante responde e tem Acesso Total ao Disco.
             checkDiskAccess()
         case .requiresApproval: permission = .needsApproval
         case .notRegistered: permission = .notActivated
@@ -91,7 +99,6 @@ final class FormatController: CardFormatting {
         if permission == .needsDiskAccess {   // já aprovado; o que falta é o Acesso Total ao Disco
             openDiskAccessSettings(); revealHelperInFinder(); return
         }
-        // register() lança quando falta aprovação; o status (lido logo depois) diz o que aconteceu.
         register()
         refreshPermission()
         if permission == .needsApproval { openSystemSettings() }
@@ -109,37 +116,51 @@ final class FormatController: CardFormatting {
         NSWorkspace.shared.activateFileViewerSelecting([helper])
     }
 
-    /// Pergunta ao ajudante (que é quem precisa do acesso) se ele tem Acesso Total ao Disco.
+    /// Pergunta ao ajudante (com timeout e limpeza de conexão) se ele tem Acesso Total ao Disco.
     private func checkDiskAccess() {
         let conn = NSXPCConnection(machServiceName: CardFormatXPC.machServiceName, options: .privileged)
         conn.remoteObjectInterface = CardFormatXPC.serviceInterface()
         conn.setCodeSigningRequirement(CardFormatXPC.helperRequirement)
-        conn.resume()
-        let proxy = conn.remoteObjectProxyWithErrorHandler { _ in conn.invalidate() } as? CardFormatServiceProtocol
-        proxy?.checkDiskAccess { has in
+        let once = OnceBox()
+        let finish: (Bool?) -> Void = { [weak self] has in
+            guard once.claim() else { return }
             conn.invalidate()
             Task { @MainActor [weak self] in
                 guard let self, self.service.status == .enabled else { return }
-                self.permission = has ? .ready : .needsDiskAccess
-            }
-        }
-    }
-
-    func format(_ request: FormatRequest, progress: @escaping @MainActor (FormatStep) -> Void) async -> FormatResponse {
-        // Sem ajudante de pé, a conexão XPC espera para sempre. Confere antes; se não responde, registra de
-        // novo (o launchd tenta subir a cada ~10 s) e, como último recurso, desfaz e refaz o registro.
-        if await !helperResponds() {
-            NSLog("Cardflow: ajudante sem resposta; registrando de novo")
-            await reRegister()
-            if await !helperResponds(within: 25) {
-                await reRegister()
-                if await !helperResponds(within: 25) {
-                    refreshPermission()
-                    return FormatResponse(failure: .helperUnavailable, detail: "o ajudante não respondeu", plan: nil)
+                if let has {
+                    self.permission = has ? .ready : .needsDiskAccess
+                } else if self.permission == .notActivated || self.permission == .needsApproval {
+                    // Ajudante habilitado mas não respondeu no prazo: mantém estado conhecido sem afirmar .ready à toa
+                    self.permission = .needsDiskAccess
                 }
             }
         }
-        return await sendFormat(request, progress: progress)
+        conn.interruptionHandler = { finish(nil) }
+        conn.invalidationHandler = { finish(nil) }
+        conn.resume()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 6) { finish(nil) }
+        guard let proxy = conn.remoteObjectProxyWithErrorHandler({ _ in finish(nil) }) as? CardFormatServiceProtocol else {
+            finish(nil); return
+        }
+        proxy.checkDiskAccess { has in finish(has) }
+    }
+
+    func format(_ request: FormatRequest, progress: @escaping @MainActor (FormatStep) -> Void) async -> FormatResponse {
+        // Aguarda um eventual reparo já em andamento antes de testar o ajudante.
+        if let pending = repairTask { await pending.value }
+        if await !helperResponds() {
+            NSLog("Cardflow: ajudante sem resposta; registrando de novo")
+            await reRegister()
+            if await !helperResponds(within: 20) {
+                refreshPermission()
+                return FormatResponse(failure: .helperUnavailable, detail: "o ajudante não respondeu", plan: nil)
+            }
+        }
+        let resp = await sendFormat(request, progress: progress)
+        if resp.failure == .diskAccessDenied {
+            permission = .needsDiskAccess
+        }
+        return resp
     }
 
     /// O ajudante responde ao ping dentro do prazo?
@@ -178,8 +199,15 @@ final class FormatController: CardFormatting {
             conn.interruptionHandler = { finish(FormatResponse(failure: .internalError, detail: "conexão interrompida", plan: nil)) }
             conn.invalidationHandler = { finish(FormatResponse(failure: .internalError, detail: "ajudante indisponível", plan: nil)) }
             conn.resume()
+            DispatchQueue.global().asyncAfter(deadline: .now() + 180) {
+                finish(FormatResponse(failure: .internalError, detail: "tempo esgotado aguardando o ajudante", plan: nil))
+            }
             let relay = ProgressRelay { raw in
-                if let s = FormatStep(rawValue: raw) { Task { @MainActor in progress(s) } }
+                guard !once.isClaimed, let s = FormatStep(rawValue: raw) else { return }
+                Task { @MainActor in
+                    guard !once.isClaimed else { return }
+                    progress(s)
+                }
             }
             let proxy = conn.remoteObjectProxyWithErrorHandler { err in
                 finish(FormatResponse(failure: .internalError, detail: err.localizedDescription, plan: nil))
@@ -206,5 +234,6 @@ final class ProgressRelay: NSObject, CardFormatProgressProtocol {
 final class OnceBox: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false
+    var isClaimed: Bool { lock.lock(); defer { lock.unlock() }; return done }
     func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }

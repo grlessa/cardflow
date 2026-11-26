@@ -37,8 +37,10 @@ struct ManageModelsSheet: View {
             HStack(spacing: 6) {
                 Button { model.requestNewModel(); dismiss() } label: { footerSymbol("plus") }
                     .help("menu.file.newModel")
+                    .accessibilityLabel(Text("menu.file.newModel"))
                 Button { confirmingDelete = true } label: { footerSymbol("minus") }
                     .help("models.delete.help")
+                    .accessibilityLabel(Text("models.delete.help"))
                     .disabled(deletable.isEmpty)
                 Divider().frame(height: 16)
                 Button("main.preset.duplicate") { selection = Set(selection.compactMap { model.duplicatePreset($0) }) }

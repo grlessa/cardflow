@@ -1,8 +1,8 @@
 import Foundation
 import OffloadKit
 
-/// Ciclo de vida de cada cartão: aparece → é lido UMA vez → prévia recalculada sobre a lista em memória
-/// (trocar mídia, destino ou modelo não relê o cartão) → sai do Mac.
+/// Ciclo de vida de cada cartão: aparece -> é lido UMA vez -> prévia recalculada sobre a lista em memória
+/// (trocar mídia, destino ou modelo não relê o cartão) -> sai do Mac.
 extension AppModel {
     /// Sincroniza `cards` com as fontes montadas. O mesmo caminho com outro volume (outro "Untitled") é
     /// outro cartão: o anterior sai e o novo é lido do zero.
@@ -11,8 +11,28 @@ extension AppModel {
         for v in srcs {
             if let existing = cards.first(where: { $0.id == v.id && Self.sameMedium($0.volume, v) }) {
                 next.append(existing)
+            } else if let renamed = cards.first(where: { Self.sameRenamedMedium($0.volume, v) }),
+                      !next.contains(where: { $0 === renamed }) {
+                // Volume renomeado pelo usuário no Finder: preserva a sessão e atualiza caminho/watcher.
+                let oldID = renamed.id
+                renamed.volume = v
+                if selection == .card(oldID) { selection = .card(renamed.id) }
+                renamed.watcher?.stop()
+                startWatching(renamed)
+                next.append(renamed)
             } else if let owner = cards.first(where: { Self.ownsRemount($0, v) }), !next.contains(where: { $0 === owner }) {
-                // o volume que volta da formatação (mesmo disco físico) é o MESMO cartão, não um novo e vazio
+                // O volume que volta da formatação (mesmo disco físico) é o MESMO cartão, não um novo e vazio.
+                // Atualiza `volume` (novo UUID/caminho) e limpa a flag única de remontagem.
+                let oldID = owner.id
+                owner.volume = v
+                owner.remountedAfterFormat = true
+                owner.awaitingPostFormatRemount = false
+                if let bsd = v.physicalDeviceID, case .done = owner.formatState {
+                    formattingWholeDiskBSDs.remove(bsd)
+                }
+                if selection == .card(oldID) { selection = .card(owner.id) }
+                owner.watcher?.stop()
+                startWatching(owner)
                 next.append(owner)
             } else {
                 let c = CardSession(volume: v, mediaChoice: defaultMediaChoice)
@@ -23,13 +43,13 @@ extension AppModel {
                 startWatching(c)
             }
         }
-        // formatando: o cartão some do Mac por uns segundos (desmonta e remonta) sem ter "saído"
+        // Formatando (ou aguardando remontar 1x logo após formatar): o cartão desmonta e volta sem "sair".
         for c in cards where Self.isFormatInFlight(c) && !next.contains(where: { $0 === c }) { next.append(c) }
         let leaving = cards.filter { old in !next.contains { $0 === old } }
         let arrived = next.filter { new in !cards.contains { $0 === new } }
         cards = next
         for c in leaving { cardDidLeave(c) }
-        // seleção: sem nada escolhido, o primeiro cartão; cartão novo ganha a vez se o que está à vista
+        // Seleção: sem nada escolhido, o primeiro cartão; cartão novo ganha a vez se o que está à vista
         // não está ocupado (copiando, na fila, formatando).
         let current: CardSession? = { if case .card(let id)? = selection { return card(id: id) }; return nil }()
         if !selectionByUser {
@@ -46,22 +66,25 @@ extension AppModel {
         return false
     }
 
-    /// Formatação em andamento, ou recém-terminada esperando o volume voltar.
+    /// Formatação em andamento (`.formatting`), ou recém-terminada ainda aguardando a 1ª remontagem.
+    /// Nunca inclui `.checking` nem `.confirming`: tirar o cartão antes de confirmar cancela e remove o cartão.
     private static func isFormatInFlight(_ c: CardSession) -> Bool {
         switch c.formatState {
-        case .checking, .confirming, .formatting: return true
-        case .done: return !c.ejected && (c.formattedAt.map { Date().timeIntervalSince($0) < 30 } ?? false)
+        case .formatting: return true
+        case .done:
+            return c.awaitingPostFormatRemount && !c.ejected
+                && (c.formattedAt.map { Date().timeIntervalSince($0) < 30 } ?? false)
         default: return false
         }
     }
 
-    /// Este cartão é dono do volume `v`? Durante e depois da formatação (até ejetar), o volume novo que
-    /// aparece no mesmo disco físico é ele mesmo.
+    /// Este cartão é dono do volume `v`? Exclusivamente durante `.formatting` ou na primeira remontagem
+    /// pós-formatação (`awaitingPostFormatRemount`), para nunca absorver um cartão novo inserido depois.
     private static func ownsRemount(_ c: CardSession, _ v: ExternalVolume) -> Bool {
         guard let disk = c.volume.physicalDeviceID, disk == v.physicalDeviceID else { return false }
         switch c.formatState {
-        case .checking, .confirming, .formatting: return true
-        case .done: return !c.ejected
+        case .formatting: return true
+        case .done: return c.awaitingPostFormatRemount && !c.ejected
         default: return false
         }
     }
@@ -70,12 +93,23 @@ extension AppModel {
         a.volumeUUID == b.volumeUUID && a.totalBytes == b.totalBytes
     }
 
-    /// O cartão saiu do Mac. Sai da fila sem erro. Se tinha terminado bem, deixa um resumo (CompletedCard)
-    /// que fica à vista no lugar dele: quem volta encontra "pronto, pode tirar" e não uma tela vazia.
+    private static func sameRenamedMedium(_ a: ExternalVolume, _ b: ExternalVolume) -> Bool {
+        guard let ua = a.volumeUUID, !ua.isEmpty, ua == b.volumeUUID else { return false }
+        return a.physicalDeviceID == b.physicalDeviceID && a.totalBytes == b.totalBytes
+    }
+
+    /// O cartão saiu do Mac. Cancela tarefas pendentes, tira da fila e, se terminou bem, deixa resumo.
     func cardDidLeave(_ card: CardSession) {
         card.scanTask?.cancel()
+        card.cameraTask?.cancel()
         card.watcher?.stop(); card.watcher = nil
-        queue.remove(card.id)
+        if let bsd = card.volume.physicalDeviceID { formattingWholeDiskBSDs.remove(bsd) }
+        if case .checking = card.formatState { card.formatState = .idle }
+        if case .confirming = card.formatState { card.formatState = .idle }
+        if card.phase == .queued {
+            batchCount = max(0, batchCount - 1)
+        }
+        queue.remove(card.sessionID.uuidString)
         let wasSelected: Bool = {
             switch selection {
             case .card(let id)?: return id == card.id
@@ -84,11 +118,34 @@ extension AppModel {
             }
         }()
         reloadHistory()   // em segundo plano: Recentes ganha a cópia assim que a lista chega
-        if let done = completion(for: card) {
-            completed.insert(done, at: 0)
+        let doneID = UUID().uuidString
+        let ctx = card.offloadContext ?? (card.isAlreadyCopied ? currentOffloadContext(for: card) : nil)
+        let dests = ctx?.destinations ?? offloadDestinations
+        if let done = CompletedCard.make(from: card, destinations: dests, manifestPaths: []) {
+            let finalDone = CompletedCard(id: doneID, name: done.name, mediaKind: done.mediaKind,
+                                          files: done.files, bytes: done.bytes, destinations: done.destinations,
+                                          steps: done.steps, verdict: done.verdict, fileSystem: done.fileSystem,
+                                          manifestPaths: done.manifestPaths, pathSegments: done.pathSegments)
+            completed.insert(finalDone, at: 0)
             if completed.count > 6 { completed.removeLast(completed.count - 6) }
+            // Se era cartão "já estava copiado" sem manifestPaths no phase, resolve caminhos fora da main thread.
+            if finalDone.manifestPaths.isEmpty, let ctx, let scanned = card.scanned {
+                let cardUUID = card.volume.volumeUUID
+                Task.detached { [weak self] in
+                    let paths = Self.findManifestPaths(scanned: scanned, cardUUID: cardUUID, ctx: ctx)
+                    guard !paths.isEmpty else { return }
+                    await MainActor.run { [weak self] in
+                        guard let self, let idx = self.completed.firstIndex(where: { $0.id == doneID }) else { return }
+                        let old = self.completed[idx]
+                        self.completed[idx] = CompletedCard(id: old.id, name: old.name, mediaKind: old.mediaKind,
+                                                            files: old.files, bytes: old.bytes, destinations: old.destinations,
+                                                            steps: old.steps, verdict: old.verdict, fileSystem: old.fileSystem,
+                                                            manifestPaths: paths, pathSegments: old.pathSegments)
+                    }
+                }
+            }
             if wasSelected {
-                selection = .completed(done.id)
+                selection = .completed(finalDone.id)
                 selectionByUser = true   // fica no resumo; cartão novo que chegar toma a vez
             }
             return
@@ -97,28 +154,12 @@ extension AppModel {
         selection = cards.first.map { .card($0.id) }
     }
 
-    private func completion(for card: CardSession) -> CompletedCard? {
-        let ctx = card.offloadContext
-        let dests = ctx?.destinations ?? offloadDestinations
-        var paths: [String] = []
-        if case .finished = card.phase {} else if card.isAlreadyCopied, let c = ctx ?? currentOffloadContext(for: card) {
-            paths = manifestPaths(of: card, ctx: c)
-        }
-        return CompletedCard.make(from: card, destinations: dests, manifestPaths: paths)
-    }
-
     /// Fecha o resumo de um cartão concluído.
     func dismissCompleted(_ id: String) {
         completed.removeAll { $0.id == id }
         if case .completed(let sel)? = selection, sel == id {
             selection = cards.first.map { .card($0.id) }
         }
-    }
-
-    static func offloadId(fromManifestPaths paths: [String]) -> String? {
-        guard let p = paths.first, let data = FileManager.default.contents(atPath: p) else { return nil }
-        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        return (try? dec.decode(Manifest.self, from: data))?.offloadId
     }
 
     // MARK: Mudanças no cartão conectado
@@ -149,7 +190,7 @@ extension AppModel {
         let root = card.volume.url
         card.scanTask = Task.detached { [weak self] in
             let files = try? CardScanner(classifier: FileClassifier()).scan(cardRoot: root)
-            await MainActor.run {
+            await MainActor.run { [weak self] in
                 card.scanTask = nil
                 guard let self, let files, self.cards.contains(where: { $0 === card }) else { return }
                 _ = self.applyRescan(card, files: files)
@@ -163,11 +204,18 @@ extension AppModel {
     func applyRescan(_ card: CardSession, files: [MediaFile]) -> Bool {
         func key(_ f: [MediaFile]) -> [String: Int64] { Dictionary(f.map { ($0.relPath, $0.size) }, uniquingKeysWith: { a, _ in a }) }
         guard key(files) != key(card.scanned ?? []) else { return false }
+        let oldGroups = Set((card.scanned ?? []).map(CameraGroups.key(for:)))
+        let newGroups = Set(files.map(CameraGroups.key(for:)))
         card.scanned = files
+        if !newGroups.subtracting(oldGroups).isEmpty {
+            // Chegaram pastas/câmeras novas no cartão: permite detectar câmera de novo.
+            card.cameraDetected = false
+        }
         switch card.phase {
         case .finished, .failed:
             card.phase = .ready
             card.finishedAt = nil; card.startedAt = nil; card.lastElapsed = nil
+            card.frozenPathSegments = nil; card.frozenTotalBytes = nil
             card.formatState = .idle
         default: break
         }
@@ -176,8 +224,11 @@ extension AppModel {
         return true
     }
 
-    /// Ao voltar pro app: relê os cartões parados e recalcula as prévias (espaço livre dos discos muda por fora).
+    /// Ao voltar pro app: recheca permissões, espaço livre e relê cartões parados.
     func refreshOnActivate() {
+        formatter.refreshPermission()
+        probeInternalPermissions()
+        refreshDiskSpaces()
         for c in cards {
             recomputePreview(c)
             if canRescan(c) { rescan(c) }
@@ -187,15 +238,18 @@ extension AppModel {
     func startScan(_ card: CardSession) {
         card.phase = .scanning
         let root = card.volume.url
+        let bsd = card.volume.physicalDeviceID
         card.scanTask = Task.detached { [weak self] in
             let files = try? CardScanner(classifier: FileClassifier()).scan(cardRoot: root)
-            await self?.scanFinished(card, files: files)
+            let diskBytes = bsd.flatMap { PhysicalDisk.wholeDiskSize(bsdName: $0) }
+            await self?.scanFinished(card, files: files, wholeDiskBytes: diskBytes)
         }
     }
 
-    private func scanFinished(_ card: CardSession, files: [MediaFile]?) {
+    private func scanFinished(_ card: CardSession, files: [MediaFile]?, wholeDiskBytes: UInt64?) {
         guard cards.contains(where: { $0 === card }) else { return }
         card.scanned = files ?? []
+        if let wholeDiskBytes { card.wholeDiskBytes = wholeDiskBytes }
         card.scanTask = nil
         if card.phase == .scanning { card.phase = .ready }
         autoDetectCamera(card)
@@ -209,9 +263,11 @@ extension AppModel {
     }
 
     /// Recalcula a prévia sobre a lista já lida, em segundo plano. Resultado antigo é descartado.
+    /// Cartões já concluídos (`.finished` ou `.done`) mantêm seu resumo congelado.
     func recomputePreview(_ card: CardSession) {
         guard let scanned = card.scanned else { return }
-        switch card.phase { case .running, .queued: return; default: break }
+        switch card.phase { case .running, .queued, .finished: return; default: break }
+        if case .done = card.formatState { return }
         card.previewGeneration &+= 1
         let gen = card.previewGeneration
         let dests = offloadDestinations
@@ -235,6 +291,7 @@ extension AppModel {
                                               lote: pv?.lote?.numero, locale: locale)
             await MainActor.run {
                 guard card.previewGeneration == gen else { return }
+                card.lastPreviewMedia = media
                 card.preview = pv
                 card.tree = tree
             }
@@ -260,24 +317,22 @@ extension AppModel {
         recomputePreview(card)
     }
 
-    /// Preenche a câmera pelo metadado (EXIF/QuickTime) do 1º arquivo legível, uma vez por cartão e só
-    /// quando o modelo usa {camera}. Não atropela ajuste manual (não roda de novo no mesmo cartão).
+    /// Preenche a câmera pelo metadado (EXIF/QuickTime) dos arquivos legíveis. Não atropela ajuste manual.
     func autoDetectCamera(_ card: CardSession) {
-        // sempre, mesmo sem a peça Câmera no modelo: o exemplo da opção Câmera já mostra a câmera real
         guard !card.cameraDetected, let scanned = card.scanned else { return }
         card.cameraDetected = true
-        Task {
-            // uma leitura por pasta do cartão (cada câmera grava na sua); nome curto como quem filma fala
-            // ("FX30", não "SONY ILME-FX30"); sem detecção fica CAM A/B…
+        card.cameraTask?.cancel()
+        card.cameraTask = Task { [weak self, weak card] in
             let byGroup = await CameraGroups.detect(in: scanned).mapValues(CameraMetadata.shortName)
+            guard !Task.isCancelled, let self, let card,
+                  self.cards.contains(where: { $0 === card }), !card.isBusy else { return }
             guard !byGroup.isEmpty else { return }
             card.detectedByGroup = byGroup
-            // câmera "do cartão" (uma câmera só, ou a maior quando tem várias)
             if let main = card.cameraEntries.first(where: { $0.detected != nil })?.detected {
                 card.detectedCamera = main
                 if !card.cameraEdited { card.camera = main }
             }
-            recomputePreview(card)
+            self.recomputePreview(card)
         }
     }
 }

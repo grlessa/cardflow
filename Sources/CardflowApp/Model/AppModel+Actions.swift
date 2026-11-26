@@ -19,46 +19,76 @@ extension AppModel {
         addDestinationFolder(url)
     }
 
-    func addDestinationFolder(_ url: URL) {
-        let isVolumeRoot = watcher.volumes.contains { $0.url.standardizedFileURL == url.standardizedFileURL }
-        if !isVolumeRoot && !customFolders.contains(url) && !internalShortcuts().contains(where: { $0.url == url }) {
+    func addDestinationFolder(_ rawURL: URL) {
+        let url = Self.normalizeFolderURL(rawURL)
+        if let mountedVol = watcher.volumes.first(where: { Self.normalizeFolderURL($0.url).path == url.path }) {
+            // Se o volume escolhido estava classificado como cartão, passa a ser destino.
+            if isSource(mountedVol) {
+                forcedSources.remove(mountedVol.id)
+                forcedDestinations.insert(mountedVol.id)
+            }
+        } else if !customFolders.contains(where: { $0.path == url.path })
+                    && !internalShortcuts().contains(where: { $0.url.path == url.path }) {
             customFolders.append(url)
+            // Garante disponibilidade imediata mesmo antes do refresh em background concluir.
+            if !resolvedCustomFolders.contains(where: { $0.url.path == url.path }) {
+                resolvedCustomFolders.append(ExternalVolume(url: url, name: url.lastPathComponent,
+                                                            isRemovable: false, isInternal: true,
+                                                            totalBytes: nil, physicalDeviceID: nil, volumeUUID: nil,
+                                                            isInternalShortcut: true))
+            }
         }
         setUserDestination(url)
         selection = .destination(url)
     }
 
     /// Tira uma pasta da lista de destinos lembrados (não apaga nada do disco).
-    func forgetDestinationFolder(_ url: URL) {
-        customFolders.removeAll { $0 == url }
-        if destinationURL == url { destinationURL = nil }
-        if backupURL == url { backupURL = nil }
+    func forgetDestinationFolder(_ rawURL: URL) {
+        let path = Self.normalizeFolderURL(rawURL).path
+        customFolders.removeAll { $0.path == path }
+        resolvedCustomFolders.removeAll { $0.url.path == path }
+        if let d = destinationURL, Self.normalizeFolderURL(d).path == path { destinationURL = nil; preferredDestUUID = nil }
+        if let b = backupURL, Self.normalizeFolderURL(b).path == path { backupURL = nil; preferredBackupUUID = nil }
         reconcileVolumes()
         saveDiskSelection()
     }
 
-    func setBackup(_ url: URL?) {
+    func setBackup(_ rawURL: URL?) {
+        let url = rawURL.map(Self.normalizeFolderURL)
         backupURL = url
-        if url != nil, url == destinationURL { destinationURL = nil }
+        preferredBackupUUID = volume(url)?.volumeUUID
+        if let url, let dest = destinationURL, Self.normalizeFolderURL(dest).path == url.path {
+            destinationURL = nil
+            preferredDestUUID = nil
+        }
         reconcileVolumes()
         saveDiskSelection()
     }
 
     enum DestinationRole { case principal, backup, none }
     func role(of url: URL) -> DestinationRole {
-        if url == destinationURL { return .principal }
-        if url == backupURL { return .backup }
+        let path = Self.normalizeFolderURL(url).path
+        if let d = destinationURL, Self.normalizeFolderURL(d).path == path { return .principal }
+        if let b = backupURL, Self.normalizeFolderURL(b).path == path { return .backup }
         return .none
     }
-    func setRole(_ role: DestinationRole, for url: URL) {
+    func setRole(_ role: DestinationRole, for rawURL: URL) {
+        let url = Self.normalizeFolderURL(rawURL)
         switch role {
         case .principal:
-            if backupURL == url { backupURL = nil }
+            if let b = backupURL, Self.normalizeFolderURL(b).path == url.path {
+                backupURL = nil; preferredBackupUUID = nil
+            }
             setUserDestination(url)
-        case .backup: setBackup(url)
+        case .backup:
+            setBackup(url)
         case .none:
-            if destinationURL == url { destinationURL = nil; preferredDestUUID = nil }
-            if backupURL == url { backupURL = nil }
+            if let d = destinationURL, Self.normalizeFolderURL(d).path == url.path {
+                destinationURL = nil; preferredDestUUID = nil
+            }
+            if let b = backupURL, Self.normalizeFolderURL(b).path == url.path {
+                backupURL = nil; preferredBackupUUID = nil
+            }
             reconcileVolumes(); saveDiskSelection()
         }
     }
@@ -71,7 +101,25 @@ extension AppModel {
         panel.canChooseDirectories = false
         if let cfp = UTType(filenameExtension: "cfp") { panel.allowedContentTypes = [cfp, .json] }
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try importPreset(from: url) } catch { modelError = String(localized: "main.importError") }
+        let store = presetStore
+        Task.detached { [weak self] in
+            do {
+                var p = try store.load(from: url)
+                let existing = Set(((try? store.list()) ?? []).map(\.id))
+                if p.id == "factory-default" || p.id == "flat-default" || existing.contains(p.id) {
+                    p.id = UUID().uuidString
+                }
+                try store.save(p)
+                let savedID = p.id
+                await MainActor.run { [weak self] in
+                    self?.reloadPresets(selecting: savedID)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.modelError = String(localized: "main.importError")
+                }
+            }
+        }
     }
 
     func requestExportModel() {
@@ -79,7 +127,17 @@ extension AppModel {
         panel.nameFieldStringValue = PresetStore.exportFilename(for: activePreset)
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? exportActivePreset(to: url)
+        let preset = activePreset
+        let store = presetStore
+        Task.detached { [weak self] in
+            do {
+                try store.export(preset, to: url)
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.modelError = error.localizedDescription
+                }
+            }
+        }
     }
 
     /// Novo modelo a partir do de fábrica, já salvo e selecionado; o painel do modelo abre pra editar.
@@ -87,7 +145,12 @@ extension AppModel {
         var p = Preset.factoryDefault
         p.id = UUID().uuidString
         p.name = uniqueModelName(String(localized: "model.new.defaultName"))
-        try? presetStore.save(p)
+        do {
+            try presetStore.save(p)
+        } catch {
+            modelError = error.localizedDescription
+            return
+        }
         reloadPresets(selecting: p.id, preserveContext: true)
         savePresetSelection()
         setInspector(true)
@@ -105,24 +168,31 @@ extension AppModel {
     func displayName(_ p: Preset) -> String {
         p.id == Preset.factoryDefault.id ? String(localized: "preset.factory.name") : p.name
     }
-
-
 }
 
 // MARK: - Painel do modelo (edição ao vivo)
 
 extension AppModel {
-    /// Editor do modelo ativo pro painel lateral. O de fábrica vira um rascunho de modelo novo.
+    /// Editor do modelo ativo pro painel lateral. Preserva rascunho em andamento se o inspetor foi fechado e reaberto.
     func makeLiveEditor() -> PresetEditorModel {
-        let ed = PresetEditorModel.editing(activePreset)
+        let restoring: Preset?
+        if let override = previewPresetOverride,
+           (isFactory(selectedPresetId) || override.id == activePreset.id) {
+            restoring = override
+        } else {
+            restoring = nil
+        }
+        let ed = PresetEditorModel.editing(activePreset, restoringDraft: restoring)
         ed.otherNames = Set(presets.filter { $0.id != ed.draft.id }.map(\.name))
         return ed
     }
 
     /// Cada mudança no painel: a prévia mostra na hora; um modelo do usuário é salvo sozinho depois de
-    /// uma pausa curta. O de fábrica só vira modelo quando o usuário salva com um nome.
+    /// uma pausa curta (em background). O de fábrica só vira modelo quando o usuário salva com um nome.
     func applyLiveDraft(_ editor: PresetEditorModel) {
         guard editor.hasUnsavedChanges else {
+            liveSaveTask?.cancel()
+            liveSaveTask = nil
             if previewPresetOverride != nil { previewPresetOverride = nil; recomputeAllPreviews() }
             return
         }
@@ -130,10 +200,22 @@ extension AppModel {
         recomputeAllPreviews()
         guard !editor.isNew else { return }
         liveSaveTask?.cancel()
+        let store = presetStore
         liveSaveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(600))
-            guard let self, !Task.isCancelled, editor.canSave, editor.save(into: self.presetStore) else { return }
-            self.presets = [.factoryDefault] + ((try? self.presetStore.list()) ?? [])
+            guard let self, !Task.isCancelled, editor.canSave else { return }
+            let normalized = editor.normalizedForSave()
+            let savedList: [Preset]? = await Task.detached {
+                do {
+                    try store.save(normalized)
+                    return (try? store.list()) ?? []
+                } catch {
+                    return nil
+                }
+            }.value
+            guard !Task.isCancelled, let list = savedList else { return }
+            editor.markSaved(normalized)
+            self.presets = [.factoryDefault] + list
             if self.previewPresetOverride == editor.draft { self.previewPresetOverride = nil }
         }
     }
@@ -141,6 +223,8 @@ extension AppModel {
     /// Salva o rascunho (vindo do modelo de fábrica) como um modelo novo e passa a usá-lo.
     @discardableResult
     func saveDraftAsNewModel(_ editor: PresetEditorModel, name: String) -> Bool {
+        liveSaveTask?.cancel()
+        liveSaveTask = nil
         editor.draft.name = name
         guard editor.canSave, editor.save(into: presetStore) else { return false }
         reloadPresets(selecting: editor.draft.id, preserveContext: true)
@@ -182,6 +266,8 @@ extension AppModel {
 
     /// Descarta o rascunho não salvo do modelo de fábrica.
     func discardDraft() {
+        liveSaveTask?.cancel()
+        liveSaveTask = nil
         previewPresetOverride = nil
         recomputeAllPreviews()
     }
@@ -197,7 +283,12 @@ extension AppModel {
 
     /// Exclui modelos (o de fábrica nunca). Se o modelo em uso sair, volta pro de fábrica.
     func deletePresets(_ ids: Set<String>) {
-        for id in ids where !isFactory(id) { try? presetStore.delete(id: id) }
+        if ids.contains(selectedPresetId) {
+            liveSaveTask?.cancel()
+            liveSaveTask = nil
+            previewPresetOverride = nil
+        }
+        for id in ids where !isFactory(id) { _ = try? presetStore.delete(id: id) }
         if ids.contains(selectedPresetId) {
             reloadPresets(selecting: Preset.factoryDefault.id, preserveContext: true)
             savePresetSelection()
@@ -209,8 +300,17 @@ extension AppModel {
     func renamePreset(_ id: String, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !isFactory(id), !trimmed.isEmpty, var p = presets.first(where: { $0.id == id }) else { return }
+        if id == selectedPresetId {
+            liveSaveTask?.cancel()
+            liveSaveTask = nil
+        }
         p.name = trimmed
-        try? presetStore.save(p)
+        do {
+            try presetStore.save(p)
+        } catch {
+            modelError = error.localizedDescription
+            return
+        }
         reloadPresets()
     }
 
@@ -230,7 +330,16 @@ extension AppModel {
         panel.nameFieldStringValue = PresetStore.exportFilename(for: p)
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? presetStore.export(p, to: url)
+        let store = presetStore
+        Task.detached { [weak self] in
+            do {
+                try store.export(p, to: url)
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.modelError = error.localizedDescription
+                }
+            }
+        }
     }
 
     func usePreset(_ id: String) {

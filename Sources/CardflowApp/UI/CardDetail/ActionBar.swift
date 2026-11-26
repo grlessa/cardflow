@@ -33,7 +33,7 @@ struct ActionBar: View {
     @ViewBuilder private var summary: some View {
         switch card.formatState {
         case .checking: busy("format.checking")
-        case .formatting(let step): busy(LocalizedStringKey(FormatResultSection.label(step)))
+        case .formatting(let step): busyVerbatim(FormatResultSection.label(step))
         case .done(let plan):
             status("action.formatted \(FormatResultSection.fsName(plan)) \(plan.clusterBytes / 1024)",
                    detail: card.ejected ? "action.formatted.removeCard" : nil,
@@ -42,8 +42,8 @@ struct ActionBar: View {
             status("format.blocked.title", detail: "format.blocked.detail \(paths.count)",
                    symbol: "exclamationmark.octagon.fill", color: .red)
         case .failed(let f, let detail):
-            status(LocalizedStringKey(FormatResultSection.failure(f)), detail: nil,
-                   symbol: "exclamationmark.triangle.fill", color: .orange)
+            statusVerbatim(FormatResultSection.failure(f), detail: nil,
+                           symbol: "exclamationmark.triangle.fill", color: .orange)
                 .help(detail ?? "")
         case .idle, .confirming:
             phaseSummary
@@ -58,8 +58,8 @@ struct ActionBar: View {
             if model.destinationURL == nil {
                 status("empty.noDestination.title", detail: "detail.where.none", symbol: "externaldrive.badge.questionmark", color: .orange)
             } else if card.isAlreadyCopied {
-                status("action.alreadyCopied", detail: card.alreadyCopiedDetail.map { LocalizedStringKey($0) },
-                       symbol: "checkmark.seal.fill", color: .green)
+                statusVerbatim(String(localized: "action.alreadyCopied"), detail: card.alreadyCopiedDetail,
+                               symbol: "checkmark.seal.fill", color: .green)
             } else if card.preview == nil {
                 busy("main.card.calculating")
             } else if card.isEmpty {
@@ -71,7 +71,7 @@ struct ActionBar: View {
                         .font(.headline)
                         .monospacedDigit()
                     if let hint = readyHint {
-                        Text(hint).font(.subheadline).foregroundStyle(hintIsWarning ? .orange : .secondary).lineLimit(2)
+                        Text(verbatim: hint).font(.subheadline).foregroundStyle(hintIsWarning ? .orange : .secondary).lineLimit(2)
                     }
                 }
             }
@@ -87,25 +87,26 @@ struct ActionBar: View {
                     .truncationMode(.tail)
                 ProgressView(value: Double(p.bytesDone), total: Double(max(p.bytesTotal, 1)))
                     .progressViewStyle(.linear)
-                Text(progressDetail(p)).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+                Text(verbatim: progressDetail(p)).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
                     .lineLimit(1)
             }
             .frame(minWidth: 200)
         case .finished(let o):
             if !o.failures.isEmpty {
-                status("result.doNotFormat", detail: LocalizedStringKey(String(localized: "count.filesFailed \(o.failures.count)")),
-                       symbol: "exclamationmark.octagon.fill", color: .red)
+                statusVerbatim(String(localized: "result.doNotFormat"), detail: String(localized: "count.filesFailed \(o.failures.count)"),
+                               symbol: "exclamationmark.octagon.fill", color: .red)
             } else if o.canSafelyFormatCard {
-                status("action.verified", detail: verifiedDetail(o), symbol: "checkmark.seal.fill", color: .green)
+                statusVerbatim(String(localized: "action.verified"), detail: verifiedDetail(o),
+                               symbol: "checkmark.seal.fill", color: .green)
             } else if o.copiedKeepingCameras {
                 status("action.verifiedKept", detail: "action.verifiedKept.detail", symbol: "lock.fill", color: .orange)
             } else {
                 status("result.nothingToCopy", detail: "result.reviewBeforeAct", symbol: "questionmark.circle.fill", color: .orange)
             }
         case .failed(let msg, let uncertain):
-            status(uncertain ? "result.doNotFormat" : "action.failed.title", detail: LocalizedStringKey(msg),
-                   symbol: uncertain ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill",
-                   color: uncertain ? .red : .orange)
+            statusVerbatim(String(localized: uncertain ? "result.doNotFormat" : "action.failed.title"), detail: msg,
+                           symbol: uncertain ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill",
+                           color: uncertain ? .red : .orange)
         }
     }
 
@@ -117,7 +118,15 @@ struct ActionBar: View {
         case .done: reportButton
         case .blocked: Button("action.backToCard") { card.formatState = .idle }
         case .failed(let f, _):
-            if f == .unmountFailed || f == .busy { Button("format.retry") { model.startFormatFlow(card) } }
+            if f == .diskAccessDenied {
+                Button("format.activate.openSettings") {
+                    model.formatter.openDiskAccessSettings()
+                    model.formatter.revealHelperInFinder()
+                }
+                .buttonStyle(.glassProminent)
+            } else if f == .unmountFailed || f == .busy {
+                Button("format.retry") { model.startFormatFlow(card) }
+            }
             Button("action.backToCard") { card.formatState = .idle }
         case .idle, .confirming:
             phaseControls
@@ -145,14 +154,12 @@ struct ActionBar: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!model.canStart(card))
             }
         case .queued:
             Button("action.removeFromQueue") { model.dequeue(card) }
         case .running:
             Button(role: .cancel) { model.cancelOffload(card) } label: { Label("main.running.stop", systemImage: "stop.fill") }
-                .keyboardShortcut(".", modifiers: .command)
                 .disabled(card.isCancelling)
         case .finished(let o):
             if !o.failures.isEmpty {
@@ -199,7 +206,7 @@ struct ActionBar: View {
     /// O que acontece no fim, numa frase, logo ao lado do destino ("No fim, formata e ejeta o cartão.").
     private var afterSentence: String {
         let format = model.autoFormatThisSession && model.formattingAvailable && card.excludedCameras.isEmpty
-        let eject = UserDefaults.standard.object(forKey: "cardflow.ejectWhenDone") as? Bool ?? true
+        let eject = model.ejectWhenDone
         switch (format, eject) {
         case (true, true): return " " + String(localized: "after.summary.both")
         case (true, false): return " " + String(localized: "after.summary.format")
@@ -227,11 +234,11 @@ struct ActionBar: View {
     // MARK: Terminou
 
 
-    private func verifiedDetail(_ o: OffloadOutcome) -> LocalizedStringKey {
-        if card.ejected { return "action.verified.ejected" }
+    private func verifiedDetail(_ o: OffloadOutcome) -> String {
+        if card.ejected { return String(localized: "action.verified.ejected") }
         let count = String(localized: "count.filesVerified \(o.verifiedCount)")
-        if let e = card.lastElapsed { return LocalizedStringKey(count + " " + String(localized: "action.inTime \(Format.elapsed(e))")) }
-        return LocalizedStringKey(count)
+        if let e = card.lastElapsed { return count + " " + String(localized: "action.inTime \(Format.elapsed(e))") }
+        return count
     }
 
     // MARK: Botões comuns
@@ -283,10 +290,31 @@ struct ActionBar: View {
         }
     }
 
+    private func statusVerbatim(_ title: String, detail: String?, symbol: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title2)
+                .foregroundStyle(color)
+                .symbolRenderingMode(.hierarchical)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title).font(.headline)
+                if let detail { Text(verbatim: detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
+            }
+        }
+    }
+
     private func busy(_ title: LocalizedStringKey) -> some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
             Text(title).foregroundStyle(.secondary)
+            Spacer()
+        }
+    }
+
+    private func busyVerbatim(_ title: String) -> some View {
+        HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text(verbatim: title).foregroundStyle(.secondary)
             Spacer()
         }
     }

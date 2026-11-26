@@ -39,6 +39,8 @@ struct RootView: View {
         }
         .alert("main.importError", isPresented: Binding(get: { model.modelError != nil }, set: { if !$0 { model.modelError = nil } })) {
             Button("main.ok", role: .cancel) { model.modelError = nil }
+        } message: {
+            if let msg = model.modelError { Text(verbatim: msg) }
         }
         .onChange(of: model.watcher.volumes) { model.reconcileVolumes() }
         .onChange(of: model.selectedPresetId) { model.presetSelectionChanged() }

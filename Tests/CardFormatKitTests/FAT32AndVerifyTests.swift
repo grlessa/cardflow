@@ -18,9 +18,17 @@ import Foundation
         try dev.write(sector: 0, Fixture.bytes("fat32_30g_mbr.bin"))
         try dev.write(sector: 8_192, Fixture.bytes("fat32_30g_boot_sectors.bin"))
         let info = try BootSectorReader.read(dev)
-        #expect(info == BootInfo(fileSystem: .fat32, partitionStart: 8_192, dataStartAbsolute: 24_576,
-                                 clusterBytes: 32_768, fatLength: 7_678, reservedSectors: 1_028))
+        #expect(info == BootInfo(fileSystem: .fat32, partitionStart: 8_192, partitionSectors: 62_906_368, partitionType: 0x0C,
+                                 dataStartAbsolute: 24_576, clusterBytes: 32_768, fatLength: 7_678, reservedSectors: 1_028))
         #expect(PostFormatVerifier.issues(device: dev, plan: try FormatPlan.make(totalSectors: 62_914_560, sectorSize: 512)).isEmpty)
+    }
+
+    @Test func volumeLabelRemoveControlesCombinantesEEspacosRestantes() {
+        #expect(VolumeLabel.exfat("A\r\nB") == "AB")
+        #expect(VolumeLabel.exfat("/\u{0301}OK") == "\u{0301}OK")
+        #expect(VolumeLabel.exfat(":   :") == "")
+        #expect(VolumeLabel.fat(".   .") == "")
+        #expect(VolumeLabel.fat("a\r\nb") == "AB")
     }
 
     @Test func conferenciaPegaExFATDesalinhado() throws {

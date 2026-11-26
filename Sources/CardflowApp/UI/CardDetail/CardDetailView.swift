@@ -63,6 +63,31 @@ struct CardDetailView: View {
                     CameraEntriesView(card: card)
                 }
             }
+            if !model.workingPreset.sessionFields.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionTitle("inspector.fields")
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(model.workingPreset.sessionFields, id: \.key) { field in
+                            HStack(spacing: 10) {
+                                Text(verbatim: field.label.isEmpty ? field.key : field.label)
+                                    .font(.callout.weight(.medium))
+                                    .frame(minWidth: 100, alignment: .leading)
+                                DeferredTextField(LocalizedStringKey(field.label.isEmpty ? field.key : field.label), text: Binding(
+                                    get: { model.sessionValues[field.key] ?? "" },
+                                    set: { v in
+                                        model.sessionValues[field.key] = v
+                                        model.savePresetSelection()
+                                    }))
+                                    .textFieldStyle(.roundedBorder)
+                                    .disabled(card.isBusy)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(.background.secondary, in: .rect(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator.opacity(0.6)))
+                }
+            }
             if card.scanned != nil && !card.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     SectionTitle("after.section")

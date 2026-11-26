@@ -6,8 +6,8 @@ import Foundation
 /// da câmera dele e pra deixar uma câmera inteira de fora da cópia.
 public enum CameraGroups {
     public static func key(for f: MediaFile) -> String {
+        if f.preserve { return PreservePlanner.bundleKey(f.relPath) }
         let parts = f.relPath.split(separator: "/").map(String.init)
-        if f.preserve { return parts.prefix(2).joined(separator: "/") }
         return parts.dropLast().joined(separator: "/")
     }
 

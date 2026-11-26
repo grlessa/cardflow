@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>cli.abort.noSpace</key>
-	<string>Abortado: espaço insuficiente.</string>
-	<key>cli.abort.sameDisk %@</key>
-	<string>Abortado: destinos no mesmo disco físico (%@) — o backup precisa ser outro disco.</string>
 	<key>cli.cancelled</key>
 	<string>Cancelado pelo usuário.</string>
 	<key>cli.confirm.prompt</key>
@@ -16,8 +12,24 @@
 	<string>valor inválido: %@</string>
 	<key>cli.error.missing %@</key>
 	<string>falta o argumento obrigatório: %@</string>
+	<key>cli.error.naming.pathTraversal</key>
+	<string>o modelo não pode usar '..' nem começar com '/'.</string>
+	<key>cli.error.naming.unknownModifier %@</key>
+	<string>modificador desconhecido no modelo: %@.</string>
+	<key>cli.error.naming.unknownToken %@</key>
+	<string>campo desconhecido no modelo: {%@}.</string>
 	<key>cli.error.noSpace</key>
 	<string>espaço insuficiente no destino.</string>
+	<key>cli.error.offload.cancelled</key>
+	<string>cópia cancelada. Os arquivos já copiados estão no destino, mas a cópia ficou incompleta. Mantenha o cartão como está.</string>
+	<key>cli.error.offload.diskFullDuringCopy</key>
+	<string>um disco de destino encheu durante a cópia. Libere espaço e tente de novo. O cartão continua intacto, mantenha-o como está.</string>
+	<key>cli.error.offload.notEnoughSpace %@</key>
+	<string>não há espaço suficiente em: %@. Libere espaço no destino e tente de novo.</string>
+	<key>cli.error.offload.permissionDenied</key>
+	<string>o macOS bloqueou o acesso à pasta. Libere em Ajustes &gt; Privacidade &gt; Arquivos e Pastas e tente de novo.</string>
+	<key>cli.error.offload.unsafeDestination %@</key>
+	<string>caminho de destino fora da pasta escolhida: %@.</string>
 	<key>cli.error.prefix</key>
 	<string>erro:</string>
 	<key>cli.error.preset.fileTooLarge</key>
@@ -27,30 +39,35 @@
 	<key>cli.error.preset.unsupportedSchema %lld</key>
 	<string>este preset foi feito numa versão incompatível do app (schema %lld).</string>
 	<key>cli.error.sameDisk %@</key>
-	<string>destinos no mesmo disco físico (%@) — o backup precisa ser outro disco.</string>
+	<string>destinos no mesmo disco físico (%@): o backup precisa ser outro disco.</string>
 	<key>cli.error.verificationFailed %lld</key>
 	<string>%lld falha(s) na verificação. NÃO formate o cartão.</string>
 	<key>cli.help</key>
-	<string>cardflow — cópia verificada de cartão (motor OffloadKit na linha de comando)
+	<string>cardflow: cópia verificada de cartão (motor OffloadKit na linha de comando)
 
 uso:
   cardflow --card &lt;caminho&gt; --to &lt;destino&gt; [--to &lt;destino2&gt;] \
-           [--media tudo|foto|video|audio] [--camera &lt;nome&gt;] [--projeto &lt;nome&gt;] \
-           [--set campo=valor] [--rename] [--dry-run] [--yes] [--preset &lt;arquivo.cfp&gt;]</string>
-	<key>report.outcome.cardAlreadyCopied</key>
-	<string>Este cartão já tinha sido copiado (nada novo).</string>
+           [--media tudo|foto|video|audio] [--camera &lt;nome&gt;] [--projeto|--project &lt;nome&gt;] \
+           [--date AAAA-MM-DD[..AAAA-MM-DD]] [--set campo=valor] \
+           [--rename] [--verify-all] [--dry-run] [--yes|-y] [--preset &lt;arquivo.cfp&gt;]
+  cardflow --version | -V
+  cardflow --help | -h</string>
 	<key>report.outcome.failures %@</key>
 	<string>Falharam: %@</string>
 	<key>report.outcome.header %1$lld %2$lld %3$lld %4$lld</key>
-	<string>Verificados: %1$lld · Pulados (já existiam): %2$lld · Falhas: %3$lld · Sidecars: %4$lld</string>
+	<string>Verificados: %1$lld · Pulados (já existiam): %2$lld · Falhas: %3$lld · Arquivos auxiliares: %4$lld</string>
 	<key>report.outcome.manifestFailures %@</key>
-	<string>⚠️ Manifesto NÃO salvo em: %@ (a mídia foi verificada; só o registro falhou — disco cheio/somente-leitura?)</string>
+	<string>⚠️ Manifesto NÃO salvo em: %@ (a mídia foi verificada, só o registro falhou: disco cheio ou somente leitura?)</string>
 	<key>report.outcome.manifestPath %@</key>
 	<string>Manifesto: %@</string>
 	<key>report.outcome.relocatedCinema %1$lld %2$@</key>
 	<string>⚠️ %1$lld clipe(s) de cinema movido(s) pra evitar sobrescrever filmagem diferente (confira o relink no editor): %2$@</string>
+	<key>report.outcome.reportPath %@</key>
+	<string>Relatório: %@</string>
 	<key>report.outcome.unrecognized %@</key>
 	<string>Não reconhecidos: %@</string>
+	<key>report.summary.alreadyPresent %lld</key>
+	<string>Já presentes e verificados no destino: %lld arquivo(s).</string>
 	<key>report.summary.cinema %lld</key>
 	<string> + %lld clipe(s) de cinema</string>
 	<key>report.summary.destinations %@</key>
@@ -65,8 +82,12 @@ uso:
 	<string>Vai copiar: %1$@ = %2$lld arquivo(s), %3$@ por destino.</string>
 	<key>report.summary.unrecognized %@</key>
 	<string>⚠️ Arquivos não reconhecidos (copiados para .cardflow/desconhecidos): %@</string>
+	<key>report.verdict.manifestFailed</key>
+	<string>❌ O registro da cópia não pôde ser salvo em todos os destinos. NÃO formate o cartão.</string>
 	<key>report.verdict.notOk %lld</key>
 	<string>❌ %lld falha(s) na verificação. NÃO formate o cartão.</string>
+	<key>report.verdict.nothingSaved</key>
+	<string>❌ Nenhum arquivo copiado ou verificado. NÃO formate o cartão.</string>
 	<key>report.verdict.ok</key>
 	<string>✅ Tudo verificado em todos os destinos. Pode formatar o cartão com segurança.</string>
 </dict>

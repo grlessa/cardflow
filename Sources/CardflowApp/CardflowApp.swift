@@ -14,7 +14,7 @@ struct CardflowApp: App {
                 .onAppear {
                     Preferences.applyAppearance()
                     model.start()
-                    if Preferences.checksUpdatesOnLaunch { updates.probe() }
+                    if Preferences.checksUpdatesOnLaunch { updates.probeOnce() }
                 }
         }
         .defaultSize(width: 1100, height: 720)

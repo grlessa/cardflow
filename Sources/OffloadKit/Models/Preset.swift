@@ -90,10 +90,10 @@ public struct Preset: Codable, Equatable, Sendable {
         rename = try c.decode(Rename.self, forKey: .rename)
         destinationRoles = try c.decode([String].self, forKey: .destinationRoles)
         folderStructure = try c.decode(String.self, forKey: .folderStructure)
-        photoExtensions = try c.decode([String].self, forKey: .photoExtensions)
-        videoExtensions = try c.decode([String].self, forKey: .videoExtensions)
-        audioExtensions = try c.decode([String].self, forKey: .audioExtensions)
-        sidecarExtensions = try c.decode([String].self, forKey: .sidecarExtensions)
+        photoExtensions = try c.decodeIfPresent([String].self, forKey: .photoExtensions) ?? []
+        videoExtensions = try c.decodeIfPresent([String].self, forKey: .videoExtensions) ?? []
+        audioExtensions = try c.decodeIfPresent([String].self, forKey: .audioExtensions) ?? []
+        sidecarExtensions = try c.decodeIfPresent([String].self, forKey: .sidecarExtensions) ?? []
         copySidecars = try c.decode(SidecarPolicy.self, forKey: .copySidecars)
         dateFormat = try c.decode(String.self, forKey: .dateFormat)
         timeFormat = try c.decodeIfPresent(String.self, forKey: .timeFormat) ?? "HHmmss"   // compat: preset antigo

@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 
 SRC="${1:-Resources/cardflow.icon}"
 OUT="$(mktemp -d)"
+trap 'rm -rf "$OUT"' EXIT
 
 echo "==> Compilando o ícone com actool…"
 xcrun actool "$SRC" \

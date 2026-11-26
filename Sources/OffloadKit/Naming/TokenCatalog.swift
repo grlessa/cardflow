@@ -16,7 +16,7 @@ public enum TokenCatalog {
         .init(name: "projeto", label: "Projeto", category: "Projeto", systemImage: "folder",
               description: "O nome do projeto, que vira a pasta principal."),
         .init(name: "tipo", label: "Tipo de mídia", category: "Arquivo", systemImage: "photo.on.rectangle",
-              description: "Foto, Vídeo, Áudio ou Cinema, conforme o arquivo."),
+              description: "Foto, Vídeo, Áudio ou Outros, conforme o arquivo."),
         .init(name: "nome_original", label: "Nome original", category: "Arquivo", systemImage: "doc",
               description: "O nome que o arquivo já tinha no cartão."),
         .init(name: "ext", label: "Extensão", category: "Arquivo", systemImage: "doc.badge.gearshape",

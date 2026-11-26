@@ -37,14 +37,34 @@ public enum CLIErrorReport {
             case .unsupportedSchema(let v):
                 return CLIStrings.string("cli.error.preset.unsupportedSchema %lld", v)
             case .invalidTemplate(let reason):
-                // O detalhe técnico do enum (token/traversal) permanece como complemento.
                 return CLIStrings.string("cli.error.preset.invalidTemplate %@", reason)
             case .fileTooLarge:
                 return CLIStrings.string("cli.error.preset.fileTooLarge")
             }
+        case let e as OffloadError:
+            switch e {
+            case .notEnoughSpace(let shortfalls):
+                let names = shortfalls.map { $0.destination.lastPathComponent }.joined(separator: ", ")
+                return CLIStrings.string("cli.error.offload.notEnoughSpace %@", names)
+            case .unsafeDestination(let rel):
+                return CLIStrings.string("cli.error.offload.unsafeDestination %@", rel)
+            case .cancelled:
+                return CLIStrings.string("cli.error.offload.cancelled")
+            case .diskFullDuringCopy:
+                return CLIStrings.string("cli.error.offload.diskFullDuringCopy")
+            case .permissionDenied:
+                return CLIStrings.string("cli.error.offload.permissionDenied")
+            }
+        case let e as NamingError:
+            switch e {
+            case .unknownToken(let name):
+                return CLIStrings.string("cli.error.naming.unknownToken %@", name)
+            case .unknownModifier(let name):
+                return CLIStrings.string("cli.error.naming.unknownModifier %@", name)
+            case .pathTraversal:
+                return CLIStrings.string("cli.error.naming.pathTraversal")
+            }
         default:
-            // OffloadError e erros de sistema (decode, arquivo ausente) já trazem
-            // mensagem própria; aqui só repassamos o detalhe localizável do erro.
             return detail(of: error)
         }
     }

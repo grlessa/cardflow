@@ -23,8 +23,7 @@
       --blue: #0a6fd5;
       --blue-press: #0a5fb8;
       --blue-bright: #4aa3ff;
-      --green: #1a9f6a;
-      --pink: #e0245e;
+      --green: #157f54;
       --hairline: #e0e0e0;
       font-family: system-ui, -apple-system, "SF Pro Text", BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-synthesis: none;
@@ -250,10 +249,15 @@
     function copy(text, btn) {
       var done = function () {
         var label = btn.querySelector("[data-i18n]");
-        var original = label.innerHTML;
+        if (btn._copyTimer) clearTimeout(btn._copyTimer);
         btn.classList.add("copied"); label.textContent = t("copied");
         document.getElementById("copy-status").textContent = t("copied");
-        setTimeout(function () { btn.classList.remove("copied"); label.innerHTML = original; }, 1800);
+        btn._copyTimer = setTimeout(function () {
+          btn._copyTimer = null;
+          btn.classList.remove("copied");
+          var restored = t(label.dataset.i18n);
+          if (restored != null) label.innerHTML = restored;
+        }, 1800);
       };
       var fallback = function () {
         var ta = document.createElement("textarea");

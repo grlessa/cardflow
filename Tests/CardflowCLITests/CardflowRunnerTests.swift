@@ -68,4 +68,27 @@ import Foundation
         #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Culto/Foto/DSC00001_R.JPG").path))
         #expect(!FileManager.default.fileExists(atPath: dest.appendingPathComponent("Cardflow").path))
     }
+
+    @Test func acceptsYesAndSiAtPrompt() throws {
+        for answer in ["yes", "si", "sí"] {
+            let card = try FakeCardCLI(); defer { card.cleanup() }
+            let dest = try tempDest(); defer { try? FileManager.default.removeItem(at: dest) }
+            try CardflowRunner.run(config(card: card.root, dest: dest, dryRun: false, yes: false),
+                                   input: { _ in answer }, output: { _ in })
+            #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("Conf-2026").path))
+        }
+    }
+
+    @Test func rejectsOversizedPresetFile() throws {
+        let card = try FakeCardCLI(); defer { card.cleanup() }
+        let dest = try tempDest(); defer { try? FileManager.default.removeItem(at: dest) }
+        let presetURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".cfp")
+        defer { try? FileManager.default.removeItem(at: presetURL) }
+        try Data(repeating: 0x20, count: PresetStore.maxImportBytes + 1).write(to: presetURL)
+        let cfg = try ArgParser.parse(["--card", card.root.path, "--to", dest.path,
+                                       "--preset", presetURL.path, "--yes"])
+        #expect(throws: PresetStore.PresetError.fileTooLarge) {
+            try CardflowRunner.run(cfg, input: { _ in nil }, output: { _ in })
+        }
+    }
 }

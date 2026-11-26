@@ -148,6 +148,7 @@ struct CameraNameField: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("camera.menu.help")
+            .accessibilityLabel(Text("camera.menu.help"))
         }
         .help("detail.camera")
     }
@@ -264,8 +265,6 @@ struct DestinationNode: View {
         }
     }
 
-    private func pick(_ u: URL) { role == .principal ? model.setUserDestination(u) : model.setBackup(u) }
-
     @ViewBuilder private var label: some View {
         if let volume, let url {
             filled(volume, url)
@@ -276,7 +275,7 @@ struct DestinationNode: View {
 
     private func filled(_ v: ExternalVolume, _ url: URL) -> some View {
         let short = model.hasShortfall(url, card: card)
-        let space = DiskSpace(url: url)
+        let space = model.diskSpace(for: url)
         return HStack(alignment: .center, spacing: 11) {
             MediaIllustration(kind: v.mediaKind, size: 38, volumeURL: v.url)
             VStack(alignment: .leading, spacing: 5) {
@@ -376,7 +375,7 @@ struct DiskPicker: View {
     private func diskRow(_ v: ExternalVolume) -> some View {
         let blocked = role == .backup && (v.url == model.destinationURL || model.samePhysicalDisk(v.url, model.destinationURL))
         let on = v.url == current
-        let space = DiskSpace(url: v.url)
+        let space = model.diskSpace(for: v.url)
         let fits = space.map { $0.free >= pending } ?? true
         return Button {
             if role == .principal { model.setUserDestination(v.url) } else { model.setBackup(v.url) }

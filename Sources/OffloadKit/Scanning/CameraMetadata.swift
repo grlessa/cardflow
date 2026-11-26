@@ -55,7 +55,7 @@ public enum CameraMetadata {
     static func videoCameraModel(at url: URL) async -> String? {
         let asset = AVURLAsset(url: url)
         if let items = try? await asset.load(.commonMetadata),
-           let m = compose(make: commonString(items, .commonKeyMake), model: commonString(items, .commonKeyModel)) {
+           let m = compose(make: await commonString(items, .commonKeyMake), model: await commonString(items, .commonKeyModel)) {
             return m
         }
         // Sony (XAVC) e outras câmeras de vídeo não gravam marca/modelo no MP4: vai no XML ao lado do clipe
@@ -70,7 +70,9 @@ public enum CameraMetadata {
         let candidates = [base.lastPathComponent + "M01.XML", base.lastPathComponent + ".XML", base.lastPathComponent + ".xml"]
             .map { base.deletingLastPathComponent().appendingPathComponent($0) }
         for xml in candidates {
-            guard let data = try? Data(contentsOf: xml, options: .mappedIfSafe), data.count < 512_000,
+            // Nunca usar `.mappedIfSafe` (mmap) em cartão removível: desconectar o cartão dispara SIGBUS.
+            guard let size = (try? xml.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size > 0, size < 512_000,
+                  let data = try? Data(contentsOf: xml),
                   let text = String(data: data, encoding: .utf8) else { continue }
             if let m = deviceModel(inXML: text) { return m }
         }
@@ -88,9 +90,10 @@ public enum CameraMetadata {
         return compose(make: attr("manufacturer"), model: attr("modelName"))
     }
 
-    private static func commonString(_ items: [AVMetadataItem], _ key: AVMetadataKey) -> String? {
-        guard let id = AVMetadataItem.identifier(forKey: key, keySpace: .common) else { return nil }
-        return AVMetadataItem.metadataItems(from: items, filteredByIdentifier: id).first?.stringValue
+    private static func commonString(_ items: [AVMetadataItem], _ key: AVMetadataKey) async -> String? {
+        guard let id = AVMetadataItem.identifier(forKey: key, keySpace: .common),
+              let item = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: id).first else { return nil }
+        return try? await item.load(.stringValue)
     }
 
     // MARK: - Nome curto

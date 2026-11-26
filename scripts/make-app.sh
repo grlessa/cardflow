@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 cd "$(dirname "$0")/.."
-BUILD_LOG="$(mktemp)"
-swift build -c release --product CardflowApp 2>&1 | tee "$BUILD_LOG"
-# o swift build não falha quando o catálogo de textos (.xcstrings) não compila: o app sairia sem os
-# textos, mostrando as chaves. Trava aqui.
-if grep -q "xcstrings: error" "$BUILD_LOG"; then echo "❌ Localizable.xcstrings não compilou (veja acima)"; exit 1; fi
+swift build -c release --product CardflowApp
 swift build -c release --product CardflowFormatHelper
 APP="$(pwd)/Cardflow.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/CardflowApp "$APP/Contents/MacOS/Cardflow"
+/bin/cp -f .build/release/CardflowApp "$APP/Contents/MacOS/Cardflow"
 # ajudante de formatação (daemon registrado pelo app via SMAppService): binário + plist do launchd no bundle
 /bin/cp -f .build/release/CardflowFormatHelper "$APP/Contents/MacOS/CardflowFormatHelper"
 mkdir -p "$APP/Contents/Library/LaunchDaemons"

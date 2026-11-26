@@ -24,12 +24,18 @@ public struct FileCopier: FileCopying {
         defer { try? reader.close() }
 
         var writers: [FileHandle] = []
+        defer { for w in writers { try? w.close() } }
         for dest in destinations {
             try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-            fm.createFile(atPath: dest.path, contents: nil)
-            writers.append(try FileHandle(forWritingTo: dest))
+            // POSIX open com O_TRUNC preserva o errno real (EACCES/EPERM/ENOSPC/EROFS) em vez de
+            // mascarar a falha do FileManager.createFile como NSFileNoSuchFileError.
+            let fd = open(dest.path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+            guard fd >= 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno),
+                              userInfo: [NSFilePathErrorKey: dest.path])
+            }
+            writers.append(FileHandle(fileDescriptor: fd, closeOnDealloc: true))
         }
-        defer { for w in writers { try? w.close() } }
 
         var hasher = XXHash64()
         var done = false
@@ -63,8 +69,8 @@ public struct FileCopier: FileCopying {
         return hasher.finalize()
     }
 
-    /// Lê o arquivo de destino e confirma que o hash bate com o esperado.
+    /// Lê o arquivo de destino direto do disco (`F_NOCACHE`) e confirma que o hash bate com o esperado.
     public func verify(expectedHash: UInt64, fileAt url: URL) throws -> Bool {
-        try XXHash64.hash(fileAt: url) == expectedHash
+        try XXHash64.hash(fileAt: url, bypassCache: true) == expectedHash
     }
 }

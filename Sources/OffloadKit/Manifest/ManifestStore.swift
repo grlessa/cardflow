@@ -3,22 +3,22 @@ import Foundation
 public struct ManifestStore {
     public init() {}
 
-    private static let stamp: DateFormatter = {
+    private static func makeStampFormatter() -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = .current
         f.dateFormat = "yyyyMMdd-HHmmss"
         return f
-    }()
+    }
 
     private func cardflowDir(in destinationRoot: URL, eventName: String) -> URL {
         destinationRoot.appendingPathComponent(eventName).appendingPathComponent(".cardflow")
     }
 
-    /// Nome do JSON de uma cópia: carimbo de tempo (segundo) + fragmento do offloadId → dois cartões
+    /// Nome do JSON de uma cópia: carimbo de tempo (segundo) + fragmento do offloadId -> dois cartões
     /// DIFERENTES no mesmo segundo não sobrescrevem um ao outro (mesmo cartão = mesmo id = idempotente).
     static func jsonFileName(for m: Manifest) -> String {
-        "manifest-" + stamp.string(from: m.finishedAt) + "-" + CardFingerprint.shortID(m.offloadId) + ".json"
+        "manifest-" + makeStampFormatter().string(from: m.finishedAt) + "-" + CardFingerprint.shortID(m.offloadId) + ".json"
     }
 
     /// Grava o registro da cópia (JSON, na pasta oculta do projeto, que a retomada e o histórico leem) e
@@ -45,8 +45,8 @@ public struct ManifestStore {
     public func writeProjectReport(eventRootIn destinationRoot: URL, eventName: String,
                                    locale: Locale = Locale(identifier: "pt-BR")) throws -> URL {
         let project = destinationRoot.appendingPathComponent(eventName)
-        let manifests = try loadAll(eventRootIn: destinationRoot, eventName: eventName)
-        let html = ProjectReport.html(manifests: manifests, projectName: eventName, locale: locale)
+        let loaded = loadAllWithURLs(eventRootIn: destinationRoot, eventName: eventName)
+        let html = ProjectReport.html(entries: loaded, projectName: eventName, locale: locale)
         let url = project.appendingPathComponent(ProjectReport.fileName(locale: locale))
         try Data(html.utf8).write(to: url, options: .atomic)
         for other in ProjectReport.allFileNames where other != url.lastPathComponent {
@@ -95,12 +95,7 @@ public struct ManifestStore {
     }
 
     public func loadAll(eventRootIn destinationRoot: URL, eventName: String) throws -> [Manifest] {
-        let dir = cardflowDir(in: destinationRoot, eventName: eventName)
-        guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return [] }
-        let dec = JSONDecoder()
-        dec.dateDecodingStrategy = .iso8601
-        return items.filter { $0.pathExtension == "json" }
-            .compactMap { try? dec.decode(Manifest.self, from: Data(contentsOf: $0)) }
+        loadAllWithURLs(eventRootIn: destinationRoot, eventName: eventName).map(\.manifest)
     }
 
     /// Todos os manifestos de um destino, varrendo as pastas de evento (`<dest>/<evento>/.cardflow`).

@@ -87,7 +87,7 @@ import AppKit
         win.toolbarStyle = .unified
         win.contentView = host
         win.orderFront(nil)
-        for _ in 0..<40 { RunLoop.main.run(until: Date().addingTimeInterval(0.025)); try? await Task.sleep(nanoseconds: 5_000_000) }
+        for _ in 0..<40 { try? await Task.sleep(for: .milliseconds(25)) }
         let frameView = win.contentView!.superview ?? host
         let rep = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds)!
         frameView.cacheDisplay(in: frameView.bounds, to: rep)

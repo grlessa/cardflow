@@ -90,6 +90,7 @@ struct SidebarFooter: View {
 enum Links {
     static let site = URL(string: "https://cardflow.lessafilms.com")!
     static let support = URL(string: "https://cardflow.lessafilms.com/apoie/")!
+    static let releases = URL(string: "https://github.com/grlessa/cardflow/releases")!
 }
 
 extension AppModel {
@@ -173,7 +174,7 @@ struct DestinationRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if let space = DiskSpace(url: volume.url) {
+                if let space = model.diskSpace(for: volume.url) {
                     CapacityLine(space: space)
                 }
             }
@@ -240,7 +241,7 @@ struct DestinationContextMenu: View {
         Button("dest.menu.dontUse") { model.setRole(.none, for: volume.url) }.disabled(role == .none)
         Divider()
         Button("menu.card.revealInFinder") { NSWorkspace.shared.open(volume.url) }
-        if model.customFolders.contains(volume.url) {
+        if model.customFolders.contains(where: { $0.path == AppModel.normalizeFolderURL(volume.url).path }) {
             Button("dest.menu.forget") { model.forgetDestinationFolder(volume.url) }
         }
         if !volume.isInternalShortcut {

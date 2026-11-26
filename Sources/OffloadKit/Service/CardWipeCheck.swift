@@ -59,7 +59,7 @@ public enum CardWipeCheck {
             if choices.excludedGroups.contains(CameraGroups.key(for: f)) { r.notVerified.append(f.relPath); continue }
             if isExcludedByChoice(f, service: service, choices: choices, preset: preset, dateOK: dateOK) {
                 if f.preserve {
-                    let bundle = f.relPath.split(separator: "/").prefix(2).joined(separator: "/")
+                    let bundle = PreservePlanner.bundleKey(f.relPath)
                     if cinemaBundlesExcluded.insert(bundle).inserted { r.excludedByChoice[.cinema, default: 0] += 1 }
                 } else {
                     r.excludedByChoice[f.type, default: 0] += 1

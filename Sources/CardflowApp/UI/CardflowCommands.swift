@@ -27,7 +27,7 @@ struct CardflowCommands: Commands {
                 .disabled(!(model.selectedCard.map(model.canStart) ?? false))
             Button("menu.card.copyAll") { model.enqueueAll() }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
-                .disabled(model.readyToCopyCount == 0)
+                .disabled(model.readyToCopyCount < 2)
             Button("menu.card.stop") { if let c = model.selectedCard { model.cancelOffload(c) } }
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!(model.selectedCard?.isRunning ?? false) && model.selectedCard?.phase != .queued)

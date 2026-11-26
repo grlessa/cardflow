@@ -76,10 +76,12 @@ struct CompletedCard: Identifiable, Equatable {
         // (conectado, segue a tela de sempre; tirado do Mac, não deixa resumo).
         if steps.first?.kind == .alreadyThere, !steps.dropFirst().contains(where: { $0.state != .pending }) { return nil }
 
-        return CompletedCard(id: UUID().uuidString, name: card.volume.name, mediaKind: card.volume.mediaKind,
-                             files: files, bytes: card.preview?.totalBytes ?? 0, destinations: destinations,
+        let stableID = live ? "live-\(card.sessionID.uuidString)" : UUID().uuidString
+        return CompletedCard(id: stableID, name: card.volume.name, mediaKind: card.volume.mediaKind,
+                             files: files, bytes: card.frozenTotalBytes ?? card.preview?.totalBytes ?? 0,
+                             destinations: destinations,
                              steps: steps, verdict: verdict, fileSystem: fileSystem, manifestPaths: paths,
-                             pathSegments: card.pathSegments)
+                             pathSegments: card.frozenPathSegments ?? card.pathSegments)
     }
 }
 

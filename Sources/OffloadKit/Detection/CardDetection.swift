@@ -47,8 +47,6 @@ public enum CardDetection {
     /// sistema (interno E não-removível) é barrado. Time Machine nunca é fonte.
     public static func isCard(_ vol: ExternalVolume) -> Bool {
         guard vol.isRemovable || !vol.isInternal else { return false }
-        // Pelo tipo físico: SD/CFexpress/CFast é cartão mesmo vazio (recém-formatado).
-        if vol.traits?.isCameraMedia == true { return true }
         let fm = FileManager.default
         // Volume de rede (NAS): é destino/arquivo, não fonte de offload — e varrer pela rede é lento.
         if let vals = try? vol.url.resourceValues(forKeys: [.volumeIsLocalKey]), vals.volumeIsLocal == false {
@@ -60,8 +58,13 @@ public enum CardDetection {
         if rootEntries.contains(where: {
             $0 == "Backups.backupdb" || $0.hasSuffix(".sparsebundle") || $0.hasSuffix(".backupbundle")
         }) { return false }
-        // 1) pasta-marcador de câmera de nome exato na raiz
-        if cameraMarkers.contains(where: { fm.fileExists(atPath: vol.url.appendingPathComponent($0).path) }) {
+        // Pelo tipo físico: SD/CFexpress/CFast é cartão mesmo vazio (recém-formatado).
+        if vol.traits?.isCameraMedia == true { return true }
+        // 1) pasta-marcador de câmera de nome exato na raiz (exige diretório, não arquivo homônimo)
+        if cameraMarkers.contains(where: {
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: vol.url.appendingPathComponent($0).path, isDirectory: &isDir) && isDir.boolValue
+        }) {
             return true
         }
         // 2) Cinema EOS XF / Panasonic P2: CONTENTS com pasta de clipe (CLIP/CLIPS/CLIPS001…), não DCIM.
@@ -79,7 +82,12 @@ public enum CardDetection {
         for name in rootEntries {
             if name.hasPrefix(".") { continue }   // ignora lixo do macOS (.Spotlight-V100, .fseventsd, .Trashes)
             let upper = name.uppercased()
-            if upper.hasSuffix(".RDM") || upper.hasSuffix(".RDC") { return true }
+            if upper.hasSuffix(".RDM") || upper.hasSuffix(".RDC") {
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: vol.url.appendingPathComponent(name).path, isDirectory: &isDir), isDir.boolValue {
+                    return true
+                }
+            }
             if looseSourceExtensions.contains((name as NSString).pathExtension.lowercased()) { return true }
         }
         // 4) subpastas (até 2 níveis): clipe de cinema-original ou pasta RED — pega SSD organizado em
@@ -92,6 +100,9 @@ public enum CardDetection {
         var budget = 400   // teto de pastas visitadas — não varre um disco de trabalho gigante
         func scan(_ dir: URL, _ depth: Int) -> Bool {
             guard depth >= 0, budget > 0, let items = try? fm.contentsOfDirectory(atPath: dir.path) else { return false }
+            // Pasta de projeto gerada pelo próprio Cardflow (.cardflow dentro) nunca caracteriza um SSD de
+            // destino como cartão de câmera, mesmo contendo bundles de cinema em <Projeto>/<Cartão>/A001.braw.
+            if dir != root && items.contains(".cardflow") { return false }
             budget -= 1
             var subdirs: [URL] = []
             for name in items {

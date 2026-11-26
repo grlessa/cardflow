@@ -2,31 +2,32 @@ import Foundation
 
 /// O cartão mantém o nome atual (decisão do dono); aqui só o adequamos ao que cada sistema aceita.
 public enum VolumeLabel {
-    private static let forbiddenCommon = Set("\"*/:<>?\\|")
-    private static let forbiddenFAT = Set(".+,;=[]")
+    private static let forbiddenCommonScalars = Set("\"*/:<>?\\|".unicodeScalars)
+    private static let forbiddenFATScalars = Set(".+,;=[]".unicodeScalars)
 
     /// exFAT: até 11 unidades UTF-16, sem caracteres proibidos nem de controle.
     public static func exfat(_ s: String) -> String {
-        let cleaned = s.trimmingCharacters(in: .whitespaces)
-            .filter { !forbiddenCommon.contains($0) && !($0.asciiValue.map { $0 < 0x20 } ?? false) }
+        let filtered = String(String.UnicodeScalarView(s.unicodeScalars.filter { sc in
+            sc.value >= 0x20 && sc.value != 0x7F && !forbiddenCommonScalars.contains(sc)
+        })).trimmingCharacters(in: .whitespaces)
         var out = ""
-        for ch in cleaned {
+        for ch in filtered {
             if (out + String(ch)).utf16.count > 11 { break }
             out.append(ch)
         }
-        return out
+        return out.trimmingCharacters(in: .whitespaces)
     }
 
     /// FAT: ASCII maiúsculo, até 11 bytes; não-ASCII vira "_".
     public static func fat(_ s: String) -> String {
-        let up = s.trimmingCharacters(in: .whitespaces).uppercased()
-        var out = ""
-        for ch in up {
-            guard !forbiddenCommon.contains(ch), !forbiddenFAT.contains(ch) else { continue }
-            let c: Character = (ch.asciiValue.map { $0 >= 0x20 && $0 < 0x7F } ?? false) ? ch : "_"
-            if out.count == 11 { break }
-            out.append(c)
+        let up = s.uppercased()
+        var buf = ""
+        for sc in up.unicodeScalars {
+            if sc.value < 0x20 || sc.value == 0x7F { continue }
+            if forbiddenCommonScalars.contains(sc) || forbiddenFATScalars.contains(sc) { continue }
+            if sc.value < 0x7F { buf.unicodeScalars.append(sc) } else { buf.append("_") }
         }
-        return out
+        let trimmed = buf.trimmingCharacters(in: .whitespaces)
+        return String(trimmed.prefix(11)).trimmingCharacters(in: .whitespaces)
     }
 }

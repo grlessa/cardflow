@@ -3,6 +3,8 @@ import Foundation
 /// MBR igual à do formatador oficial: área de boot zerada, assinatura de disco, UMA entrada, 55 AA.
 public enum MBR {
     public static func bytes(for plan: FormatPlan, diskSignature: UInt32) -> [UInt8] {
+        precondition(plan.partitionStartSector <= UInt64(UInt32.max) && plan.partitionSectorCount <= UInt64(UInt32.max),
+                     "MBR exige LBA de 32 bits (≤ 2 TiB)")
         var m = [UInt8](repeating: 0, count: 512)
         put32(&m, 440, diskSignature)
         let e = 446
@@ -13,7 +15,7 @@ public enum MBR {
         let end = chs(lba: plan.partitionStartSector + plan.partitionSectorCount - 1)
         m[e+5] = end.0; m[e+6] = end.1; m[e+7] = end.2
         put32(&m, e+8, UInt32(plan.partitionStartSector))
-        put32(&m, e+12, UInt32(truncatingIfNeeded: plan.partitionSectorCount))
+        put32(&m, e+12, UInt32(plan.partitionSectorCount))
         m[510] = 0x55; m[511] = 0xAA
         return m
     }

@@ -38,7 +38,7 @@ struct ModelInspector: View {
             DetailSection("inspector.folders") {
                 // um bloco só: o trilho que liga as pastas atravessa as linhas sem divisória no meio
                 VStack(spacing: 0) {
-                    ForEach(editor.folderLevels.indices, id: \.self) { i in
+                    ForEach(Array(zip(editor.folderLevelIDs, editor.folderLevels.indices)), id: \.0) { _, i in
                         FolderLevelRow(editor: editor, index: i, example: ex.folders[safe: i] ?? "",
                                        render: { renderLevel(editor, $0) })
                     }
@@ -111,12 +111,17 @@ struct ModelInspector: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    ForEach(editor.draft.sessionFields.indices, id: \.self) { index in
+                    ForEach(editor.draft.sessionFields, id: \.key) { field in
                         HStack(spacing: 8) {
                             Image(systemName: "character.textbox").foregroundStyle(.tint)
-                            DeferredTextField("preset.sessionField.labelPlaceholder", text: $editor.draft.sessionFields[index].label)
+                            DeferredTextField("preset.sessionField.labelPlaceholder", text: Binding(
+                                get: { editor.draft.sessionFields.first(where: { $0.key == field.key })?.label ?? field.label },
+                                set: { v in
+                                    guard let idx = editor.draft.sessionFields.firstIndex(where: { $0.key == field.key }) else { return }
+                                    editor.draft.sessionFields[idx].label = v
+                                }))
                                 .textFieldStyle(.roundedBorder)
-                            Button(role: .destructive) { editor.removeSessionField(at: index) } label: {
+                            Button(role: .destructive) { editor.removeSessionField(key: field.key) } label: {
                                 Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
                             }
                             .buttonStyle(.borderless)

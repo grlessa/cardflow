@@ -7,15 +7,26 @@ import FormatHelperCore
 /// que uma versão nova do app (binário novo do ajudante) entre em uso sem reiniciar o Mac.
 final class ListenerDelegate: NSObject, NSXPCListenerDelegate {
     let service = HelperService()
+    private weak var listener: NSXPCListener?
     private let lock = NSLock()
     private var openConnections = 0
+    private var shuttingDown = false
     private var idleTimer: DispatchSourceTimer?
 
+    init(listener: NSXPCListener) { self.listener = listener }
+
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection c: NSXPCConnection) -> Bool {
+        lock.lock()
+        if shuttingDown {
+            lock.unlock()
+            return false
+        }
+        openConnections += 1
+        idleTimer?.cancel(); idleTimer = nil
+        lock.unlock()
         c.exportedInterface = CardFormatXPC.serviceInterface()
         c.exportedObject = service
         c.invalidationHandler = { [weak self] in self?.connectionEnded() }
-        lock.lock(); openConnections += 1; idleTimer?.cancel(); idleTimer = nil; lock.unlock()
         c.resume()
         return true
     }
@@ -31,8 +42,14 @@ final class ListenerDelegate: NSObject, NSXPCListenerDelegate {
         t.schedule(deadline: .now() + 60)
         t.setEventHandler { [weak self] in
             guard let self else { return }
-            self.lock.lock(); let idle = self.openConnections <= 0; self.lock.unlock()
-            if idle && !self.service.isBusy { exit(0) }
+            self.lock.lock()
+            let canExit = self.openConnections <= 0 && !self.service.isBusy
+            if canExit { self.shuttingDown = true }
+            self.lock.unlock()
+            if canExit {
+                self.listener?.invalidate()
+                exit(0)
+            }
         }
         lock.lock(); idleTimer?.cancel(); idleTimer = t; lock.unlock()
         t.resume()
@@ -41,7 +58,7 @@ final class ListenerDelegate: NSObject, NSXPCListenerDelegate {
 
 let listener = NSXPCListener(machServiceName: CardFormatXPC.machServiceName)
 listener.setConnectionCodeSigningRequirement(CardFormatXPC.clientRequirement)
-let delegate = ListenerDelegate()
+let delegate = ListenerDelegate(listener: listener)
 listener.delegate = delegate
 listener.resume()
 delegate.scheduleIdleExit()   // subiu sem ninguém conectar (ex.: launchd no boot) → não fica pendurado

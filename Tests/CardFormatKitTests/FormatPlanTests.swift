@@ -66,4 +66,14 @@ import Testing
         #expect(throws: FormatPlanError.outsideSDARanges(67_000_000)) { try FormatPlan.make(totalSectors: 67_000_000, sectorSize: 512) }
         #expect(throws: FormatPlanError.outsideSDARanges(4_294_800_000)) { try FormatPlan.make(totalSectors: 4_294_800_000, sectorSize: 512) }
     }
+
+    @Test func fat32Oscilacao16GiBCobreTodosOsClusters() throws {
+        for total: UInt64 in [33_439_680, 33_443_000, 33_447_871] {
+            let p = try FormatPlan.make(totalSectors: total, sectorSize: 512)
+            #expect(p.fileSystem == .fat32)
+            #expect(UInt64(p.clusterCount) + 2 <= UInt64(p.fatLength) * 128)
+            let dataStart = p.partitionStartSector + UInt64(p.reservedSectors) + 2 * UInt64(p.fatLength)
+            #expect(dataStart % UInt64(p.boundaryUnitSectors) == 0)
+        }
+    }
 }

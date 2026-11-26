@@ -20,12 +20,19 @@ public enum ProjectReport {
     public static func anchor(for m: Manifest) -> String { "cartao-" + CardFingerprint.shortID(m.offloadId) }
 
     public static func html(manifests: [Manifest], projectName: String, locale: Locale) -> String {
+        html(entries: manifests.map { (url: URL(fileURLWithPath: ManifestStore.jsonFileName(for: $0)), manifest: $0) },
+             projectName: projectName, locale: locale)
+    }
+
+    public static func html(entries: [(url: URL, manifest: Manifest)], projectName: String, locale: Locale) -> String {
         let L = ReportLang(locale)
         // retomada reescreve o mesmo offloadId: fica o registro mais recente de cada cópia.
-        let runs = Dictionary(grouping: manifests, by: \.offloadId).values
-            .compactMap { $0.max { $0.finishedAt < $1.finishedAt } }
-            .sorted { $0.finishedAt < $1.finishedAt }
-        let ctx = Context(L: L, locale: locale, runs: runs, projectName: projectName)
+        let latestEntries = Dictionary(grouping: entries, by: { $0.manifest.offloadId }).values
+            .compactMap { $0.max { $0.manifest.finishedAt < $1.manifest.finishedAt } }
+            .sorted { $0.manifest.finishedAt < $1.manifest.finishedAt }
+        let runs = latestEntries.map(\.manifest)
+        let jsonNames = Dictionary(uniqueKeysWithValues: latestEntries.map { ($0.manifest.offloadId, $0.url.lastPathComponent) })
+        let ctx = Context(L: L, locale: locale, runs: runs, jsonNames: jsonNames, projectName: projectName)
         return [ctx.head(), ctx.top(), ctx.hero(), ctx.whereSaved(), ctx.cards(), ctx.folders(), ctx.technical(),
                 ctx.foot()].joined(separator: "\n")
     }
@@ -65,7 +72,19 @@ private struct Context {
     let L: ReportLang
     let locale: Locale
     let runs: [Manifest]
+    let jsonNames: [String: String]
     let projectName: String
+    private let mediumDateTimeFormatter: DateFormatter
+    private let mediumDateFormatter: DateFormatter
+    private let shortDateTimeFormatter: DateFormatter
+
+    init(L: ReportLang, locale: Locale, runs: [Manifest], jsonNames: [String: String], projectName: String) {
+        self.L = L; self.locale = locale; self.runs = runs; self.jsonNames = jsonNames; self.projectName = projectName
+        let mdt = DateFormatter(); mdt.locale = locale; mdt.dateStyle = .medium; mdt.timeStyle = .short
+        let md = DateFormatter(); md.locale = locale; md.dateStyle = .medium; md.timeStyle = .none
+        let sdt = DateFormatter(); sdt.locale = locale; sdt.dateStyle = .short; sdt.timeStyle = .short
+        self.mediumDateTimeFormatter = mdt; self.mediumDateFormatter = md; self.shortDateTimeFormatter = sdt
+    }
 
     // MARK: dados derivados
 
@@ -86,18 +105,21 @@ private struct Context {
     var interruptedRuns: [Manifest] { runs.filter { $0.interrupted && failedCount($0) == 0 } }
     /// Cópias que deixaram câmeras no cartão de propósito (material de outra pessoa).
     var keptRuns: [Manifest] { runs.filter { !($0.keptCameras ?? []).isEmpty && failedCount($0) == 0 && !$0.interrupted } }
+    /// Cópias que terminaram sem erro, mas sem copiar nem confirmar nenhuma mídia (ex.: filtro errado).
+    var emptyRuns: [Manifest] {
+        runs.filter { $0.files.filter { !isAside($0) }.isEmpty && failedCount($0) == 0 && !$0.interrupted }
+    }
 
     func date(_ d: Date, time: Bool = true) -> String {
-        let f = DateFormatter(); f.locale = locale; f.dateStyle = .medium; f.timeStyle = time ? .short : .none
-        return f.string(from: d)
+        (time ? mediumDateTimeFormatter : mediumDateFormatter).string(from: d)
     }
     func shortDate(_ d: Date) -> String {
-        let f = DateFormatter(); f.locale = locale; f.dateStyle = .short; f.timeStyle = .short
-        return f.string(from: d)
+        shortDateTimeFormatter.string(from: d)
     }
     func esc(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 
     /// Ícone do dispositivo de cada cópia: o do macOS (o mesmo da barra lateral do app), embutido uma vez
@@ -176,6 +198,13 @@ private struct Context {
             cls = "warn"; icon = Self.iconWarn
             title = L.s("Nenhuma cópia registrada.", "No copies recorded.", "Ninguna copia registrada.")
             body = ""
+        } else if !emptyRuns.isEmpty {
+            cls = "warn"; icon = Self.iconWarn
+            title = L.s("Nenhum arquivo copiado de ", "No files copied from ", "No se copiaron archivos de ")
+                + L.list(emptyRuns.map(\.source.volumeName)) + "."
+            body = L.s("Não formate o cartão antes de confirmar o filtro ou copiar os arquivos.",
+                       "Do not format the card before checking the filter or copying the files.",
+                       "No formatees la tarjeta antes de revisar el filtro o copiar los archivos.")
         } else {
             cls = "ok"; icon = Self.iconOk
             title = L.s("Tudo conferido.", "All verified.", "Todo verificado.")
@@ -293,8 +322,9 @@ private struct Context {
             notes.append(L.s("Registro parcial: a cópia parou antes do fim", "Partial record: the copy stopped before the end", "Registro parcial: la copia se detuvo antes del final"))
         }
         if let f = r.cardFormatted {
+            let clusterText = f.clusterBytes >= 1024 ? "\(f.clusterBytes / 1024) KB" : "\(f.clusterBytes) B"
             notes.append(L.s("Formatado em ", "Formatted on ", "Formateada el ") + date(f.at)
-                         + " (\(f.fileSystem), " + L.s("blocos de ", "", "bloques de ") + "\(f.clusterBytes / 1024) KB" + L.s("", " clusters", "") + ")")
+                         + " (\(f.fileSystem), " + L.s("blocos de ", "", "bloques de ") + clusterText + L.s("", " clusters", "") + ")")
         }
 
         var failures = ""
@@ -364,8 +394,8 @@ private struct Context {
             let real = r.finishedAt.timeIntervalSince(r.startedAt)
             let secs = max(1, real)
             let copied = r.files.filter { $0.status == "verified" }.reduce(Int64(0)) { $0 + $1.bytes }
-            let speed = copied > 0 ? L.bytes(Int64(Double(copied) / secs)) + "/s" : "—"
-            let json = ManifestStore.jsonFileName(for: r)
+            let speed = copied > 0 ? L.bytes(Int64(Double(copied) / secs)) + "/s" : "-"
+            let json = jsonNames[r.offloadId] ?? ManifestStore.jsonFileName(for: r)
             return "<tr><td>\(esc(r.source.volumeName))</td><td class=\"num\">\(esc(shortDate(r.startedAt)))</td><td class=\"num\">\(esc(real < 1 ? "< 1 s" : L.duration(secs)))</td>"
                 + "<td class=\"num\">\(esc(speed))</td><td><code>\(esc(String(r.source.fingerprint.prefix(12))))</code></td>"
                 + "<td>\(esc(r.presetName))</td>"
@@ -378,7 +408,7 @@ private struct Context {
             let header = "<tr class=\"group\"><th colspan=\"5\">\(esc(r.source.volumeName))</th></tr>"
             return header + r.files.map { f -> String in
                 let status = f.status == "present" ? L.s("já estava", "already there", "ya estaba") : L.s("conferido", "verified", "verificado")
-                let when = f.sourceDate.map { shortDate($0) } ?? "—"
+                let when = f.sourceDate.map { shortDate($0) } ?? "-"
                 let q = (f.sourceRelPath + " " + f.destRelPath + " " + r.source.volumeName + " " + f.xxhash64).lowercased()
                 // caminho relativo à pasta do projeto (o nome do projeto já está no título)
                 let prefix = projectName + "/"

@@ -6,6 +6,19 @@ import Testing
     @Test func projetoEhOMesmoQueEvento() throws {
         let c = try ArgParser.parse(["--card", "/c", "--to", "/d", "--projeto", "Casamento"])
         #expect(c.evento == "Casamento")
+        let c2 = try ArgParser.parse(["--card", "/c", "--to", "/d", "--project", "Casamento"])
+        #expect(c2.evento == "Casamento")
+    }
+
+    @Test func parsesVerifyAllAndDate() throws {
+        let c = try ArgParser.parse([
+            "--card", "/c", "--to", "/d", "--verify-all", "--date", "2026-10-05..2026-10-07",
+        ])
+        #expect(c.verifyAll == true)
+        #expect(c.capturedIn != nil)
+        #expect(throws: CLIError.self) {
+            _ = try ArgParser.parse(["--card", "/c", "--to", "/d", "--date", "2026-02-31"])
+        }
     }
 
     @Test func parsesFullInvocation() throws {

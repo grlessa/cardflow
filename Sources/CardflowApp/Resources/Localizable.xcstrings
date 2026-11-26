@@ -2,7 +2,7 @@
   "sourceLanguage": "pt-BR",
   "strings": {
     "preset.factory.name": {
-      "comment" : "Nome de exibição do preset de fábrica (id=factory-default). Só exibição; o dado salvo continua \"Padrão\".",
+      "comment": "Nome de exibição do preset de fábrica (id=factory-default). Só exibição; o dado salvo continua \"Padrão\".",
       "localizations": {
         "pt-BR": {
           "stringUnit": {
@@ -596,116 +596,6 @@
         }
       }
     },
-    "main.stat.photos": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "fotos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "photos"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "fotos"
-          }
-        }
-      }
-    },
-    "main.stat.videos": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "vídeos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "videos"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "videos"
-          }
-        }
-      }
-    },
-    "main.stat.audios": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "áudios"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "audios"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "audios"
-          }
-        }
-      }
-    },
-    "main.stat.clip": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clipe"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clip"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clip"
-          }
-        }
-      }
-    },
-    "main.stat.clips": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clipes"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clips"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clips"
-          }
-        }
-      }
-    },
     "main.lote.label %@ %@": {
       "localizations": {
         "pt-BR": {
@@ -900,28 +790,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Entendido, crear un lote nuevo igual"
-          }
-        }
-      }
-    },
-    "main.dest.backup": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BACKUP (OPCIONAL)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BACKUP (OPTIONAL)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BACKUP (OPCIONAL)"
           }
         }
       }
@@ -1274,28 +1142,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Detener"
-          }
-        }
-      }
-    },
-    "main.alreadyCopied.title": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Já está copiado"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Already copied"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ya está copiado"
           }
         }
       }
@@ -2194,72 +2040,6 @@
         }
       }
     },
-    "preset.error.pathTraversal": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A estrutura não pode sair da pasta de destino (sem “..”, “/” ou “~” no início)."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The structure can’t leave the destination folder (no “..”, “/” or leading “~”)."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La estructura no puede salir de la carpeta de destino (sin «..», «/» ni «~» al inicio)."
-          }
-        }
-      }
-    },
-    "preset.error.unknownModifier %@": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modificador desconhecido: :%@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown modifier: :%@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modificador desconocido: :%@"
-          }
-        }
-      }
-    },
-    "preset.error.unknownToken %@": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Token desconhecido: {%@}"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown token: {%@}"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Token desconocido: {%@}"
-          }
-        }
-      }
-    },
     "preset.field.name": {
       "localizations": {
         "pt-BR": {
@@ -2278,50 +2058,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nombre del modelo"
-          }
-        }
-      }
-    },
-    "preset.folders.hint": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cada linha é uma pasta, e a de baixo fica dentro da de cima. Use “+ Texto…” pra digitar um nome fixo (ex.: Culto)."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Each row is a folder, and the one below sits inside the one above. Use “+ Text…” to type a fixed name (e.g. Service)."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cada fila es una carpeta, y la de abajo va dentro de la de arriba. Usa «+ Texto…» para escribir un nombre fijo (ej.: Misa)."
-          }
-        }
-      }
-    },
-    "preset.rename.keepOriginal": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Os arquivos mantêm o nome original da câmera."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Files keep the camera’s original name."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Los archivos conservan el nombre original de la cámara."
           }
         }
       }
@@ -2370,28 +2106,6 @@
         }
       }
     },
-    "preset.sessionField.keyPlaceholder": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "chave"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "key"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clave"
-          }
-        }
-      }
-    },
     "preset.sessionField.labelPlaceholder": {
       "localizations": {
         "pt-BR": {
@@ -2410,50 +2124,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Etiqueta"
-          }
-        }
-      }
-    },
-    "preset.step.basic": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Básico"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Basics"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Básico"
-          }
-        }
-      }
-    },
-    "preset.step.naming": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomeação"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Naming"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nombrado"
           }
         }
       }
@@ -2590,446 +2260,6 @@
         }
       }
     },
-    "pill.folder.remove.help": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remover esta pasta"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove this folder"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quitar esta carpeta"
-          }
-        }
-      }
-    },
-    "pill.folder.add": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "nova pasta"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "new folder"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "nueva carpeta"
-          }
-        }
-      }
-    },
-    "pill.add.text": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Texto…"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Text…"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Texto…"
-          }
-        }
-      }
-    },
-    "pill.section.customFields": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Campos personalizados"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Custom fields"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Campos personalizados"
-          }
-        }
-      }
-    },
-    "pill.text.placeholder": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "texto"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "text"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "texto"
-          }
-        }
-      }
-    },
-    "pill.text.remove.help": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remover texto"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove text"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quitar texto"
-          }
-        }
-      }
-    },
-    "pill.case.label": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caixa"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Case"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mayúsculas"
-          }
-        }
-      }
-    },
-    "pill.dateFormat.label": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formato da data"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Date format"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formato de la fecha"
-          }
-        }
-      }
-    },
-    "pill.dateFormat.longFull": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "28 de maio de 2026"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "May 28, 2026"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "28 de mayo de 2026"
-          }
-        }
-      }
-    },
-    "pill.dateFormat.longNoYear": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "28 de maio"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "May 28"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "28 de mayo"
-          }
-        }
-      }
-    },
-    "pill.dateFormat.longMonthYear": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "maio de 2026"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "May 2026"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "mayo de 2026"
-          }
-        }
-      }
-    },
-    "pill.timeFormat.label": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formato da hora"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Time format"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formato de la hora"
-          }
-        }
-      }
-    },
-    "pill.counter.digits %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dígitos: %lld"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Digits: %lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dígitos: %lld"
-          }
-        }
-      }
-    },
-    "pill.counter.start %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Começa em: %lld"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Starts at: %lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comienza en: %lld"
-          }
-        }
-      }
-    },
-    "pill.counter.step %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Passo: %lld"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Step: %lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paso: %lld"
-          }
-        }
-      }
-    },
-    "pill.segment.remove": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remover peça"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove piece"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quitar pieza"
-          }
-        }
-      }
-    },
-    "pill.separator.space": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "espaço"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "space"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "espacio"
-          }
-        }
-      }
-    },
-    "pill.separator.hyphen": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "hífen  -"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "hyphen  -"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "guion  -"
-          }
-        }
-      }
-    },
-    "pill.separator.underline": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "underline  _"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "underscore  _"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "guion bajo  _"
-          }
-        }
-      }
-    },
-    "pill.separator.help": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Como juntar as peças: espaço, hífen ou underline"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "How to join the pieces: space, hyphen or underscore"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cómo unir las piezas: espacio, guion o guion bajo"
-          }
-        }
-      }
-    },
     "onboarding.cta": {
       "localizations": {
         "pt-BR": {
@@ -3162,72 +2392,6 @@
         }
       }
     },
-    "Lote (descarga)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lote (descarga)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Batch (offload)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lote (descarga)"
-          }
-        }
-      }
-    },
-    "Pasta de origem": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pasta de origem"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Source folder"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Carpeta de origen"
-          }
-        }
-      }
-    },
-    "Nº sequencial": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nº sequencial"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sequence no."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nº secuencial"
-          }
-        }
-      }
-    },
     "Data": {
       "localizations": {
         "pt-BR": {
@@ -3272,28 +2436,6 @@
         }
       }
     },
-    "Turno (Manhã/Tarde/Noite)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turno (Manhã/Tarde/Noite)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shift (Morning/Afternoon/Night)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turno (Mañana/Tarde/Noche)"
-          }
-        }
-      }
-    },
     "Dia (28)": {
       "localizations": {
         "pt-BR": {
@@ -3312,226 +2454,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Día (28)"
-          }
-        }
-      }
-    },
-    "Dia da semana (Segunda)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dia da semana (Segunda)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Weekday (Monday)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Día de la semana (Lunes)"
-          }
-        }
-      }
-    },
-    "Dia abrev. (Seg)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dia abrev. (Seg)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Weekday abbr. (Mon)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Día abrev. (Lun)"
-          }
-        }
-      }
-    },
-    "Mês (05)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mês (05)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Month (05)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mes (05)"
-          }
-        }
-      }
-    },
-    "Mês abrev. (Mai)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mês abrev. (Mai)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Month abbr. (May)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mes abrev. (May)"
-          }
-        }
-      }
-    },
-    "Mês nome (Maio)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mês nome (Maio)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Month name (May)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mes nombre (Mayo)"
-          }
-        }
-      }
-    },
-    "Ano (2026)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ano (2026)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Year (2026)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Año (2026)"
-          }
-        }
-      }
-    },
-    "Ano (26)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ano (26)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Year (26)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Año (26)"
-          }
-        }
-      }
-    },
-    "Horas (17)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Horas (17)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hours (17)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Horas (17)"
-          }
-        }
-      }
-    },
-    "Minutos (26)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Minutos (26)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Minutes (26)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Minutos (26)"
-          }
-        }
-      }
-    },
-    "Segundos (40)": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segundos (40)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Seconds (40)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segundos (40)"
           }
         }
       }
@@ -3818,28 +2740,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "La estructura de carpetas del modelo es inválida: saldría de la carpeta de destino."
-          }
-        }
-      }
-    },
-    "pill.counter.continueAcrossLotes": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar do lote anterior"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue from previous batch"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar del lote anterior"
           }
         }
       }
@@ -4752,28 +3652,6 @@
         }
       }
     },
-    "format.settings.title": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formatação de cartões"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Card formatting"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formateo de tarjetas"
-          }
-        }
-      }
-    },
     "format.settings.explainer": {
       "localizations": {
         "pt-BR": {
@@ -5012,28 +3890,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proyecto"
-          }
-        }
-      }
-    },
-    "O nome do projeto, que vira a pasta principal.": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O nome do projeto, que vira a pasta principal."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The project name, which becomes the main folder."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El nombre del proyecto, que se convierte en la carpeta principal."
           }
         }
       }
@@ -5676,28 +4532,6 @@
         }
       }
     },
-    "action.failed.files %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld arquivos não passaram na conferência."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld files failed verification."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld archivos no pasaron la verificación."
-          }
-        }
-      }
-    },
     "action.failed.title": {
       "localizations": {
         "pt-BR": {
@@ -6050,50 +4884,6 @@
         }
       }
     },
-    "action.verified.detail %lld %@": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld arquivos conferidos em %2$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld files verified in %2$@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld archivos verificados en %2$@"
-          }
-        }
-      }
-    },
-    "action.verified.detailShort %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld arquivos conferidos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld files verified"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld archivos verificados"
-          }
-        }
-      }
-    },
     "action.verified.ejected": {
       "localizations": {
         "pt-BR": {
@@ -6292,28 +5082,6 @@
         }
       }
     },
-    "dest.role": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Papel"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Role"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Función"
-          }
-        }
-      }
-    },
     "dest.role.backup": {
       "localizations": {
         "pt-BR": {
@@ -6490,50 +5258,6 @@
         }
       }
     },
-    "detail.ignored.show %lld": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ver os %lld"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show %lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ver los %lld"
-          }
-        }
-      }
-    },
-    "detail.nothingSelected": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nada do tipo escolhido neste cartão"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing of the chosen type on this card"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nada del tipo elegido en esta tarjeta"
-          }
-        }
-      }
-    },
     "detail.reader.builtIn": {
       "localizations": {
         "pt-BR": {
@@ -6666,28 +5390,6 @@
         }
       }
     },
-    "detail.tree.meta %lld %@": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld arquivos · %2$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld files · %2$@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld archivos · %2$@"
-          }
-        }
-      }
-    },
     "detail.tree.more %lld": {
       "localizations": {
         "pt-BR": {
@@ -6750,28 +5452,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Se copian igual, por seguridad, en una carpeta aparte."
-          }
-        }
-      }
-    },
-    "detail.what": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copiar"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copy"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copiar"
           }
         }
       }
@@ -7190,28 +5870,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proyecto"
-          }
-        }
-      }
-    },
-    "inspector.rename": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Renomear os arquivos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rename files"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Renombrar los archivos"
           }
         }
       }
@@ -7964,28 +6622,6 @@
         }
       }
     },
-    "recent.verified": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conferidos"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verified"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verificados"
-          }
-        }
-      }
-    },
     "recent.verifiedFormatted": {
       "localizations": {
         "pt-BR": {
@@ -8118,28 +6754,6 @@
         }
       }
     },
-    "settings.format": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formatação"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formatting"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Formateo"
-          }
-        }
-      }
-    },
     "settings.general": {
       "localizations": {
         "pt-BR": {
@@ -8180,50 +6794,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Idioma"
-          }
-        }
-      }
-    },
-    "settings.language.help": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Cardflow segue o idioma do sistema. Dá pra escolher outro só pra ele nos Ajustes do Sistema."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cardflow follows the system language. You can pick another one just for it in System Settings."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cardflow sigue el idioma del sistema. Puedes elegir otro solo para la app en Ajustes del Sistema."
-          }
-        }
-      }
-    },
-    "settings.language.open": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir Ajustes do Sistema…"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open System Settings…"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir Ajustes del Sistema…"
           }
         }
       }
@@ -8708,28 +7278,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Carpeta %lld"
-          }
-        }
-      }
-    },
-    "inspector.folder.help": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Monte o nome com as peças. Texto fixo também vale, como Culto."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Build the name from the pieces. Fixed text works too, like Service."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arma el nombre con las piezas. También vale texto fijo, como Culto."
           }
         }
       }
@@ -9424,28 +7972,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "SSD, CFexpress o HDD"
-          }
-        }
-      }
-    },
-    "preset.rename.joinersHint": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Os juntadores cinza (· - _) entre as peças definem como elas se unem. Clique num pra trocar."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The gray joiners (· - _) between the pieces decide how they connect. Click one to change it."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Los conectores grises (· - _) entre las piezas definen cómo se unen. Haz clic en uno para cambiarlo."
           }
         }
       }
@@ -12210,50 +10736,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segundos"
-          }
-        }
-      }
-    },
-    "O nome da câmera (CAM A, CAM 1…), escolhido em cada cartão.": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O nome da câmera (CAM A, CAM 1…), escolhido em cada cartão."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The camera name (CAM A, CAM 1…), chosen on each card."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El nombre de la cámara (CAM A, CAM 1…), elegido en cada tarjeta."
-          }
-        }
-      }
-    },
-    "A pasta onde o arquivo estava no cartão (CLIP, 100CANON…).": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A pasta onde o arquivo estava no cartão (CLIP, 100CANON…)."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The folder the file was in on the card (CLIP, 100CANON…)."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La carpeta donde estaba el archivo en la tarjeta (CLIP, 100CANON…)."
           }
         }
       }

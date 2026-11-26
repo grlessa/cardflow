@@ -151,9 +151,14 @@ public struct XXHash64 {
     }
 
     /// Hash de um arquivo lendo em blocos (não carrega tudo na memória).
-    public static func hash(fileAt url: URL, seed: UInt64 = 0, chunkSize: Int = 1 << 22) throws -> UInt64 {
+    /// Quando `bypassCache == true`, ativa `F_NOCACHE` para forçar a releitura direta da mídia
+    /// de armazenamento (sem ler do Unified Buffer Cache em RAM).
+    public static func hash(fileAt url: URL, seed: UInt64 = 0, chunkSize: Int = 1 << 22, bypassCache: Bool = false) throws -> UInt64 {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
+        if bypassCache {
+            _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
+        }
         var hasher = XXHash64(seed: seed)
         var done = false
         while !done {

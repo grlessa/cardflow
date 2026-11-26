@@ -195,14 +195,14 @@ private struct UpdateSettings: View {
         Form {
             Section {
                 LabeledContent("settings.updates.version") {
-                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
                         .monospacedDigit()
                 }
                 Toggle("settings.updates.onLaunch", isOn: $checkOnLaunch)
                 LabeledContent {
                     HStack {
                         Button("settings.updates.notes") {
-                            NSWorkspace.shared.open(Links.site)
+                            NSWorkspace.shared.open(Links.releases)
                         }
                         if let v = updates.availableVersion {
                             Button("main.update.install") { updates.install() }.buttonStyle(.borderedProminent)

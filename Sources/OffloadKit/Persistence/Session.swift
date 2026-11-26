@@ -54,6 +54,6 @@ public struct SessionStore {
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(session).write(to: fileURL)
+        try enc.encode(session).write(to: fileURL, options: .atomic)
     }
 }

@@ -86,17 +86,25 @@ public struct PresetStore {
         return "\(cleaned.isEmpty ? "preset" : cleaned).cfp"
     }
 
+    private static func isValidPresetID(_ id: String) -> Bool {
+        !id.isEmpty && id != "." && id != ".." && !id.contains("/") && !id.contains(":")
+            && !id.contains("..") && !id.hasPrefix("~") && !id.contains("\0")
+    }
+
     /// Valida schema suportado + tokens conhecidos nos templates (estrutura e renome).
     public static func validate(_ preset: Preset) throws {
         guard (1...maxSchemaVersion).contains(preset.schemaVersion) else {
             throw PresetError.unsupportedSchema(preset.schemaVersion)   // rejeita 0/negativo também
         }
         guard !preset.folderStructure.isEmpty else { throw PresetError.invalidTemplate("estrutura de pastas vazia") }
-        guard preset.rename.counterPadding >= 1 else { throw PresetError.invalidTemplate("contador inválido (< 1 dígito)") }
+        guard (1...12).contains(preset.rename.counterPadding) else {
+            throw PresetError.invalidTemplate("contador inválido (deve ter entre 1 e 12 dígitos)")
+        }
+        guard preset.rename.counterStart >= 0, preset.rename.counterStep >= 1 else {
+            throw PresetError.invalidTemplate("parâmetros de contador inválidos")
+        }
         // o id vira o nome do arquivo .cfp em disco — não pode conter separador nem travessia.
-        let id = preset.id
-        guard !id.isEmpty, id != ".", id != "..", !id.contains("/"), !id.contains(":"),
-              !id.contains(".."), !id.hasPrefix("~"), !id.contains("\0") else {
+        guard isValidPresetID(preset.id) else {
             throw PresetError.invalidTemplate("identificador de preset inválido")
         }
         let keys = Set(preset.sessionFields.map(\.key))
@@ -106,6 +114,9 @@ public struct PresetStore {
             try NameBuilder.validateTokensExist(in: preset.folderStructure, knownSessionKeys: keys)
             // o template de nome só é usado (e cobrado) quando o renome está ligado.
             if preset.rename.enabled {
+                if preset.rename.template.contains("/") {
+                    throw NamingError.pathTraversal(preset.rename.template)
+                }
                 try NameBuilder.validateNoTraversal(in: preset.rename.template)
                 try NameBuilder.validateTokensExist(in: preset.rename.template, knownSessionKeys: keys)
             }
@@ -126,10 +137,14 @@ public struct PresetStore {
         try Self.validate(preset)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(preset).write(to: url)
+        try enc.encode(preset).write(to: url, options: .atomic)
     }
 
     public func load(from url: URL) throws -> Preset {
+        if let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+           fileSize > Self.maxImportBytes {
+            throw PresetError.fileTooLarge
+        }
         let data = try Data(contentsOf: url)
         guard data.count <= Self.maxImportBytes else { throw PresetError.fileTooLarge }
         let preset = try JSONDecoder().decode(Preset.self, from: data)
@@ -145,6 +160,9 @@ public struct PresetStore {
     }
 
     public func delete(id: String) throws {
+        guard Self.isValidPresetID(id) else {
+            throw PresetError.invalidTemplate("identificador de preset inválido")
+        }
         let url = directory.appendingPathComponent("\(id).cfp")
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)

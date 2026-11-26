@@ -4,7 +4,6 @@ import SwiftUI
 /// copiar". Formatar vale só nesta sessão (sempre começa desligado); ejetar é lembrado entre aberturas.
 struct AfterCopyOptions: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("cardflow.ejectWhenDone") private var ejectWhenDone = true
     let card: CardSession
 
     var body: some View {
@@ -23,9 +22,9 @@ struct AfterCopyOptions: View {
         .buttonStyle(.plain)
         .disabled(formatLockedByCamera || model.formatter.permission == .unavailable)
 
-        Button { ejectWhenDone.toggle() } label: {
+        Button { model.ejectWhenDone.toggle() } label: {
             OptionTile(symbol: "eject", title: "after.eject.title",
-                       detail: ejectWhenDone ? "after.eject.on" : "after.eject.off", on: ejectWhenDone)
+                       detail: model.ejectWhenDone ? "after.eject.on" : "after.eject.off", on: model.ejectWhenDone)
         }
         .buttonStyle(.plain)
     }

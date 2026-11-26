@@ -12,6 +12,28 @@ public struct CardflowConfig: Equatable {
     public var assumeYes: Bool
     public var presetPath: String?
     public var sessionValues: [String: String] = [:]
+    public var verifyAll: Bool = false
+    public var capturedIn: DateInterval? = nil
+
+    public init(card: String, destinations: [String], media: Preset.Media.Kind,
+                camera: String, evento: String?, renameOverride: Bool?,
+                dryRun: Bool, assumeYes: Bool, presetPath: String?,
+                sessionValues: [String: String] = [:],
+                verifyAll: Bool = false,
+                capturedIn: DateInterval? = nil) {
+        self.card = card
+        self.destinations = destinations
+        self.media = media
+        self.camera = camera
+        self.evento = evento
+        self.renameOverride = renameOverride
+        self.dryRun = dryRun
+        self.assumeYes = assumeYes
+        self.presetPath = presetPath
+        self.sessionValues = sessionValues
+        self.verifyAll = verifyAll
+        self.capturedIn = capturedIn
+    }
 }
 
 public enum CLIError: Error, Equatable {
@@ -49,6 +71,8 @@ public enum ArgParser {
         var assumeYes = false
         var presetPath: String?
         var sessionValues: [String: String] = [:]
+        var verifyAll = false
+        var capturedIn: DateInterval? = nil
 
         var i = 0
         func nextValue(_ flag: String) throws -> String {
@@ -71,13 +95,18 @@ public enum ArgParser {
                 default: throw CLIError.badValue("--media \(v)")
                 }
             case "--camera": camera = try nextValue("--camera")
-            case "--projeto", "--evento": evento = try nextValue(args[i])
+            case "--projeto", "--project", "--evento": evento = try nextValue(args[i])
             case "--preset": presetPath = try nextValue("--preset")
             case "--set":
                 let kv = try nextValue("--set")
                 guard let eq = kv.firstIndex(of: "="), eq != kv.startIndex else { throw CLIError.badValue("--set \(kv)") }
                 let key = String(kv[..<eq]); let value = String(kv[kv.index(after: eq)...])
                 sessionValues[key] = value
+            case "--date":
+                let raw = try nextValue("--date")
+                guard let interval = parseDateInterval(raw) else { throw CLIError.badValue("--date \(raw)") }
+                capturedIn = interval
+            case "--verify-all": verifyAll = true
             case "--rename": renameOverride = true
             case "--dry-run": dryRun = true
             case "--yes", "-y": assumeYes = true
@@ -91,6 +120,35 @@ public enum ArgParser {
         return CardflowConfig(card: card, destinations: destinations, media: media,
                               camera: camera, evento: evento, renameOverride: renameOverride,
                               dryRun: dryRun, assumeYes: assumeYes, presetPath: presetPath,
-                              sessionValues: sessionValues)
+                              sessionValues: sessionValues, verifyAll: verifyAll,
+                              capturedIn: capturedIn)
+    }
+
+    /// Interpreta `YYYY-MM-DD` (dia inteiro) ou `YYYY-MM-DD..YYYY-MM-DD` (intervalo inclusivo) no fuso local.
+    public static func parseDateInterval(_ raw: String, calendar: Calendar = .current) -> DateInterval? {
+        func parseDay(_ s: String) -> Date? {
+            let parts = s.split(separator: "-", omittingEmptySubsequences: false)
+            guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+                  let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]) else { return nil }
+            var comps = DateComponents()
+            comps.year = y; comps.month = m; comps.day = d
+            guard let date = calendar.date(from: comps) else { return nil }
+            let roundTrip = calendar.dateComponents([.year, .month, .day], from: date)
+            guard roundTrip.year == y, roundTrip.month == m, roundTrip.day == d else { return nil }
+            return calendar.startOfDay(for: date)
+        }
+
+        let bounds = raw.components(separatedBy: "..")
+        if bounds.count == 1 {
+            guard let start = parseDay(bounds[0]),
+                  let end = calendar.date(byAdding: .day, value: 1, to: start) else { return nil }
+            return DateInterval(start: start, end: end)
+        } else if bounds.count == 2 {
+            guard let a = parseDay(bounds[0]), let b = parseDay(bounds[1]) else { return nil }
+            let lo = min(a, b), hi = max(a, b)
+            guard let end = calendar.date(byAdding: .day, value: 1, to: hi) else { return nil }
+            return DateInterval(start: lo, end: end)
+        }
+        return nil
     }
 }

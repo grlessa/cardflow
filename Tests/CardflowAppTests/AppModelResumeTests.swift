@@ -127,7 +127,6 @@ import Testing
 
         #expect(model.cards[0].isAlreadyCopied)
         #expect(model.canStart(model.cards[0]) == false)
-        #expect(model.cards[0].alreadyCopiedTitle == "main.alreadyCopied.title")
         let detail = model.cards[0].alreadyCopiedDetail ?? ""
         #expect(detail.hasPrefix("main.alreadyCopied.detail"))
         #expect(detail.contains("36"))

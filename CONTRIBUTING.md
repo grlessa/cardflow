@@ -21,7 +21,7 @@ Todo PR deve deixar `swift test` verde. O CI roda isso automaticamente, mas rode
   negócio vive aqui e é coberta por teste.** Se você mexe no comportamento, escreva o teste no
   diretório `Tests/OffloadKitTests`.
 - **`CardflowApp`** é a interface (`SwiftUI`). Ela não é testável sem tela, então é validada por
-  build e por inspeção visual. Evite colocar regra de negócio aqui — extraia pro `OffloadKit` e teste lá.
+  build e por inspeção visual. Evite colocar regra de negócio aqui; extraia pro `OffloadKit` e teste lá.
 - **`cardflow`/`CardflowCLI`** é a versão de linha de comando do mesmo motor.
 
 Regra de ouro: este é um app cujo trabalho é **não perder footage**. Qualquer mudança em cópia,

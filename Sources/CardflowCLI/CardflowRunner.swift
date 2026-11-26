@@ -18,9 +18,9 @@ public enum CardflowRunner {
     static func buildPreset(_ config: CardflowConfig) throws -> Preset {
         var preset: Preset
         if let path = config.presetPath {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            preset = try JSONDecoder().decode(Preset.self, from: data)
-            if let e = config.evento { preset.evento = e }   // só sobrescreve se --evento foi passado
+            let url = URL(fileURLWithPath: path)
+            preset = try PresetStore(directory: url.deletingLastPathComponent()).load(from: url)
+            if let e = config.evento { preset.evento = e }   // só sobrescreve se --projeto/--evento foi passado
         } else {
             preset = .factoryDefault
             if let e = config.evento { preset.evento = e }    // sem preset: usa o de fábrica (projeto "Projeto")
@@ -32,26 +32,30 @@ public enum CardflowRunner {
 
     public static func run(_ config: CardflowConfig,
                            input: (String) -> String?,
-                           output: (String) -> Void) throws {
+                           output: (String) -> Void,
+                           onProgress: ((OffloadProgress) -> Void)? = nil) throws {
         let preset = try buildPreset(config)
         let card = URL(fileURLWithPath: config.card)
         let destinations = config.destinations.map { URL(fileURLWithPath: $0) }
-        // destinos no MESMO disco físico → "backup" não é redundância (o app já bloqueia isso).
+        // destinos no MESMO disco físico -> "backup" não é redundância (o app já bloqueia isso).
         var byDisk: [String: [String]] = [:]
         for url in destinations {
             if let bsd = PhysicalDisk.wholeDiskBSD(for: url) { byDisk[bsd, default: []].append(url.lastPathComponent) }
         }
         if let dup = byDisk.values.first(where: { $0.count > 1 }) {
-            output(CLIStrings.string("cli.abort.sameDisk %@", dup.joined(separator: ", ")))
             throw CardflowRunError.sameDisk(dup)
         }
+        let internalDests = Set(destinations.filter { url in
+            (try? url.resourceValues(forKeys: [.volumeIsInternalKey]).volumeIsInternal) == true
+        })
         let service = CopyService(preset: preset, spaceProvider: VolumeFreeSpace(), locale: CLIStrings.effectiveLocale)
 
-        let preview = try service.preview(cardRoot: card, chosenMedia: config.media, destinations: destinations)
+        let preview = try service.preview(cardRoot: card, chosenMedia: config.media, destinations: destinations,
+                                          capturedIn: config.capturedIn,
+                                          internalDestinations: internalDests)
         output(Report.summary(preview: preview, destinations: destinations))
 
         if !preview.shortfalls.isEmpty {
-            output(CLIStrings.string("cli.abort.noSpace"))
             throw CardflowRunError.noSpace
         }
         if config.dryRun {
@@ -61,7 +65,8 @@ public enum CardflowRunner {
         if !config.assumeYes {
             let prompt = CLIStrings.string("cli.confirm.prompt")
             let answer = (input(prompt) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard answer == "s" || answer == "sim" || answer == "y" else {
+            let accepted: Set<String> = ["s", "sim", "y", "yes", "si", "sí"]
+            guard accepted.contains(answer) else {
                 output(CLIStrings.string("cli.cancelled"))
                 return
             }
@@ -69,7 +74,11 @@ public enum CardflowRunner {
 
         let outcome = try service.run(cardRoot: card, chosenMedia: config.media,
                                       destinations: destinations, camera: config.camera,
-                                      sessionValues: config.sessionValues)
+                                      sessionValues: config.sessionValues,
+                                      capturedIn: config.capturedIn,
+                                      fastResume: !config.verifyAll,
+                                      internalDestinations: internalDests,
+                                      onProgress: onProgress ?? { _ in })
         output(Report.outcome(outcome))
         let verdict = Report.verdict(outcome)
         output(verdict.line)

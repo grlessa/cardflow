@@ -72,6 +72,7 @@ struct FolderLevelEditor: View {
             ForEach(formats) { f in
                 FormatRow(example: render(f.segments).nilIfEmpty ?? f.fallback, detail: f.detail,
                           on: f.segments == current) {
+                    guard editor.folderLevels.indices.contains(index) else { return }
                     editor.folderLevels[index] = f.segments
                     customizing = false
                 }
@@ -103,7 +104,10 @@ struct FolderLevelEditor: View {
             .buttonStyle(.plain)
             if customizing {
                 CustomPiecesBuilder(segments: Binding(get: { editor.folderLevels[safe: index] ?? [] },
-                                                      set: { editor.folderLevels[index] = $0 }),
+                                                      set: {
+                                                          guard editor.folderLevels.indices.contains(index) else { return }
+                                                          editor.folderLevels[index] = $0
+                                                      }),
                                     fields: editor.draft.sessionFields, defaultSeparator: " ",
                                     value: { render([.token(name: $0, modifiers: [])]) })
             }
@@ -112,8 +116,7 @@ struct FolderLevelEditor: View {
 
     private func move(_ delta: Int) {
         let j = index + delta
-        guard editor.folderLevels.indices.contains(j) else { return }
-        editor.folderLevels.swapAt(index, j)
+        editor.moveFolderLevel(from: index, to: j)
     }
 }
 
@@ -274,7 +277,7 @@ struct CustomPiecesBuilder: View {
                             Text(FolderFormats.label(name, fields: fields))
                             let v = value(name)
                             if !v.isEmpty { Text(v).foregroundStyle(.secondary) }
-                            Button { update { $0.items.remove(at: i) } } label: {
+                            Button { update { guard $0.items.indices.contains(i) else { return }; $0.items.remove(at: i) } } label: {
                                 Image(systemName: "xmark").font(.caption2.weight(.bold)).accessibilityLabel(Text("folder.custom.remove"))
                             }
                             .buttonStyle(.plain)
@@ -287,11 +290,17 @@ struct CustomPiecesBuilder: View {
                     case .text(let t):
                         HStack(spacing: 4) {
                             DeferredTextField("folder.custom.textPlaceholder", text: Binding(
-                                get: { t },
-                                set: { v in update { $0.items[i] = .text(v) } }))
+                                get: { parts.items.indices.contains(i) ? ( { if case .text(let s) = parts.items[i] { return s }; return t }() ) : t },
+                                set: { v in
+                                    update {
+                                        guard $0.items.indices.contains(i), case .text = $0.items[i] else { return }
+                                        $0.items[i] = .text(v)
+                                    }
+                                }))
+                                .id("text-\(i)-\(parts.items.count)")
                                 .textFieldStyle(.plain)
                                 .frame(width: max(50, CGFloat(t.count) * 8 + 16))
-                            Button { update { $0.items.remove(at: i) } } label: {
+                            Button { update { guard $0.items.indices.contains(i) else { return }; $0.items.remove(at: i) } } label: {
                                 Image(systemName: "xmark").font(.caption2.weight(.bold)).accessibilityLabel(Text("folder.custom.remove"))
                             }
                             .buttonStyle(.plain)

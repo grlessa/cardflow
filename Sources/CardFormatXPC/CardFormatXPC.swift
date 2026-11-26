@@ -49,10 +49,10 @@ public enum CardFormatXPC {
     public static let machServiceName = "com.cardflow.app.formathelper"
     public static let plistName = "com.cardflow.app.formathelper.plist"
     public static let teamID = "NAS37P6Q53"
-    public static let clientRequirement =
-        "identifier \"com.cardflow.app\" and anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\""
-    public static let helperRequirement =
-        "identifier \"com.cardflow.app.formathelper\" and anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\""
+    private static let developerIDChain =
+        "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = \"\(teamID)\""
+    public static let clientRequirement = "identifier \"com.cardflow.app\" and \(developerIDChain)"
+    public static let helperRequirement = "identifier \"com.cardflow.app.formathelper\" and \(developerIDChain)"
 
     public static func serviceInterface() -> NSXPCInterface {
         let i = NSXPCInterface(with: CardFormatServiceProtocol.self)

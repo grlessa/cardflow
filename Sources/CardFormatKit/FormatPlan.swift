@@ -66,18 +66,30 @@ public struct FormatPlan: Codable, Equatable, Sendable {
             return rsv
         }
         var fat = fatFor(clusters: partSectors / spc)
+        var seen: Set<UInt64> = []
         for _ in 0..<16 {
             let rsv = reservedFor(fat: fat)
             let clusters = (partSectors - rsv - 2 * fat) / spc
             let need = fatFor(clusters: clusters)
             if need == fat { break }
+            if !seen.insert(fat).inserted {
+                // Em torno de 16 GiB o arredondamento de reservados pode oscilar entre dois valores
+                // adjacentes: escolhe o maior que sempre cobre todos os clusters resultantes.
+                fat = max(fat, need)
+                break
+            }
             fat = need
         }
-        let rsv = reservedFor(fat: fat)
-        let clusters = UInt32((partSectors - rsv - 2 * fat) / spc)
+        var rsv = reservedFor(fat: fat)
+        var clusters = (partSectors - rsv - 2 * fat) / spc
+        while clusters + 2 > fat * 128 {
+            fat += 1
+            rsv = reservedFor(fat: fat)
+            clusters = (partSectors - rsv - 2 * fat) / spc
+        }
         return FormatPlan(totalSectors: totalSectors, fileSystem: .fat32, boundaryUnitSectors: r.boundaryUnitSectors,
                           sectorsPerCluster: r.sectorsPerCluster, partitionStartSector: bu, partitionSectorCount: partSectors,
                           partitionType: 0x0C, fatOffset: UInt32(rsv), clusterHeapOffset: UInt32(rsv + 2 * fat),
-                          clusterCount: clusters, reservedSectors: UInt32(rsv), fatLength: UInt32(fat), numberOfFATs: 2)
+                          clusterCount: UInt32(clusters), reservedSectors: UInt32(rsv), fatLength: UInt32(fat), numberOfFATs: 2)
     }
 }

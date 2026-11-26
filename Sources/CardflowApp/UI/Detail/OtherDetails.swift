@@ -50,7 +50,7 @@ struct EmptyStateView: View {
             .font(.subheadline)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(.quaternary.opacity(0.7), in: .capsule)
-            .accessibilityLabel(Text("empty.step.a11y \(n)") + Text(" ") + Text(title))
+            .accessibilityLabel(Text("\(Text("empty.step.a11y \(n)")) \(Text(title))"))
     }
 }
 
@@ -78,7 +78,7 @@ struct DestinationDetailView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                if let space = DiskSpace(url: volume.url) {
+                if let space = model.diskSpace(for: volume.url) {
                     VStack(alignment: .leading, spacing: 6) {
                         ProjectedCapacityBar(space: space, adding: 0).frame(height: 10)
                         HStack {
@@ -127,7 +127,7 @@ struct DestinationDetailView: View {
 
             HStack(spacing: 10) {
                 Button { NSWorkspace.shared.open(volume.url) } label: { Label("menu.card.revealInFinder", systemImage: "folder") }
-                if model.customFolders.contains(volume.url) {
+                if model.customFolders.contains(where: { $0.path == AppModel.normalizeFolderURL(volume.url).path }) {
                     Button(role: .destructive) { model.forgetDestinationFolder(volume.url) } label: {
                         Label("dest.menu.forget", systemImage: "minus.circle")
                     }
@@ -304,9 +304,7 @@ struct RecentDetailView: View {
         return out
     }
 
-    private var bytes: Int64 {
-        item.manifest.files.filter { !$0.destRelPath.contains("/.cardflow/") }.reduce(0) { $0 + $1.bytes }
-    }
+    private var bytes: Int64 { item.totalBytes }
 
     private var verdict: LocalizedStringKey {
         if item.failed { return "result.doNotFormat" }

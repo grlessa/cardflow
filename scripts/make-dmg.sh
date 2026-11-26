@@ -18,10 +18,20 @@ source scripts/_notarize.sh   # notarize_with_log (busca o log da Apple na recus
 
 [ -d "$APP" ] || { echo "❌ Cardflow.app não existe. Rode scripts/sign-and-notarize.sh primeiro."; exit 1; }
 
+STAGE=""
+RWDIR=""
+DEVICE=""
+cleanup() {
+  if [ -n "${DEVICE:-}" ]; then hdiutil detach "$DEVICE" >/dev/null 2>&1 || true; fi
+  [ -n "${STAGE:-}" ] && rm -rf "$STAGE"
+  [ -n "${RWDIR:-}" ] && rm -rf "$RWDIR"
+}
+trap cleanup EXIT
+
 echo "==> Montando o DMG bonito (fundo + arraste-pra-Aplicativos)…"
 hdiutil detach "/Volumes/$VOLNAME" >/dev/null 2>&1 || true   # limpa um mount anterior, evita "Cardflow 1"
 STAGE="$(mktemp -d)"
-cp -R "$APP" "$STAGE/Cardflow.app"
+/bin/cp -Rf "$APP" "$STAGE/Cardflow.app"
 ln -s /Applications "$STAGE/Applications"   # o usuário só arrasta o ícone pra cá
 mkdir -p "$STAGE/.background"
 swift scripts/make-installer-bg.swift "$STAGE/.background/bg.png" mono >/dev/null   # gera o fundo @2x (seta azul mono)
@@ -57,20 +67,22 @@ end tell
 APPLESCRIPT
 sync
 hdiutil detach "$DEVICE" >/dev/null
+DEVICE=""
 hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG" >/dev/null
 rm -rf "$RWDIR"
+RWDIR=""
 echo "   $DMG"
 
 if [ "${SKIP_NOTARIZE:-0}" = "1" ]; then
-  echo "⚠️  SKIP_NOTARIZE=1 — DMG criado sem assinar/notarizar (só para teste local)."
+  echo "⚠️  SKIP_NOTARIZE=1: DMG criado sem assinar/notarizar (só para teste local)."
   exit 0
 fi
 
 IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep 'Developer ID Application' | head -1 | sed -E 's/.*"(.*)".*/\1/' || true)"
 if [ -z "$IDENTITY" ]; then
-  echo "⚠️  Sem certificado 'Developer ID Application' no Keychain — DMG criado mas NÃO assinado."
-  echo "    Para distribuir sem aviso do Gatekeeper: configure o certificado (docs/notarizacao.md) e rode de novo."
-  exit 0
+  echo "❌ Sem certificado 'Developer ID Application' no Keychain: DMG criado mas NÃO assinado."
+  echo "   Para distribuir sem aviso do Gatekeeper: configure o certificado (docs/notarizacao.md) ou use SKIP_NOTARIZE=1 para teste local."
+  exit 1
 fi
 
 echo "==> Assinando o DMG…"
