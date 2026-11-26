@@ -3,23 +3,22 @@
   <channel>
     <title>Cardflow</title>
     <item>
-      <title>1.0.2</title>
-      <sparkle:version>387</sparkle:version>
-      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+      <title>1.0.3</title>
+      <sparkle:version>394</sparkle:version>
+      <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <pubDate>Wed, 07 Oct 2026 04:18:27 +0000</pubDate>
-      <description><![CDATA[<h2>Cardflow 1.0.2</h2>
-<p>O fim da cópia agora fica claro, do começo ao fim, e o cartão acompanha o que muda nele.</p>
+      <pubDate>Thu, 26 Nov 2026 18:45:03 +0000</pubDate>
+      <description><![CDATA[<h2>Cardflow 1.0.3</h2>
+<p>Revisão focada em segurança na cópia e na formatação de cartões, estabilidade da interface e melhorias na linha de comando.</p>
 <ul>
-  <li>Nova seção &quot;Ao terminar&quot;, com Formatar e Ejetar lado a lado. Cada combinação tem um fim claro, e a barra de baixo diz numa frase o que vai acontecer.</li>
-  <li>Quando o cartão termina, a tela mostra cada etapa com a hora: copiado, conferido, formatado e ejetado. Ela fica à vista depois que o cartão sai, e o cartão aparece na lateral como &quot;Concluído&quot; até você fechar.</li>
-  <li>Formatar não faz mais a tela pular para um cartão vazio: o cartão formatado continua sendo o mesmo até ejetar.</li>
-  <li>A opção de ejetar ao terminar passa a valer também depois de formatar.</li>
-  <li>Arquivos novos ou apagados no cartão conectado aparecem sozinhos, sem fechar o app. O espaço livre dos discos também é recalculado.</li>
-  <li>A barra de baixo ficou com um botão só. &quot;Retomar conferindo tudo&quot; foi para o aviso de retomada.</li>
+  <li>Verificação real no destino sem cache do sistema operacional e manifestos isolados por disco quando você copia para Principal e Backup ao mesmo tempo.</li>
+  <li>Retomada de cópia mais confiável: confere se os arquivos ainda existem no destino e respeita a escolha de tipos e datas sem confundir contagens.</li>
+  <li>Proteção reforçada na formatação de cartões: validação estrita de partição única FAT32/exFAT, proteção contra troca de dispositivo e bloqueio de discos do sistema ou volumes APFS.</li>
+  <li>Interface mais fluida: leituras de espaço livre, relatórios e volumes saíram do fio principal; os campos personalizados do modelo voltam a aparecer no detalhe do cartão quando configurados.</li>
+  <li>Melhorias na linha de comando (<code>cardflow</code>): novas opções <code>--version</code>, <code>--project</code>, <code>--verify-all</code> e <code>--date</code>, progresso no terminal, reserva de espaço em disco interno e mensagens traduzidas.</li>
 </ul>
 ]]></description>
-      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v1.0.2/Cardflow.dmg" sparkle:edSignature="mbYALYr8YbdBCI1zPLwg86nVsIdVxQ7cwMKDAqRBrULAvHwN7lweA6M4fKbQ7np2j27Igr6cxcq15fO4W7PjCQ==" length="6757279" type="application/octet-stream" />
+      <enclosure url="https://github.com/grlessa/cardflow/releases/download/v1.0.3/Cardflow.dmg" sparkle:edSignature="oIMdaNNPl88mNCkrtd2wd3RTM1I18BhZRNXy0p684NfUcI2FXkozbf24XyiFVEBfTWxKXxdey813jheWTFhnCw==" length="6877553" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
